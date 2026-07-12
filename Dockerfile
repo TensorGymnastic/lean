@@ -1,15 +1,28 @@
 FROM python:3.12-slim
 
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    poppler-utils \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
-RUN pip install --no-cache-dir uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
-COPY pyproject.toml README.md Makefile ./
-COPY app ./app
-COPY tests ./tests
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev
 
-RUN uv sync --all-groups
+COPY src ./src
+COPY db ./db
+COPY supabase ./supabase
 
-EXPOSE 8000
+RUN uv sync --frozen --no-dev
 
-CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+EXPOSE 8765 8766
+
+CMD ["uv", "run", "python", "-m", "lean.mcp_server", "--transport", "http", "--host", "0.0.0.0", "--port", "8765"]

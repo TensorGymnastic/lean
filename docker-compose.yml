@@ -1,9 +1,29 @@
 services:
-  app:
-    build: .
-    env_file:
-      - .env.example
+  supabase-db:
+    image: supabase/postgres:15.6.1.143
     ports:
-      - "8000:8000"
+      - "54322:5432"
+    environment:
+      POSTGRES_PASSWORD: postgres
     volumes:
-      - .:/app
+      - supabase-db-data:/var/lib/postgresql/data
+      - ./db/schemas:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  lean-app:
+    build: .
+    ports:
+      - "8765:8765"
+      - "8766:8766"
+    env_file: .env
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  supabase-db-data:
