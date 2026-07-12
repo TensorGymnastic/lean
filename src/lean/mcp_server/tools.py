@@ -101,7 +101,7 @@ async def ingest_pdf(path: str) -> IngestResult:
         chunk_rows = [
             ChunkRow(
                 document_id=doc_id,
-                chunk_index=c.chunk_index,
+                chunk_index=global_idx,
                 section_path=c.section_path,
                 heading_text=c.heading_text,
                 page_start=None,
@@ -110,7 +110,7 @@ async def ingest_pdf(path: str) -> IngestResult:
                 content=c.content,
                 embedding=emb,
             )
-            for c, emb in zip(chunk_results, embeddings, strict=True)
+            for global_idx, (c, emb) in enumerate(zip(chunk_results, embeddings, strict=True))
         ]
         store.replace_chunks(doc_id, chunk_rows)
     finally:

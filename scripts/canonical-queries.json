@@ -1,0 +1,22 @@
+[
+  {
+    "query": "What is DMAIC?",
+    "expected_section_substring": ["DMAIC", "Define", "Measure"]
+  },
+  {
+    "query": "Explain kaizen",
+    "expected_section_substring": ["kaizen", "Kaizen", "continuous improvement"]
+  },
+  {
+    "query": "What is takt time?",
+    "expected_section_substring": ["takt", "Takt"]
+  },
+  {
+    "query": "Voice of the customer",
+    "expected_section_substring": ["voice of the customer", "VOC", "customer"]
+  },
+  {
+    "query": "How to use a control chart?",
+    "expected_section_substring": ["control chart", "SPC", "statistical process control"]
+  }
+]
