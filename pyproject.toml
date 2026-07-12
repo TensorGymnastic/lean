@@ -18,7 +18,7 @@ dependencies = [
     "pgvector>=0.3",
     "sentence-transformers>=3.0",
     "torch>=2.3",
-    "markitdown>=0.0.16",
+    "markitdown[pdf]>=0.0.16",
     "mistune>=3.0",
     "tiktoken>=0.7",
     "pymupdf>=1.24",
@@ -64,13 +64,18 @@ line-length = 100
 src = ["src", "tests"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM", "TCH"]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["TC001", "TC002", "TC003"]  # TYPE_CHECKING moves are noisy for eager-imported modules
 
 [tool.mypy]
 python_version = "3.12"
 strict = true
 plugins = ["pydantic.mypy"]
 packages = ["src/lean"]
+
+[[tool.mypy.overrides]]
+module = ["fitz", "markitdown"]
+ignore_missing_imports = true
 
 [tool.uv]
 package = true
