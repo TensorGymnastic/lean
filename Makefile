@@ -1,4 +1,6 @@
-.PHONY: install hooks-install format format-check lint typecheck test verify
+.PHONY: install hooks-install format format-check lint typecheck test verify \
+        db-init db-reset vllm-health ingest-all ingest-one search \
+        mcp-serve mcp-serve-http api-serve smoke build up down
 
 install:
 	uv sync --all-groups
@@ -22,3 +24,48 @@ test:
 	uv run python3 -m pytest
 
 verify: format-check lint typecheck test
+
+db-init:
+	psql "$(SUPABASE_DB_URL)" -f db/schemas/001_extensions.sql
+	psql "$(SUPABASE_DB_URL)" -f db/schemas/002_documents.sql
+	psql "$(SUPABASE_DB_URL)" -f db/schemas/003_chunks.sql
+	psql "$(SUPABASE_DB_URL)" -f supabase/seed.sql
+
+db-reset:
+	supabase db reset
+
+vllm-health:
+	@./scripts/smoke-vllm.sh
+
+ingest-all:
+	uv run python -m lean.cli ingest data/*.pdf
+
+ingest-one:
+	@test -n "$(FILE)" || (echo "Usage: make ingest-one FILE=path/to.pdf" && exit 1)
+	uv run python -m lean.cli ingest "$(FILE)"
+
+search:
+	@test -n "$(QUERY)" || (echo "Usage: make search QUERY='...'" && exit 1)
+	uv run python -m lean.cli search "$(QUERY)"
+
+mcp-serve:
+	uv run python -m lean.mcp_server --transport stdio
+
+mcp-serve-http:
+	uv run python -m lean.mcp_server --transport http --port 8765
+
+api-serve:
+	uv run uvicorn lean.api.routes:app --reload --port 8766
+
+smoke:
+	./scripts/smoke-vllm.sh
+	./scripts/smoke-pgvector.sh
+
+build:
+	docker compose build
+
+up:
+	docker compose up -d
+
+down:
+	docker compose down
