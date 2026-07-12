@@ -29,6 +29,7 @@ class LiquidLMFEmbedder:
         model: str = "LiquidAI/LFM2.5-Embedding-350M",
         hf_token: str | None = None,
         device: str = "cpu",
+        dim: int = 1024,
     ) -> None:
         if hf_token:
             os.environ["HF_TOKEN"] = hf_token
@@ -38,7 +39,7 @@ class LiquidLMFEmbedder:
             trust_remote_code=True,
             device=device,
         )
-        self._dim = 1024
+        self._dim = dim
 
     @property
     def dim(self) -> int:

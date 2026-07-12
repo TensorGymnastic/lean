@@ -20,7 +20,13 @@ from lean.chunker.markdown_ast import build_sections
 from lean.chunker.recursive import chunk_sections
 from lean.embeddings.liquid_lmf import LiquidLMFEmbedder
 from lean.extraction.pipeline import extract_pdf_markdown
-from lean.models.schemas import Chunk, CorpusStats, DocumentSummary, IngestResult
+from lean.models.schemas import (
+    Chunk,
+    CorpusStats,
+    DocumentSummary,
+    ExtractionMethod,
+    IngestResult,
+)
 from lean.settings import Settings
 from lean.store.pgvector import ChunkRow, PgVectorStore
 
@@ -38,6 +44,8 @@ def _get_embedder() -> LiquidLMFEmbedder:
         _embedder = LiquidLMFEmbedder(
             model=settings.embedding_model,
             hf_token=settings.hf_token,
+            device=settings.embedding_device,
+            dim=settings.embedding_dim,
         )
     return _embedder
 
@@ -63,20 +71,27 @@ async def ingest_pdf(path: str) -> IngestResult:
             pdf_path,
             vllm_base_url=settings.vllm_base_url,
             hf_token=settings.hf_token,
+            ocr_model=settings.ocr_model,
+            ocr_dpi=settings.ocr_dpi,
+            ocr_timeout_s=settings.ocr_timeout_s,
+            ocr_max_tokens=settings.ocr_max_tokens,
         )
     )
 
     warnings: list[str] = []
-    if method.value == "markitdown":
+    if method == ExtractionMethod.MARKITDOWN:
         warnings.append("vLLM unavailable, fell back to markitdown")
 
-    sections = await anyio.to_thread.run_sync(lambda: build_sections(markdown))
+    sections = await anyio.to_thread.run_sync(
+        lambda: build_sections(markdown, max_heading_level=settings.max_section_heading_level)
+    )
     chunk_results = await anyio.to_thread.run_sync(
         lambda: chunk_sections(
             sections,
             target_min=settings.chunk_target_min,
             target_max=settings.chunk_target_max,
             hard_cap=settings.chunk_hard_cap,
+            encoding=settings.token_counter_encoding,
         )
     )
 

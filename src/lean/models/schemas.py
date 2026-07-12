@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 from datetime import datetime  # noqa: TC003 (needed at runtime by Pydantic)
-from typing import Literal
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
-ExtractionMethod = Literal["unlimited_ocr", "markitdown"]
+
+class ExtractionMethod(StrEnum):
+    """Which extraction path produced this document's markdown."""
+
+    UNLIMITED_OCR = "unlimited_ocr"
+    MARKITDOWN = "markitdown"
 
 
 class DocumentSummary(BaseModel):

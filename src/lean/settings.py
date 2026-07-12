@@ -43,11 +43,28 @@ class Settings(BaseSettings):
     # --- Embeddings ---
     embedding_model: str = "LiquidAI/LFM2.5-Embedding-350M"
     embedding_dim: int = 1024
+    embedding_device: str = "cpu"
+
+    # --- OCR (Unlimited-OCR via vLLM) ---
+    ocr_model: str = "baidu/Unlimited-OCR"
+    ocr_dpi: int = 300
+    ocr_timeout_s: float = 600.0
+    ocr_max_tokens: int = 32768
 
     # --- Chunking (tokens) ---
     chunk_target_min: int = 350
     chunk_target_max: int = 450
     chunk_hard_cap: int = 500
+    max_section_heading_level: int = 4
+    token_counter_encoding: str = "cl100k_base"
+
+    # --- Retrieval ---
+    search_top_k: int = 5
+    min_similarity: float = 0.0
+    hybrid_search_enabled: bool = True
+    rerank_enabled: bool = False
+    rerank_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    rerank_top_n: int = 5
 
     # --- Storage buckets ---
     sources_bucket: str = "sources"

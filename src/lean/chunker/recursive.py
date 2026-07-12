@@ -14,7 +14,13 @@ import tiktoken
 
 from lean.chunker.markdown_ast import Section
 
-_ENC = tiktoken.get_encoding("cl100k_base")
+_ENCODINGS: dict[str, tiktoken.Encoding] = {}
+
+
+def _get_encoding(name: str = "cl100k_base") -> tiktoken.Encoding:
+    if name not in _ENCODINGS:
+        _ENCODINGS[name] = tiktoken.get_encoding(name)
+    return _ENCODINGS[name]
 
 
 @dataclass
@@ -34,12 +40,10 @@ def chunk_sections(
     target_min: int,
     target_max: int,
     hard_cap: int,
+    encoding: str = "cl100k_base",
 ) -> list[ChunkResult]:
-    """Split each section's content into token-bounded chunks.
-
-    Each section produces chunks with ``chunk_index`` starting at 0.
-    Sections shorter than ``target_min`` produce a single chunk.
-    """
+    """Split each section's content into token-bounded chunks."""
+    enc = _get_encoding(encoding)
     results: list[ChunkResult] = []
     for section in sections:
         chunks = _split_text(
@@ -47,6 +51,7 @@ def chunk_sections(
             target_min=target_min,
             target_max=target_max,
             hard_cap=hard_cap,
+            enc=enc,
         )
         for i, (content, token_count) in enumerate(chunks):
             results.append(
@@ -62,9 +67,16 @@ def chunk_sections(
 
 
 def _split_text(
-    text: str, *, target_min: int, target_max: int, hard_cap: int
+    text: str,
+    *,
+    target_min: int,
+    target_max: int,
+    hard_cap: int,
+    enc: tiktoken.Encoding | None = None,
 ) -> list[tuple[str, int]]:
     """Split text into chunks of approximately target_max tokens."""
+    if enc is None:
+        enc = _get_encoding()
     if not text.strip():
         return []
     paragraphs = text.split("\n\n")
@@ -73,20 +85,18 @@ def _split_text(
     current_tokens = 0
 
     for para in paragraphs:
-        para_tokens = _count_tokens(para)
+        para_tokens = len(enc.encode(para))
         if para_tokens > hard_cap:
-            # Flush current first
             if current:
                 joined = "\n\n".join(current)
-                chunks.append((joined, _count_tokens(joined)))
+                chunks.append((joined, len(enc.encode(joined))))
                 current = []
                 current_tokens = 0
-            # Split the big paragraph by sentence
-            for sentence_chunk in _split_by_sentences(para, target_max, hard_cap):
+            for sentence_chunk in _split_by_sentences(para, target_max, hard_cap, enc=enc):
                 chunks.append(sentence_chunk)
         elif current_tokens + para_tokens > target_max and current:
             joined = "\n\n".join(current)
-            chunks.append((joined, _count_tokens(joined)))
+            chunks.append((joined, len(enc.encode(joined))))
             current = [para]
             current_tokens = para_tokens
         else:
@@ -95,31 +105,37 @@ def _split_text(
 
     if current:
         joined = "\n\n".join(current)
-        chunks.append((joined, _count_tokens(joined)))
+        chunks.append((joined, len(enc.encode(joined))))
     return chunks
 
 
-def _split_by_sentences(text: str, target_max: int, hard_cap: int) -> list[tuple[str, int]]:
+def _split_by_sentences(
+    text: str,
+    target_max: int,
+    hard_cap: int,
+    *,
+    enc: tiktoken.Encoding | None = None,
+) -> list[tuple[str, int]]:
     """Split a too-long paragraph by sentence boundaries."""
+    if enc is None:
+        enc = _get_encoding()
     sentences = re.split(r"(?<=[.!?])\s+", text.strip())
     chunks: list[tuple[str, int]] = []
     current: list[str] = []
     current_tokens = 0
     for sent in sentences:
-        sent_tokens = _count_tokens(sent)
+        sent_tokens = len(enc.encode(sent))
         if sent_tokens > hard_cap:
-            # Flush current
             if current:
                 joined = " ".join(current)
-                chunks.append((joined, _count_tokens(joined)))
+                chunks.append((joined, len(enc.encode(joined))))
                 current = []
                 current_tokens = 0
-            # Last resort: split by words
-            for word_chunk in _split_by_words(sent, hard_cap):
+            for word_chunk in _split_by_words(sent, hard_cap, enc=enc):
                 chunks.append(word_chunk)
         elif current_tokens + sent_tokens > target_max and current:
             joined = " ".join(current)
-            chunks.append((joined, _count_tokens(joined)))
+            chunks.append((joined, len(enc.encode(joined))))
             current = [sent]
             current_tokens = sent_tokens
         else:
@@ -127,18 +143,25 @@ def _split_by_sentences(text: str, target_max: int, hard_cap: int) -> list[tuple
             current_tokens += sent_tokens
     if current:
         joined = " ".join(current)
-        chunks.append((joined, _count_tokens(joined)))
+        chunks.append((joined, len(enc.encode(joined))))
     return chunks
 
 
-def _split_by_words(text: str, hard_cap: int) -> list[tuple[str, int]]:
+def _split_by_words(
+    text: str,
+    hard_cap: int,
+    *,
+    enc: tiktoken.Encoding | None = None,
+) -> list[tuple[str, int]]:
     """Hard-split by words when sentences are too long."""
+    if enc is None:
+        enc = _get_encoding()
     words = text.split()
     chunks: list[tuple[str, int]] = []
     buf: list[str] = []
     buf_tokens = 0
     for w in words:
-        w_tokens = _count_tokens(w)
+        w_tokens = len(enc.encode(w))
         if buf_tokens + w_tokens > hard_cap:
             joined = " ".join(buf)
             chunks.append((joined, buf_tokens))
@@ -151,7 +174,3 @@ def _split_by_words(text: str, hard_cap: int) -> list[tuple[str, int]]:
         joined = " ".join(buf)
         chunks.append((joined, buf_tokens))
     return chunks
-
-
-def _count_tokens(text: str) -> int:
-    return len(_ENC.encode(text))

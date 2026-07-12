@@ -23,23 +23,14 @@ class Section:
     content: str = ""  # body content under this heading
 
 
-def build_sections(markdown: str) -> list[Section]:
-    """Parse markdown into sections by walking H1-H4 headers.
-
-    Each section's ``path`` is the join of its ancestor headings with ' > '.
-    ``content`` is the body text between this heading and the next heading
-    of any level.
-
-    Text before the first heading (if any) is attached to an implicit
-    section with path "Front Matter".
-    """
+def build_sections(markdown: str, *, max_heading_level: int = 4) -> list[Section]:
+    """Parse markdown into sections by walking H1-H{max_heading_level} headers."""
     ast_parser = mistune.create_markdown(renderer="ast", plugins=["speedup"])
-    # mistune 3.x parse() returns (tokens, state) tuple
     parsed = ast_parser.parse(markdown)
     tokens = parsed[0] if isinstance(parsed, tuple) else parsed
 
     sections: list[Section] = []
-    heading_stack: list[tuple[int, str]] = []  # [(level, text), ...]
+    heading_stack: list[tuple[int, str]] = []
     current_section: Section | None = None
     body_parts: list[str] = []
 
@@ -50,8 +41,7 @@ def build_sections(markdown: str) -> list[Section]:
 
         if token_type == "heading":
             level = token.get("attrs", {}).get("level", 1)
-            if level > 4:
-                # Treat H5+ as body content, not a section break
+            if level > max_heading_level:
                 text = _extract_text(token)
                 body_parts.append(text)
                 continue

@@ -9,7 +9,6 @@ so downstream code knows which path ran.
 from __future__ import annotations
 
 import logging
-from enum import StrEnum
 from pathlib import Path
 
 from lean.extraction.markitdown_fallback import (
@@ -21,15 +20,9 @@ from lean.extraction.unlimited_ocr import (
 from lean.extraction.unlimited_ocr import (
     extract_markdown as extract_ocr,
 )
+from lean.models.schemas import ExtractionMethod
 
 logger = logging.getLogger(__name__)
-
-
-class ExtractionMethod(StrEnum):
-    """Which extraction path produced this document's markdown."""
-
-    UNLIMITED_OCR = "unlimited_ocr"
-    MARKITDOWN = "markitdown"
 
 
 def extract_pdf_markdown(
@@ -37,17 +30,12 @@ def extract_pdf_markdown(
     *,
     vllm_base_url: str,
     hf_token: str | None,
+    ocr_model: str = "baidu/Unlimited-OCR",
+    ocr_dpi: int = 300,
+    ocr_timeout_s: float = 600.0,
+    ocr_max_tokens: int = 32768,
 ) -> tuple[str, int, ExtractionMethod]:
     """Extract markdown from a PDF, preferring Unlimited-OCR.
-
-    Args:
-        pdf_path: Path to the PDF file.
-        vllm_base_url: Base URL of the vLLM server.
-        hf_token: Optional HuggingFace token.
-
-    Returns:
-        Tuple of (markdown, page_count, method).
-        ``method`` indicates which extractor succeeded.
 
     The function never raises OCRBackendUnavailable — if vLLM fails,
     it logs a warning and falls back to markitdown.
@@ -57,6 +45,10 @@ def extract_pdf_markdown(
             pdf_path,
             vllm_base_url=vllm_base_url,
             hf_token=hf_token,
+            model=ocr_model,
+            dpi=ocr_dpi,
+            timeout=ocr_timeout_s,
+            max_tokens=ocr_max_tokens,
         )
         return markdown, page_count, ExtractionMethod.UNLIMITED_OCR
     except OCRBackendUnavailable as exc:

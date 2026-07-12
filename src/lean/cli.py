@@ -45,9 +45,13 @@ def search(
 @app.command()
 def mcp_serve(
     transport: str = typer.Option("stdio", help="stdio or http"),
-    port: int = typer.Option(8765, help="HTTP port"),
+    port: int = typer.Option(None, help="HTTP port (default: from settings)"),
 ) -> None:
     """Run the MCP server."""
+    from lean.settings import get_settings
+
+    if port is None:
+        port = get_settings().mcp_http_port
     sys.argv = ["lean-mcp", "--transport", transport, "--port", str(port)]
     from lean.mcp_server.__main__ import main
 

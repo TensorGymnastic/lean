@@ -18,8 +18,6 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-_MODEL = "baidu/Unlimited-OCR"
-
 
 class OCRBackendUnavailable(RuntimeError):
     """Raised when the remote vLLM backend is unreachable or returns an error."""
@@ -30,8 +28,10 @@ def extract_markdown(
     *,
     vllm_base_url: str,
     hf_token: str | None = None,
+    model: str = "baidu/Unlimited-OCR",
     dpi: int = 300,
     timeout: float = 600.0,
+    max_tokens: int = 32768,
 ) -> tuple[str, int]:
     """Extract markdown from a PDF via Unlimited-OCR served on vLLM.
 
@@ -43,8 +43,10 @@ def extract_markdown(
         pdf_path: Path to the PDF file.
         vllm_base_url: Base URL of the vLLM server (e.g. ``http://3080ti:8000``).
         hf_token: Optional HuggingFace token for the Authorization header.
+        model: vLLM model name to request.
         dpi: DPI for page rendering (300 is Unlimited-OCR's recommended default).
         timeout: HTTP timeout in seconds (large PDFs take time).
+        max_tokens: Max output tokens for the vLLM completion.
 
     Returns:
         Tuple of (markdown_text, page_count).
@@ -69,10 +71,10 @@ def extract_markdown(
         )
 
     payload = {
-        "model": _MODEL,
+        "model": model,
         "messages": [{"role": "user", "content": content_parts}],
         "temperature": 0,
-        "max_tokens": 32768,
+        "max_tokens": max_tokens,
         "stream": False,
     }
     headers = {"Content-Type": "application/json"}
