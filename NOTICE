@@ -1,0 +1,45 @@
+NOTICE — Third-party model and library licenses
+
+This project (lean) incorporates the following third-party models and libraries.
+Each is used under its respective license.
+
+## baidu/Unlimited-OCR
+
+- Source: https://huggingface.co/baidu/Unlimited-OCR
+- License: MIT
+- Use: PDF page image → structured markdown extraction (primary OCR path)
+- Model size: 3B params (BF16)
+- arXiv: 2606.23050
+
+## LiquidAI/LFM2.5-Embedding-350M
+
+- Source: https://huggingface.co/LiquidAI/LFM2.5-Embedding-350M
+- License: LFM Open License v1.0
+  (https://huggingface.co/LiquidAI/LFM2.5-Embedding-350M/blob/main/LICENSE)
+- Use: 1024-dim document/query embeddings for semantic search
+- Model size: 350M params (BF16)
+- Note: LFM Open License v1.0 includes commercial-use clauses.
+  Review the full license text before any commercial deployment.
+- arXiv: 2511.23404
+
+## Microsoft MarkItDown
+
+- Source: https://github.com/microsoft/markitdown
+- License: MIT
+- Use: PDF → markdown fallback when Unlimited-OCR (vLLM) is unavailable
+
+## fastmcp
+
+- Source: https://github.com/PrefectHQ/fastmcp
+- License: Apache-2.0
+- Use: Model Context Protocol server framework (Python)
+
+## Supabase / Postgres / pgvector
+
+- Supabase: Apache-2.0 (https://supabase.com)
+- Postgres: PostgreSQL License
+- pgvector: PostgreSQL License (https://github.com/pgvector/pgvector)
+
+---
+
+This project's own code is MIT licensed.
