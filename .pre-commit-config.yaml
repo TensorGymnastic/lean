@@ -1,0 +1,52 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-merge-conflict
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: mixed-line-ending
+      - id: detect-private-key
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.1
+    hooks:
+      - id: ruff
+        args: [--fix]
+        files: ".*\\.pyi?$"
+      - id: ruff-format
+        args: [--check]
+        files: ".*\\.pyi?$"
+
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        entry: make typecheck
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
+
+      - id: vulture
+        name: vulture
+        entry: make deadcode
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
+
+      - id: deptry
+        name: deptry
+        entry: make deptry
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
+
+      - id: pre-push-gates
+        name: pre-push gates
+        entry: make prepush
+        language: system
+        pass_filenames: false
+        stages: [pre-push]

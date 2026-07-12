@@ -1,0 +1,21 @@
+services:
+  app:
+    build: .
+    env_file:
+      - .env.example
+    environment:
+      AWS_ENDPOINT_URL: http://localstack:4566
+    depends_on:
+      - localstack
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+
+  localstack:
+    image: localstack/localstack:stable
+    environment:
+      LOCALSTACK_AUTH_TOKEN: ${LOCALSTACK_AUTH_TOKEN}
+      SERVICES: s3,ssm,secretsmanager
+    ports:
+      - "4566:4566"
