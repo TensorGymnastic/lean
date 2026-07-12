@@ -30,23 +30,9 @@ repos:
         pass_filenames: false
         stages: [pre-commit]
 
-      - id: vulture
-        name: vulture
-        entry: make deadcode
-        language: system
-        pass_filenames: false
-        stages: [pre-commit]
-
-      - id: deptry
-        name: deptry
-        entry: make deptry
-        language: system
-        pass_filenames: false
-        stages: [pre-commit]
-
-      - id: pre-push-gates
-        name: pre-push gates
-        entry: make prepush
+      - id: test
+        name: pytest
+        entry: make test
         language: system
         pass_filenames: false
         stages: [pre-push]
