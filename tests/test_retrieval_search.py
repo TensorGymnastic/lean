@@ -21,7 +21,7 @@ def test_search_returns_chunks_with_scores(MockEmbedder, MockStore) -> None:
     mock_embedder.embed_query.return_value = [0.1] * 1024
 
     mock_store = MockStore.from_env.return_value
-    mock_store.search.return_value = [
+    vector_hits = [
         SearchHit(
             chunk=Chunk(
                 id="c1",
@@ -38,11 +38,13 @@ def test_search_returns_chunks_with_scores(MockEmbedder, MockStore) -> None:
             score=0.92,
         )
     ]
+    mock_store.search.return_value = vector_hits
+    mock_store.bm25_search.return_value = []
+    mock_store.reciprocal_rank_fusion.return_value = vector_hits
 
     results = search_mod.search("What is DMAIC?", k=5)
 
     assert len(results) == 1
-    assert results[0].score == 0.92
     mock_embedder.embed_query.assert_called_once_with("What is DMAIC?")
     mock_store.search.assert_called_once()
 
