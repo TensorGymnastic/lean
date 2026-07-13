@@ -19,9 +19,9 @@ from fastmcp import FastMCP
 from lean.chunker.markdown_ast import build_sections
 from lean.chunker.recursive import chunk_sections
 from lean.config.settings import Settings
-from lean.embeddings.liquid_lmf import LiquidLMFEmbedder
 from lean.extraction.metadata import extract_metadata
 from lean.extraction.pipeline import extract_pdf_markdown
+from lean.infrastructure.embedder import get_embedder
 from lean.models.schemas import (
     Chunk,
     CorpusStats,
@@ -34,21 +34,6 @@ from lean.store.pgvector import ChunkRow, PgVectorStore
 logger = logging.getLogger(__name__)
 
 mcp = FastMCP("lean")
-
-_embedder: LiquidLMFEmbedder | None = None
-
-
-def _get_embedder() -> LiquidLMFEmbedder:
-    global _embedder
-    if _embedder is None:
-        settings = Settings()
-        _embedder = LiquidLMFEmbedder(
-            model=settings.embedding_model,
-            hf_token=settings.hf_token,
-            device=settings.embedding_device,
-            dim=settings.embedding_dim,
-        )
-    return _embedder
 
 
 @mcp.tool
@@ -96,7 +81,7 @@ async def ingest_pdf(path: str) -> IngestResult:
         )
     )
 
-    embedder = _get_embedder()
+    embedder = get_embedder()
     chunk_texts = [c.content for c in chunk_results]
     embeddings = await anyio.to_thread.run_sync(lambda: embedder.embed_documents(chunk_texts))
 

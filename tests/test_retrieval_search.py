@@ -6,15 +6,16 @@ from unittest.mock import patch
 
 
 @patch("lean.retrieval.search.PgVectorStore")
-@patch("lean.retrieval.search.LiquidLMFEmbedder")
+@patch("lean.infrastructure.embedder.LiquidLMFEmbedder")
 def test_search_returns_chunks_with_scores(MockEmbedder, MockStore) -> None:
     """search() embeds the query and returns pgvector results."""
+    from lean.infrastructure import embedder as embedder_mod
     from lean.models.schemas import Chunk
     from lean.retrieval import search as search_mod
     from lean.store.pgvector import SearchHit
 
     # Reset module-level singletons
-    search_mod._embedder = None  # noqa: SLF001
+    embedder_mod._embedder = None  # noqa: SLF001
     search_mod._store = None  # noqa: SLF001
 
     mock_embedder = MockEmbedder.return_value
@@ -49,5 +50,5 @@ def test_search_returns_chunks_with_scores(MockEmbedder, MockStore) -> None:
     mock_store.search.assert_called_once()
 
     # Cleanup
-    search_mod._embedder = None  # noqa: SLF001
+    embedder_mod._embedder = None  # noqa: SLF001
     search_mod._store = None  # noqa: SLF001

@@ -15,6 +15,7 @@ from dataclasses import dataclass
 
 from psycopg.rows import dict_row
 
+from lean.infrastructure.embedder import get_embedder
 from lean.store.pgvector import PgVectorStore, SearchHit
 
 
@@ -84,16 +85,7 @@ def evaluate(
     For each sample, embed the query, search top-k, check if the expected
     chunk appears in the results.
     """
-    from lean.config.settings import Settings
-    from lean.embeddings.liquid_lmf import LiquidLMFEmbedder
-
-    settings = Settings()
-    embedder = LiquidLMFEmbedder(
-        model=settings.embedding_model,
-        hf_token=settings.hf_token,
-        device=settings.embedding_device,
-        dim=settings.embedding_dim,
-    )
+    embedder = get_embedder()
 
     hits = 0
     reciprocal_ranks: list[float] = []

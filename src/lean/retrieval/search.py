@@ -7,27 +7,13 @@ import time
 from uuid import UUID
 
 from lean.config.settings import Settings
-from lean.embeddings.liquid_lmf import LiquidLMFEmbedder
+from lean.infrastructure.embedder import get_embedder
 from lean.models.schemas import Chunk
 from lean.store.pgvector import PgVectorStore
 
 logger = logging.getLogger(__name__)
 
-_embedder: LiquidLMFEmbedder | None = None
 _store: PgVectorStore | None = None
-
-
-def _get_embedder() -> LiquidLMFEmbedder:
-    global _embedder
-    if _embedder is None:
-        settings = Settings()
-        _embedder = LiquidLMFEmbedder(
-            model=settings.embedding_model,
-            hf_token=settings.hf_token,
-            device=settings.embedding_device,
-            dim=settings.embedding_dim,
-        )
-    return _embedder
 
 
 def _get_store() -> PgVectorStore:
@@ -51,7 +37,7 @@ def search(
 ) -> list[Chunk]:
     """Embed query → search (hybrid if enabled) → rerank (if enabled) → postprocess."""
     settings = Settings()
-    embedder = _get_embedder()
+    embedder = get_embedder()
     store = _get_store()
 
     start = time.monotonic()
