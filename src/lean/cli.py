@@ -188,5 +188,54 @@ def db_init() -> None:
     typer.echo("schema applied.")
 
 
+@app.command()
+def eval(
+    sample_size: int = typer.Option(50, help="Number of chunks to sample for eval"),
+    k: int = typer.Option(5, help="Top-k for hit_rate/MRR"),
+) -> None:
+    """Run retrieval evaluation (hit_rate@k, MRR@k)."""
+    import json
+    import os
+
+    from lean.eval.runner import build_eval_dataset, evaluate
+    from lean.settings import Settings
+    from lean.store.pgvector import PgVectorStore
+
+    db_url = os.environ.get("SUPABASE_DB_URL") or Settings().supabase_db_url
+    store = PgVectorStore(db_url)
+    try:
+        typer.echo(f"Building eval dataset ({sample_size} samples)...")
+        samples = build_eval_dataset(store, sample_size=sample_size)
+        typer.echo(f"Running evaluation (k={k})...")
+        result = evaluate(store, samples, k=k)
+
+        typer.echo(f"\nResults (n={result.sample_count}, k={result.k}):")
+        typer.echo(f"  hit_rate:     {result.hit_rate:.4f}")
+        typer.echo(f"  MRR:          {result.mrr:.4f}")
+        typer.echo(f"  mean_latency: {result.mean_latency_ms:.0f}ms")
+
+        config = {"sample_size": sample_size, "k": k}
+        with store._conn.cursor() as cur:
+            cur.execute(
+                """
+                insert into public.eval_runs
+                    (config, hit_rate, mrr, mean_latency_ms, sample_count, k)
+                values (%s::jsonb, %s, %s, %s, %s, %s)
+                """,
+                (
+                    json.dumps(config),
+                    result.hit_rate,
+                    result.mrr,
+                    int(result.mean_latency_ms),
+                    result.sample_count,
+                    result.k,
+                ),
+            )
+            store._conn.commit()
+        typer.echo("\nEval run saved to eval_runs table.")
+    finally:
+        store.close()
+
+
 if __name__ == "__main__":
     app()
