@@ -13,7 +13,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from lean.store.pgvector import SearchHit
+    from lean.store.search import SearchHit
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ def rerank(
     scored = sorted(zip(hits, scores, strict=True), key=lambda x: x[1], reverse=True)
 
     from lean.models.schemas import Chunk
-    from lean.store.pgvector import SearchHit as SH
+    from lean.store.search import SearchHit as SH
 
     result: list[SH] = []
     for hit, score in scored[:top_n]:

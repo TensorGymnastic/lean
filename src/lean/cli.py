@@ -1,4 +1,4 @@
-"""Typer CLI for lean: full parity with MCP tools."""
+"""Typer CLI for lean: full parity with MCP tools via direct service calls."""
 
 from __future__ import annotations
 
@@ -46,7 +46,7 @@ def ingest(
     json_output: bool = typer.Option(False, "--json"),
 ) -> None:
     """Ingest a PDF into the corpus."""
-    from lean.mcp_server.tools import ingest_pdf
+    from lean.services.ingestion import ingest_pdf
 
     result = asyncio.run(ingest_pdf(path))
     _output(result, json_output)
@@ -65,7 +65,7 @@ def search(
     json_output: bool = typer.Option(False, "--json"),
 ) -> None:
     """Semantic + hybrid search over the corpus."""
-    from lean.retrieval.search import search as _search
+    from lean.services.search import search as _search
 
     chunks = _search(
         query,
@@ -93,9 +93,9 @@ def list_documents(
     json_output: bool = typer.Option(False, "--json"),
 ) -> None:
     """List all documents in the corpus."""
-    from lean.mcp_server.tools import list_documents as _list
+    from lean.services.corpus import list_documents as _list
 
-    docs = asyncio.run(_list())
+    docs = _list()
     if json_output:
         _output(docs, True)
         return
@@ -109,9 +109,9 @@ def corpus_stats(
     json_output: bool = typer.Option(False, "--json"),
 ) -> None:
     """Show corpus statistics."""
-    from lean.mcp_server.tools import corpus_stats as _stats
+    from lean.services.corpus import corpus_stats as _stats
 
-    stats = asyncio.run(_stats())
+    stats = _stats()
     _output(stats, json_output)
 
 
@@ -121,9 +121,9 @@ def get_chunk(
     json_output: bool = typer.Option(False, "--json"),
 ) -> None:
     """Retrieve a single chunk by ID."""
-    from lean.mcp_server.tools import get_chunk as _get
+    from lean.services.corpus import get_chunk as _get
 
-    chunk = asyncio.run(_get(chunk_id))
+    chunk = _get(chunk_id)
     if chunk is None:
         typer.echo("Chunk not found.", err=True)
         raise typer.Exit(1)
@@ -133,25 +133,25 @@ def get_chunk(
 @app.command(name="get-markdown")
 def get_markdown(doc_id: str) -> None:
     """Get the extracted markdown for a document."""
-    from lean.mcp_server.tools import get_document_markdown as _md
+    from lean.services.corpus import get_document_markdown as _md
 
-    md = asyncio.run(_md(doc_id))
+    md = _md(doc_id)
     typer.echo(md)
 
 
 @app.command()
 def delete(doc_id: str) -> None:
     """Delete a document and all its chunks."""
-    from lean.mcp_server.tools import delete_document as _del
+    from lean.services.corpus import delete_document as _del
 
-    result = asyncio.run(_del(doc_id))
+    result = _del(doc_id)
     typer.echo(f"Deleted: {result}")
 
 
 @app.command()
 def reingest(doc_id: str) -> None:
     """Re-ingest a document (re-extract with current settings)."""
-    from lean.mcp_server.tools import reingest as _re
+    from lean.services.ingestion import reingest as _re
 
     result = asyncio.run(_re(doc_id))
     _output(result, False)
@@ -199,15 +199,15 @@ def eval(
 
     from lean.config.settings import Settings
     from lean.eval.runner import build_eval_dataset, evaluate
-    from lean.store.pgvector import PgVectorStore
+    from lean.store.base import StoreConnection
 
     db_url = os.environ.get("SUPABASE_DB_URL") or Settings().supabase_db_url
-    store = PgVectorStore(db_url)
+    conn = StoreConnection(db_url)
     try:
         typer.echo(f"Building eval dataset ({sample_size} samples)...")
-        samples = build_eval_dataset(store, sample_size=sample_size)
+        samples = build_eval_dataset(conn, sample_size=sample_size)
         typer.echo(f"Running evaluation (k={k})...")
-        result = evaluate(store, samples, k=k)
+        result = evaluate(conn, samples, k=k)
 
         typer.echo(f"\nResults (n={result.sample_count}, k={result.k}):")
         typer.echo(f"  hit_rate:     {result.hit_rate:.4f}")
@@ -215,7 +215,7 @@ def eval(
         typer.echo(f"  mean_latency: {result.mean_latency_ms:.0f}ms")
 
         config = {"sample_size": sample_size, "k": k}
-        with store._conn.cursor() as cur:
+        with conn.conn.cursor() as cur:
             cur.execute(
                 """
                 insert into public.eval_runs
@@ -231,10 +231,10 @@ def eval(
                     result.k,
                 ),
             )
-            store._conn.commit()
+            conn.conn.commit()
         typer.echo("\nEval run saved to eval_runs table.")
     finally:
-        store.close()
+        conn.close()
 
 
 if __name__ == "__main__":

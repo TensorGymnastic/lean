@@ -1,27 +1,30 @@
-"""Tests for retrieval search module."""
+"""Tests for the search service."""
 
 from __future__ import annotations
 
 from unittest.mock import patch
 
 
-@patch("lean.retrieval.search.PgVectorStore")
+@patch("lean.services.search.AnalyticsRepo")
+@patch("lean.services.search.SearchEngine")
+@patch("lean.services.search.StoreConnection")
 @patch("lean.infrastructure.embedder.LiquidLMFEmbedder")
-def test_search_returns_chunks_with_scores(MockEmbedder, MockStore) -> None:
-    """search() embeds the query and returns pgvector results."""
+def test_search_returns_chunks_with_scores(
+    MockEmbedder, MockStoreConn, MockSearchEngine, MockAnalytics
+) -> None:
+    """search() embeds the query and returns vector search results."""
     from lean.infrastructure import embedder as embedder_mod
     from lean.models.schemas import Chunk
-    from lean.retrieval import search as search_mod
-    from lean.store.pgvector import SearchHit
+    from lean.services import search as search_mod
+    from lean.store.search import SearchHit
 
-    # Reset module-level singletons
+    # Reset module-level singleton
     embedder_mod._embedder = None  # noqa: SLF001
-    search_mod._store = None  # noqa: SLF001
 
     mock_embedder = MockEmbedder.return_value
     mock_embedder.embed_query.return_value = [0.1] * 1024
 
-    mock_store = MockStore.from_env.return_value
+    mock_engine = MockSearchEngine.return_value
     vector_hits = [
         SearchHit(
             chunk=Chunk(
@@ -39,16 +42,15 @@ def test_search_returns_chunks_with_scores(MockEmbedder, MockStore) -> None:
             score=0.92,
         )
     ]
-    mock_store.search.return_value = vector_hits
-    mock_store.bm25_search.return_value = []
-    mock_store.reciprocal_rank_fusion.return_value = vector_hits
+    mock_engine.vector_search.return_value = vector_hits
+    mock_engine.bm25_search.return_value = []
+    mock_engine.reciprocal_rank_fusion.return_value = vector_hits
 
     results = search_mod.search("What is DMAIC?", k=5)
 
     assert len(results) == 1
     mock_embedder.embed_query.assert_called_once_with("What is DMAIC?")
-    mock_store.search.assert_called_once()
+    mock_engine.vector_search.assert_called_once()
 
     # Cleanup
     embedder_mod._embedder = None  # noqa: SLF001
-    search_mod._store = None  # noqa: SLF001

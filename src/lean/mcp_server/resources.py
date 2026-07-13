@@ -10,18 +10,22 @@ from lean.mcp_server.tools import mcp
 @mcp.resource("lean://documents")
 async def documents_resource() -> str:
     """List all documents in the corpus (JSON array)."""
-    from lean.mcp_server.tools import list_documents
+    import anyio
 
-    docs = await list_documents()
+    from lean.services.corpus import list_documents
+
+    docs = await anyio.to_thread.run_sync(list_documents)
     return json.dumps([d.model_dump(mode="json") for d in docs], indent=2)
 
 
 @mcp.resource("lean://documents/{doc_id}/markdown")
 async def markdown_resource(doc_id: str) -> str:
     """Full extracted markdown for a document."""
-    from lean.mcp_server.tools import get_document_markdown
+    import anyio
 
-    return await get_document_markdown(doc_id)
+    from lean.services.corpus import get_document_markdown
+
+    return await anyio.to_thread.run_sync(lambda: get_document_markdown(doc_id))
 
 
 @mcp.resource("lean://documents/{doc_id}/chunks")
@@ -31,11 +35,11 @@ async def chunks_resource(doc_id: str) -> str:
 
     from psycopg.rows import dict_row
 
-    from lean.store.pgvector import PgVectorStore
+    from lean.store.base import StoreConnection
 
-    store = PgVectorStore.from_env()
+    conn = StoreConnection.from_env()
     try:
-        with store._conn.cursor(row_factory=dict_row) as cur:  # noqa: SLF001
+        with conn.conn.cursor(row_factory=dict_row) as cur:
             cur.execute(
                 "select id, chunk_index, section_path, heading_text, "
                 "page_start, page_end, token_count "
@@ -44,7 +48,7 @@ async def chunks_resource(doc_id: str) -> str:
             )
             rows = cur.fetchall()
     finally:
-        store.close()
+        conn.close()
     return json.dumps(
         [
             {
@@ -65,7 +69,9 @@ async def chunks_resource(doc_id: str) -> str:
 @mcp.resource("lean://stats")
 async def stats_resource() -> str:
     """Corpus statistics (JSON)."""
-    from lean.mcp_server.tools import corpus_stats
+    import anyio
 
-    stats = await corpus_stats()
+    from lean.services.corpus import corpus_stats
+
+    stats = await anyio.to_thread.run_sync(corpus_stats)
     return stats.model_dump_json(indent=2)

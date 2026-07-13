@@ -1,9 +1,7 @@
 """Ingestion service: PDF → markdown → chunks → embeddings → pgvector.
 
-Full ingestion pipeline plus re-ingest by document id. Extracted from
-``mcp_server.tools.ingest_pdf`` / ``reingest`` so transports (MCP, REST,
-CLI) stay thin. Uses the focused store modules directly rather than the
-``PgVectorStore`` facade.
+Full ingestion pipeline plus re-ingest by document id. Uses the focused
+store modules (``DocumentRepo``, ``ChunkRepo``) directly.
 """
 
 from __future__ import annotations

@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from lean.store.pgvector import SearchHit
+    from lean.store.search import SearchHit
 
 
 def similarity_filter(hits: list[SearchHit], min_score: float) -> list[SearchHit]:

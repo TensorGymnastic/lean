@@ -1,7 +1,8 @@
 """FastAPI mirror of MCP tools for non-agent HTTP clients.
 
-Same handlers as the MCP tools, REST shape. Bearer token auth on all
-non-health endpoints. Serves on port 8766 when started via `make api-serve`.
+Thin delegates to the service layer — same handlers as the MCP tools,
+REST shape. Bearer token auth on all non-health endpoints.
+Serves on port 8766 when started via ``make api-serve``.
 """
 
 from __future__ import annotations
@@ -9,10 +10,15 @@ from __future__ import annotations
 import hmac
 from typing import Annotated, Any
 
+import anyio
 from fastapi import Depends, FastAPI, HTTPException, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from lean.config.settings import Settings
+from lean.services.corpus import corpus_stats as _corpus_stats
+from lean.services.corpus import list_documents as _list
+from lean.services.ingestion import ingest_pdf as _ingest
+from lean.services.search import search as _search
 
 app = FastAPI(title="lean", version="0.1.0", description="Lean Six Sigma MCP corpus API")
 _security = HTTPBearer(auto_error=False)
@@ -37,9 +43,7 @@ async def health() -> dict[str, str]:
 
 @app.get("/documents", dependencies=[Depends(_verify_token)])
 async def list_documents() -> list[dict[str, Any]]:
-    from lean.mcp_server.tools import list_documents
-
-    docs = await list_documents()
+    docs = await anyio.to_thread.run_sync(_list)
     return [d.model_dump(mode="json") for d in docs]
 
 
@@ -54,32 +58,28 @@ async def search(
     year_max: int | None = None,
     min_score: float | None = None,
 ) -> list[dict[str, Any]]:
-    from lean.mcp_server.tools import search as _search
-
-    chunks = await _search(
-        query,
-        k=k,
-        doc_id=doc_id,
-        section=section,
-        author=author,
-        year_min=year_min,
-        year_max=year_max,
-        min_score=min_score,
+    chunks = await anyio.to_thread.run_sync(
+        lambda: _search(
+            query,
+            k=k,
+            doc_id=doc_id,
+            section=section,
+            author=author,
+            year_min=year_min,
+            year_max=year_max,
+            min_score=min_score,
+        )
     )
     return [c.model_dump(mode="json") for c in chunks]
 
 
 @app.post("/ingest", dependencies=[Depends(_verify_token)])
 async def ingest(path: str) -> dict[str, Any]:
-    from lean.mcp_server.tools import ingest_pdf
-
-    result = await ingest_pdf(path)
+    result = await _ingest(path)
     return result.model_dump(mode="json")
 
 
 @app.get("/stats", dependencies=[Depends(_verify_token)])
 async def stats() -> dict[str, Any]:
-    from lean.mcp_server.tools import corpus_stats
-
-    result = await corpus_stats()
+    result = await anyio.to_thread.run_sync(_corpus_stats)
     return result.model_dump(mode="json")

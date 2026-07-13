@@ -6,7 +6,6 @@ Modules:
     chunks     — ``ChunkRepo`` + ``ChunkRow``: chunks table CRUD.
     search     — ``SearchEngine`` + ``SearchHit``: vector/BM25 search + RRF.
     analytics  — ``AnalyticsRepo``: query logging + corpus stats.
-    pgvector   — backward-compat facade (``PgVectorStore``); will be removed.
 """
 
 from __future__ import annotations

@@ -16,7 +16,8 @@ from dataclasses import dataclass
 from psycopg.rows import dict_row
 
 from lean.infrastructure.embedder import get_embedder
-from lean.store.pgvector import PgVectorStore, SearchHit
+from lean.store.base import StoreConnection
+from lean.store.search import SearchEngine, SearchHit
 
 
 @dataclass
@@ -39,7 +40,7 @@ class EvalResult:
 
 
 def build_eval_dataset(
-    store: PgVectorStore,
+    store: StoreConnection,
     *,
     sample_size: int = 50,
     seed: int = 42,
@@ -48,7 +49,7 @@ def build_eval_dataset(
 
     Uses heading_text + first 100 chars of content as the pseudo-query.
     """
-    with store._conn.cursor(row_factory=dict_row) as cur:
+    with store.conn.cursor(row_factory=dict_row) as cur:
         cur.execute(
             """
             select id, heading_text, content
@@ -75,7 +76,7 @@ def build_eval_dataset(
 
 
 def evaluate(
-    store: PgVectorStore,
+    store: StoreConnection,
     samples: list[EvalSample],
     *,
     k: int = 5,
@@ -86,6 +87,7 @@ def evaluate(
     chunk appears in the results.
     """
     embedder = get_embedder()
+    engine = SearchEngine(store)
 
     hits = 0
     reciprocal_ranks: list[float] = []
@@ -95,7 +97,7 @@ def evaluate(
         start = time.monotonic()
         query_vec = embedder.embed_query(sample.query)
 
-        results: list[SearchHit] = store.search(
+        results: list[SearchHit] = engine.vector_search(
             query_embedding=query_vec,
             k=k,
         )
