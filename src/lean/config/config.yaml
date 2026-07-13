@@ -1,0 +1,38 @@
+vllm:
+  base_url: http://localhost:8000
+
+embedding:
+  model: LiquidAI/LFM2.5-Embedding-350M
+  dim: 1024
+  device: cpu
+
+ocr:
+  model: baidu/Unlimited-OCR
+  dpi: 300
+  timeout_s: 600.0
+  max_tokens: 32768
+
+chunking:
+  target_min: 350
+  target_max: 450
+  hard_cap: 500
+  max_heading_level: 4
+  token_encoding: cl100k_base
+
+retrieval:
+  top_k: 5
+  min_similarity: 0.0
+  hybrid_search: true
+  rerank:
+    enabled: false
+    model: cross-encoder/ms-marco-MiniLM-L-6-v2
+    top_n: 5
+
+storage:
+  sources_bucket: sources
+  markdown_bucket: markdown
+
+transport:
+  mcp_host: 127.0.0.1
+  mcp_port: 8765
+  api_port: 8766

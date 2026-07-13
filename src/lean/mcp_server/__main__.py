@@ -6,8 +6,8 @@ import argparse
 import logging
 import sys
 
+from lean.config.settings import Settings
 from lean.mcp_server.tools import mcp
-from lean.settings import Settings
 
 
 def main() -> None:

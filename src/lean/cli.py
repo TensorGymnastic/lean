@@ -163,7 +163,7 @@ def mcp_serve(
     port: int = typer.Option(None, help="HTTP port (default: from settings)"),
 ) -> None:
     """Run the MCP server."""
-    from lean.settings import get_settings
+    from lean.config.settings import get_settings
 
     if port is None:
         port = get_settings().mcp_http_port
@@ -197,8 +197,8 @@ def eval(
     import json
     import os
 
+    from lean.config.settings import Settings
     from lean.eval.runner import build_eval_dataset, evaluate
-    from lean.settings import Settings
     from lean.store.pgvector import PgVectorStore
 
     db_url = os.environ.get("SUPABASE_DB_URL") or Settings().supabase_db_url

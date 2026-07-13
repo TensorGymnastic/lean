@@ -18,6 +18,7 @@ from fastmcp import FastMCP
 
 from lean.chunker.markdown_ast import build_sections
 from lean.chunker.recursive import chunk_sections
+from lean.config.settings import Settings
 from lean.embeddings.liquid_lmf import LiquidLMFEmbedder
 from lean.extraction.metadata import extract_metadata
 from lean.extraction.pipeline import extract_pdf_markdown
@@ -28,7 +29,6 @@ from lean.models.schemas import (
     ExtractionMethod,
     IngestResult,
 )
-from lean.settings import Settings
 from lean.store.pgvector import ChunkRow, PgVectorStore
 
 logger = logging.getLogger(__name__)

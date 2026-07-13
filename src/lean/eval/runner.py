@@ -84,8 +84,8 @@ def evaluate(
     For each sample, embed the query, search top-k, check if the expected
     chunk appears in the results.
     """
+    from lean.config.settings import Settings
     from lean.embeddings.liquid_lmf import LiquidLMFEmbedder
-    from lean.settings import Settings
 
     settings = Settings()
     embedder = LiquidLMFEmbedder(

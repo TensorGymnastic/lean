@@ -12,7 +12,7 @@ from typing import Annotated, Any
 from fastapi import Depends, FastAPI, HTTPException, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from lean.settings import Settings
+from lean.config.settings import Settings
 
 app = FastAPI(title="lean", version="0.1.0", description="Lean Six Sigma MCP corpus API")
 _security = HTTPBearer(auto_error=False)

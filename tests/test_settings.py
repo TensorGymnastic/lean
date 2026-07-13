@@ -1,4 +1,4 @@
-"""Tests for lean.settings."""
+"""Tests for lean.config.settings."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ def test_settings_from_env(monkeypatch) -> None:
     monkeypatch.setenv("VLLM_BASE_URL", "http://3080ti:8000")
     monkeypatch.setenv("LEAN_MCP_API_KEY", "test-api-key")
 
-    from lean.settings import Settings
+    from lean.config.settings import Settings
 
     settings = Settings()
 
@@ -42,7 +42,7 @@ def test_settings_defaults_for_optional_fields(monkeypatch) -> None:
     monkeypatch.setenv("LEAN_MCP_API_KEY", "apikey")
     # VLLM_BASE_URL not set — should use default
 
-    from lean.settings import Settings
+    from lean.config.settings import Settings
 
     settings = Settings()
     assert settings.vllm_base_url == "http://localhost:8000"
@@ -56,7 +56,7 @@ def test_get_settings_factory_returns_fresh_instance(monkeypatch) -> None:
     monkeypatch.setenv("HF_TOKEN", "token")
     monkeypatch.setenv("LEAN_MCP_API_KEY", "apikey")
 
-    from lean.settings import Settings, get_settings
+    from lean.config.settings import Settings, get_settings
 
     s1 = get_settings()
     s2 = get_settings()

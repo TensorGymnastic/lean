@@ -6,9 +6,9 @@ import logging
 import time
 from uuid import UUID
 
+from lean.config.settings import Settings
 from lean.embeddings.liquid_lmf import LiquidLMFEmbedder
 from lean.models.schemas import Chunk
-from lean.settings import Settings
 from lean.store.pgvector import PgVectorStore
 
 logger = logging.getLogger(__name__)
