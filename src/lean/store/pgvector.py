@@ -7,6 +7,7 @@ more efficient over a real DB connection.
 
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import dataclass
 from uuid import UUID  # noqa: TC003
@@ -163,40 +164,51 @@ class PgVectorStore:
         k: int = 5,
         doc_id: UUID | None = None,
         section_substring: str | None = None,
+        author: str | None = None,
+        year_min: int | None = None,
+        year_max: int | None = None,
+        min_score: float | None = None,
     ) -> list[SearchHit]:
-        """Cosine similarity search over chunks.
+        """Cosine similarity search over chunks with metadata filters."""
+        needs_join = author is not None or year_min is not None or year_max is not None
+        join_clause = " join public.documents d on d.id = c.document_id" if needs_join else ""
 
-        Filters:
-        - ``doc_id``: restrict to a specific document.
-        - ``section_substring``: case-insensitive substring match on section_path.
+        conditions = [
+            "(%s::uuid is null or c.document_id = %s)",
+            "(%s::text is null or c.section_path ilike '%%' || %s || '%%')",
+        ]
+        params: list[object] = [doc_id, doc_id, section_substring, section_substring]
 
-        Returns chunks sorted by cosine similarity (highest first).
-        Score is ``1 - cosine_distance`` (so 1.0 = identical, 0.0 = orthogonal).
-        """
-        query = """
+        if author is not None:
+            conditions.append(
+                "exists (select 1 from unnest(d.authors) a where a ilike '%%' || %s || '%%')"
+            )
+            params.append(author)
+        if year_min is not None:
+            conditions.append("d.year >= %s")
+            params.append(year_min)
+        if year_max is not None:
+            conditions.append("d.year <= %s")
+            params.append(year_max)
+        if min_score is not None:
+            conditions.append("1 - (c.embedding <=> %s::vector) >= %s")
+            params.extend([query_embedding, min_score])
+
+        where_clause = " and ".join(conditions)
+
+        query = f"""
             select c.id, c.document_id, c.chunk_index, c.section_path,
                    c.heading_text, c.page_start, c.page_end, c.token_count,
                    c.content,
                    1 - (c.embedding <=> %s::vector) as score
-            from public.chunks c
-            where (%s::uuid is null or c.document_id = %s)
-              and (%s::text is null or c.section_path ilike '%%' || %s || '%%')
+            from public.chunks c{join_clause}
+            where {where_clause}
             order by c.embedding <=> %s::vector
             limit %s
         """
+        params_final = [query_embedding] + params + [query_embedding, k]
         with self._conn.cursor(row_factory=dict_row) as cur:
-            cur.execute(
-                query,
-                (
-                    query_embedding,
-                    doc_id,
-                    doc_id,
-                    section_substring,
-                    section_substring,
-                    query_embedding,
-                    k,
-                ),
-            )
+            cur.execute(query, tuple(params_final))
             rows = cur.fetchall()
         return [
             SearchHit(
@@ -216,6 +228,37 @@ class PgVectorStore:
             )
             for r in rows
         ]
+
+    def log_query(
+        self,
+        *,
+        query_text: str,
+        k: int,
+        filters: dict[str, object],
+        hit_chunk_ids: list[UUID],
+        hit_scores: list[float],
+        latency_ms: int,
+        agent_id: str | None = None,
+    ) -> None:
+        """Persist a search query log entry for analytics and evaluation."""
+        with self._conn.cursor() as cur:
+            cur.execute(
+                """
+                insert into public.query_logs
+                    (query_text, k, filters, hit_chunk_ids, hit_scores, latency_ms, agent_id)
+                values (%s, %s, %s::jsonb, %s::uuid[], %s, %s, %s)
+                """,
+                (
+                    query_text,
+                    k,
+                    json.dumps(filters),
+                    hit_chunk_ids,
+                    hit_scores,
+                    latency_ms,
+                    agent_id,
+                ),
+            )
+            self._conn.commit()
 
     def get_chunk(self, chunk_id: UUID) -> Chunk | None:
         """Fetch a single chunk by ID. Returns None if not found."""

@@ -49,10 +49,23 @@ async def search(
     k: int = 5,
     doc_id: str | None = None,
     section: str | None = None,
+    author: str | None = None,
+    year_min: int | None = None,
+    year_max: int | None = None,
+    min_score: float | None = None,
 ) -> list[dict[str, Any]]:
     from lean.mcp_server.tools import search as _search
 
-    chunks = await _search(query, k=k, doc_id=doc_id, section=section)
+    chunks = await _search(
+        query,
+        k=k,
+        doc_id=doc_id,
+        section=section,
+        author=author,
+        year_min=year_min,
+        year_max=year_max,
+        min_score=min_score,
+    )
     return [c.model_dump(mode="json") for c in chunks]
 
 

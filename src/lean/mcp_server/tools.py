@@ -19,6 +19,7 @@ from fastmcp import FastMCP
 from lean.chunker.markdown_ast import build_sections
 from lean.chunker.recursive import chunk_sections
 from lean.embeddings.liquid_lmf import LiquidLMFEmbedder
+from lean.extraction.metadata import extract_metadata
 from lean.extraction.pipeline import extract_pdf_markdown
 from lean.models.schemas import (
     Chunk,
@@ -102,15 +103,20 @@ async def ingest_pdf(path: str) -> IngestResult:
     source_storage_path = f"sources/{source_sha256}.pdf"
     markdown_storage_path = f"markdown/{source_sha256}.md"
 
+    pdf_meta = await anyio.to_thread.run_sync(lambda: extract_metadata(pdf_path))
+
     store = PgVectorStore.from_env()
     try:
         doc_id = store.upsert_document(
             source_path=str(pdf_path),
             source_sha256=source_sha256,
-            title=pdf_path.stem,
+            title=pdf_meta.title or pdf_path.stem,
             extraction_method=method.value,
             source_storage_path=source_storage_path,
             markdown_storage_path=markdown_storage_path,
+            authors=pdf_meta.authors,
+            publisher=pdf_meta.publisher,
+            year=pdf_meta.year,
             page_count=page_count,
         )
         chunk_rows = [
@@ -149,16 +155,35 @@ async def search(
     k: int = 5,
     doc_id: str | None = None,
     section: str | None = None,
+    author: str | None = None,
+    year_min: int | None = None,
+    year_max: int | None = None,
+    min_score: float | None = None,
 ) -> list[Chunk]:
     """Semantic search over the Lean Six Sigma corpus.
 
-    Returns top-k chunks by cosine similarity. Filter by doc_id or
-    section substring (case-insensitive) to narrow results.
+    Returns top-k chunks by cosine similarity. All filter params are optional.
+
+    Filters:
+        doc_id: restrict to a specific document UUID.
+        section: case-insensitive substring on section_path.
+        author: substring match on document authors.
+        year_min / year_max: restrict by publication year range.
+        min_score: drop results below this cosine similarity threshold.
     """
     from lean.retrieval.search import search as _search_impl
 
     return await anyio.to_thread.run_sync(
-        lambda: _search_impl(query, k=k, doc_id=doc_id, section=section)
+        lambda: _search_impl(
+            query,
+            k=k,
+            doc_id=doc_id,
+            section=section,
+            author=author,
+            year_min=year_min,
+            year_max=year_max,
+            min_score=min_score,
+        )
     )
 
 
