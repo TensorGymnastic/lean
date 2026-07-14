@@ -14,6 +14,7 @@ from pathlib import Path
 from lean.extraction.markitdown_fallback import (
     extract_markdown as extract_markitdown,
 )
+from lean.extraction.ocr_postprocess import clean_ocr_output
 from lean.extraction.unlimited_ocr import (
     OCRBackendUnavailable,
 )
@@ -41,7 +42,7 @@ def extract_pdf_markdown(
     it logs a warning and falls back to markitdown.
     """
     try:
-        markdown, page_count = extract_ocr(
+        raw_markdown, page_count = extract_ocr(
             pdf_path,
             vllm_base_url=vllm_base_url,
             hf_token=hf_token,
@@ -50,6 +51,7 @@ def extract_pdf_markdown(
             timeout=ocr_timeout_s,
             max_tokens=ocr_max_tokens,
         )
+        markdown = clean_ocr_output(raw_markdown)
         return markdown, page_count, ExtractionMethod.UNLIMITED_OCR
     except OCRBackendUnavailable as exc:
         logger.warning("vLLM unavailable (%s); falling back to markitdown", exc)

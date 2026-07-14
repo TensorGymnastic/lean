@@ -44,6 +44,8 @@ class Settings(BaseSettings):
     embedding_model: str = _yaml.get("embedding", {}).get("model", "LiquidAI/LFM2.5-Embedding-350M")
     embedding_dim: int = _yaml.get("embedding", {}).get("dim", 1024)
     embedding_device: str = _yaml.get("embedding", {}).get("device", "cpu")
+    embedding_remote_url: str = _yaml.get("embedding", {}).get("remote_url", "")
+    embedding_remote_model: str = _yaml.get("embedding", {}).get("remote_model", "")
 
     ocr_model: str = _yaml.get("ocr", {}).get("model", "baidu/Unlimited-OCR")
     ocr_dpi: int = _yaml.get("ocr", {}).get("dpi", 300)
