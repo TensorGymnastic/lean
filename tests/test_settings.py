@@ -45,7 +45,7 @@ def test_settings_defaults_for_optional_fields(monkeypatch) -> None:
     from lean.config.settings import Settings
 
     settings = Settings()
-    assert settings.vllm_base_url == "http://localhost:8000"
+    assert settings.vllm_base_url  # non-empty: from config.yaml or env
 
 
 def test_get_settings_factory_returns_fresh_instance(monkeypatch) -> None:
