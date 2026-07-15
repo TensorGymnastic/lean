@@ -39,4 +39,6 @@ def clean_ocr_output(raw: str) -> str:
     text = _ORPHAN_NUM_RE.sub("", text)
     text = _TRAILING_SPACE_RE.sub("", text)
     text = _MULTI_NEWLINE_RE.sub("\n\n", text)
-    return text.strip()
+    paragraphs = [p.strip() for p in text.split("\n\n")]
+    paragraphs = [p for p in paragraphs if p and not p.isspace()]
+    return "\n\n".join(paragraphs)
