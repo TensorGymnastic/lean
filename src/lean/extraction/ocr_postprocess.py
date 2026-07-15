@@ -19,17 +19,24 @@ _REF_RE = re.compile(r"<\|ref\|>[^<]*<\|/ref\|>")
 _PAGE_RE = re.compile(r"</?PAGE>")
 _GROUNDING_RE = re.compile(r"<\|grounding\|>")
 _IMAGE_TOKEN_RE = re.compile(r"<image>")
+_NON_TEXT_RE = re.compile(r"\[Non-Text\]")
+# Leftover bounding-box fragments not captured inside <|det|> tags.
+_COORD_FRAGMENT_RE = re.compile(r"^\[\d+,\s*$", re.MULTILINE)
+_ORPHAN_NUM_RE = re.compile(r"^\d+\)\s*$", re.MULTILINE)
 _MULTI_NEWLINE_RE = re.compile(r"\n{3,}")
 _TRAILING_SPACE_RE = re.compile(r"[ \t]+$", re.MULTILINE)
 
 
 def clean_ocr_output(raw: str) -> str:
     """Strip Unlimited-OCR annotations and return clean markdown."""
-    text = _DET_RE.sub("", raw)
+    text = _DET_RE.sub("\n\n", raw)
     text = _REF_RE.sub("", text)
     text = _PAGE_RE.sub("", text)
     text = _GROUNDING_RE.sub("", text)
     text = _IMAGE_TOKEN_RE.sub("", text)
+    text = _NON_TEXT_RE.sub("", text)
+    text = _COORD_FRAGMENT_RE.sub("", text)
+    text = _ORPHAN_NUM_RE.sub("", text)
     text = _TRAILING_SPACE_RE.sub("", text)
     text = _MULTI_NEWLINE_RE.sub("\n\n", text)
     return text.strip()

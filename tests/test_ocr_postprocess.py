@@ -62,3 +62,32 @@ def test_full_ocr_output_sample() -> None:
 
 def test_empty_input() -> None:
     assert clean_ocr_output("") == ""
+
+
+def test_strips_non_text_entries() -> None:
+    raw = "Some text\n[Non-Text]\nMore text"
+    result = clean_ocr_output(raw)
+    assert "[Non-Text]" not in result
+    assert "Some text" in result
+    assert "More text" in result
+
+
+def test_det_inserts_paragraph_break() -> None:
+    raw = "First para<|det|>title [1, 2, 3, 4]<|/det|>Second para"
+    assert clean_ocr_output(raw) == "First para\n\nSecond para"
+
+
+def test_strips_coordinate_fragments() -> None:
+    raw = "Some text\n[255,\nMore text"
+    result = clean_ocr_output(raw)
+    assert "[255," not in result
+    assert "Some text" in result
+    assert "More text" in result
+
+
+def test_orphaned_numbers_removed() -> None:
+    raw = "Some text\n31985)\nMore text"
+    result = clean_ocr_output(raw)
+    assert "31985)" not in result
+    assert "Some text" in result
+    assert "More text" in result
