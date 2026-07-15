@@ -59,6 +59,7 @@ async def ingest_pdf(path: str) -> IngestResult:
             ocr_dpi=settings.ocr_dpi,
             ocr_timeout_s=settings.ocr_timeout_s,
             ocr_max_tokens=settings.ocr_max_tokens,
+            ocr_batch_size=settings.ocr_batch_size,
         )
     )
 

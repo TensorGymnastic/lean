@@ -51,6 +51,7 @@ class Settings(BaseSettings):
     ocr_dpi: int = _yaml.get("ocr", {}).get("dpi", 300)
     ocr_timeout_s: float = _yaml.get("ocr", {}).get("timeout_s", 600.0)
     ocr_max_tokens: int = _yaml.get("ocr", {}).get("max_tokens", 32768)
+    ocr_batch_size: int = _yaml.get("ocr", {}).get("batch_size", 20)
 
     chunk_target_min: int = _yaml.get("chunking", {}).get("target_min", 350)
     chunk_target_max: int = _yaml.get("chunking", {}).get("target_max", 450)

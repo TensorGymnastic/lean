@@ -35,12 +35,9 @@ def extract_pdf_markdown(
     ocr_dpi: int = 300,
     ocr_timeout_s: float = 600.0,
     ocr_max_tokens: int = 32768,
+    ocr_batch_size: int = 20,
 ) -> tuple[str, int, ExtractionMethod]:
-    """Extract markdown from a PDF, preferring Unlimited-OCR.
-
-    The function never raises OCRBackendUnavailable — if vLLM fails,
-    it logs a warning and falls back to markitdown.
-    """
+    """Extract markdown from a PDF, preferring Unlimited-OCR."""
     try:
         raw_markdown, page_count = extract_ocr(
             pdf_path,
@@ -50,6 +47,7 @@ def extract_pdf_markdown(
             dpi=ocr_dpi,
             timeout=ocr_timeout_s,
             max_tokens=ocr_max_tokens,
+            batch_size=ocr_batch_size,
         )
         markdown = clean_ocr_output(raw_markdown)
         return markdown, page_count, ExtractionMethod.UNLIMITED_OCR

@@ -13,6 +13,7 @@ ocr:
   dpi: 300
   timeout_s: 1800.0
   max_tokens: 32768
+  batch_size: 20
 
 chunking:
   target_min: 350
