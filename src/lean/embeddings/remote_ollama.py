@@ -8,7 +8,6 @@ bottleneck and CUDA driver incompatibility.
 from __future__ import annotations
 
 import logging
-from concurrent.futures import ThreadPoolExecutor
 
 import httpx
 
@@ -38,26 +37,36 @@ class RemoteOllamaEmbedder:
         return self._dim
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
-        """Embed multiple passages using the Ollama API (parallel)."""
+        """Embed multiple passages using the Ollama API (sequential to avoid 500s)."""
         if not texts:
             return []
-        with ThreadPoolExecutor(max_workers=min(8, len(texts))) as pool:
-            results = list(pool.map(self._embed_one, texts))
-        return results
+        return [self._embed_one(t) for t in texts]
 
     def embed_query(self, query: str) -> list[float]:
         """Embed a single query."""
         return self._embed_one(query)
 
     def _embed_one(self, text: str) -> list[float]:
-        resp = self._client.post(
-            f"{self._base_url}/api/embeddings",
-            json={"model": self._model, "prompt": text},
-        )
+        import time
+
+        for attempt in range(3):
+            resp = self._client.post(
+                f"{self._base_url}/api/embeddings",
+                json={"model": self._model, "prompt": text},
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                embedding: list[float] = data["embedding"]
+                return embedding
+            logger.warning(
+                "Ollama embedding attempt %d failed: %d %s",
+                attempt + 1,
+                resp.status_code,
+                resp.text[:200],
+            )
+            time.sleep(1.0)
         resp.raise_for_status()
-        data = resp.json()
-        embedding: list[float] = data["embedding"]
-        return embedding
+        return []  # unreachable
 
     def close(self) -> None:
         self._client.close()

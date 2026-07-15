@@ -11,8 +11,8 @@ from lean.embeddings.remote_ollama import RemoteOllamaEmbedder
 def test_embed_query_calls_ollama_api(MockClient: MagicMock) -> None:
     mock_client = MockClient.return_value
     mock_resp = MagicMock()
+    mock_resp.status_code = 200
     mock_resp.json.return_value = {"embedding": [0.1, 0.2, 0.3]}
-    mock_resp.raise_for_status = MagicMock()
     mock_client.post.return_value = mock_resp
 
     embedder = RemoteOllamaEmbedder(
@@ -31,11 +31,11 @@ def test_embed_query_calls_ollama_api(MockClient: MagicMock) -> None:
 
 
 @patch("lean.embeddings.remote_ollama.httpx.Client")
-def test_embed_documents_parallel(MockClient: MagicMock) -> None:
+def test_embed_documents_sequential(MockClient: MagicMock) -> None:
     mock_client = MockClient.return_value
     mock_resp = MagicMock()
+    mock_resp.status_code = 200
     mock_resp.json.return_value = {"embedding": [0.5]}
-    mock_resp.raise_for_status = MagicMock()
     mock_client.post.return_value = mock_resp
 
     embedder = RemoteOllamaEmbedder(
