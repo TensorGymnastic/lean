@@ -20,10 +20,28 @@ services:
       - "8765:8765"
       - "8766:8766"
     env_file: .env
+    environment:
+      # Override config.yaml defaults for docker deployment
+      VLLM_BASE_URL: ${VLLM_BASE_URL:-http://192.168.2.37:8000}
+    volumes:
+      - ./src/lean/config/config.yaml:/app/src/lean/config/config.yaml:ro
+      - ./data:/app/data:ro
     depends_on:
       supabase-db:
         condition: service_healthy
     restart: unless-stopped
+
+  # External services (not managed by this compose file):
+  #
+  # ocr-serve — baidu/Unlimited-OCR via transformers
+  #   Host: ${GPU_SERVER_IP}:8000
+  #   Setup: see README → "Remote GPU server setup"
+  #   Systemd: ssh ${GPU_SERVER_IP} 'systemctl status ocr-serve'
+  #
+  # ollama — LFM2.5-Embedding-350M (32K context)
+  #   Host: ${GPU_SERVER_IP}:11434
+  #   Model: lfm2.5-embed-32k
+  #   Systemd: ssh ${GPU_SERVER_IP} 'systemctl status ollama'
 
 volumes:
   supabase-db-data:
