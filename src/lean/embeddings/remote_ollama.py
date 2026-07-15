@@ -52,7 +52,11 @@ class RemoteOllamaEmbedder:
         for attempt in range(3):
             resp = self._client.post(
                 f"{self._base_url}/api/embeddings",
-                json={"model": self._model, "prompt": text},
+                json={
+                    "model": self._model,
+                    "prompt": text[:8000],
+                    "options": {"num_ctx": 8192},
+                },
             )
             if resp.status_code == 200:
                 data = resp.json()
