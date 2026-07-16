@@ -1,6 +1,6 @@
 """Markitdown-based PDF → markdown extraction (fallback path).
 
-Used when Unlimited-OCR (vLLM) is unavailable. Microsoft MarkItDown
+Used when the Unlimited-OCR server is unavailable. Microsoft MarkItDown
 provides lightweight PDF-to-markdown via PDFMiner under the hood.
 Lower fidelity than vision-based OCR but no GPU required.
 """

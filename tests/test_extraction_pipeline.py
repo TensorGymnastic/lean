@@ -18,7 +18,7 @@ def _write_minimal_pdf(path: Path) -> None:
 
 
 def test_pipeline_uses_ocr_when_available(tmp_path: Path) -> None:
-    """When vLLM is available, pipeline uses Unlimited-OCR."""
+    """When OCR server is available, pipeline uses Unlimited-OCR."""
     pdf_path = tmp_path / "test.pdf"
     _write_minimal_pdf(pdf_path)
 
@@ -36,7 +36,7 @@ def test_pipeline_uses_ocr_when_available(tmp_path: Path) -> None:
 
         markdown, page_count, method = extract_pdf_markdown(
             pdf_path,
-            vllm_base_url="http://fake:8000",
+            ocr_base_url="http://fake:8000",
             hf_token="x",
         )
 
@@ -45,7 +45,7 @@ def test_pipeline_uses_ocr_when_available(tmp_path: Path) -> None:
 
 
 def test_pipeline_falls_back_when_ocr_unavailable(tmp_path: Path) -> None:
-    """When vLLM is down, pipeline falls back to markitdown."""
+    """When OCR server is down, pipeline falls back to markitdown."""
     from lean.extraction.unlimited_ocr import OCRBackendUnavailable
 
     pdf_path = tmp_path / "test.pdf"
@@ -54,7 +54,7 @@ def test_pipeline_falls_back_when_ocr_unavailable(tmp_path: Path) -> None:
     with (
         patch(
             "lean.extraction.pipeline.extract_ocr",
-            side_effect=OCRBackendUnavailable("vLLM down"),
+            side_effect=OCRBackendUnavailable("OCR server down"),
         ),
         patch(
             "lean.extraction.pipeline.extract_markitdown",
@@ -65,7 +65,7 @@ def test_pipeline_falls_back_when_ocr_unavailable(tmp_path: Path) -> None:
 
         markdown, page_count, method = extract_pdf_markdown(
             pdf_path,
-            vllm_base_url="http://fake:8000",
+            ocr_base_url="http://fake:8000",
             hf_token="x",
         )
 

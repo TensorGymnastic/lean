@@ -1,8 +1,8 @@
-"""Unlimited-OCR client via vLLM OpenAI-compatible HTTP API.
+"""Unlimited-OCR client via an OpenAI-compatible HTTP API.
 
-Calls a remote vLLM server serving ``baidu/Unlimited-OCR`` with PDF page
-images. Raises ``OCRBackendUnavailable`` when vLLM is unreachable so the
-pipeline orchestrator can fall back to markitdown.
+Calls a remote server serving ``baidu/Unlimited-OCR`` with PDF page
+images. Raises ``OCRBackendUnavailable`` when the server is unreachable so
+the pipeline orchestrator can fall back to markitdown.
 """
 
 from __future__ import annotations
@@ -20,13 +20,13 @@ logger = logging.getLogger(__name__)
 
 
 class OCRBackendUnavailable(RuntimeError):
-    """Raised when the remote vLLM backend is unreachable or returns an error."""
+    """Raised when the remote OCR backend is unreachable or returns an error."""
 
 
 def extract_markdown(
     pdf_path: Path,
     *,
-    vllm_base_url: str,
+    ocr_base_url: str,
     hf_token: str | None = None,
     model: str = "baidu/Unlimited-OCR",
     dpi: int = 300,
@@ -44,7 +44,7 @@ def extract_markdown(
 
     page_images = _pdf_to_base64_images(pdf_path, dpi=dpi)
     page_count = len(page_images)
-    logger.info("OCR: %d pages, batch_size=%d, server=%s", page_count, batch_size, vllm_base_url)
+    logger.info("OCR: %d pages, batch_size=%d, server=%s", page_count, batch_size, ocr_base_url)
 
     headers = {"Content-Type": "application/json"}
     if hf_token:
@@ -88,7 +88,7 @@ def extract_markdown(
                 }
 
                 resp = client.post(
-                    f"{vllm_base_url.rstrip('/')}/v1/chat/completions",
+                    f"{ocr_base_url.rstrip('/')}/v1/chat/completions",
                     json=payload,
                     headers=headers,
                 )
@@ -104,7 +104,7 @@ def extract_markdown(
                     len(batch_markdown),
                 )
     except (httpx.ConnectError, httpx.HTTPStatusError, httpx.ReadTimeout) as exc:
-        raise OCRBackendUnavailable(f"vLLM call failed: {exc}") from exc
+        raise OCRBackendUnavailable(f"OCR server call failed: {exc}") from exc
 
     markdown = "\n\n".join(markdown_parts)
     logger.info("OCR complete: %d pages → %d chars", page_count, len(markdown))

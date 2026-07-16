@@ -9,7 +9,7 @@ def test_settings_from_env(monkeypatch) -> None:
     monkeypatch.setenv("SUPABASE_SERVICE_KEY", "test-service-key")
     monkeypatch.setenv("SUPABASE_DB_URL", "postgresql://postgres:postgres@localhost:54322/postgres")
     monkeypatch.setenv("HF_TOKEN", "test-hf-token")
-    monkeypatch.setenv("VLLM_BASE_URL", "http://3080ti:8000")
+    monkeypatch.setenv("OCR_BASE_URL", "http://3080ti:8000")
     monkeypatch.setenv("LEAN_MCP_API_KEY", "test-api-key")
 
     from lean.config.settings import Settings
@@ -20,7 +20,7 @@ def test_settings_from_env(monkeypatch) -> None:
     assert settings.supabase_service_key == "test-service-key"
     assert settings.supabase_db_url == "postgresql://postgres:postgres@localhost:54322/postgres"
     assert settings.hf_token == "test-hf-token"
-    assert settings.vllm_base_url == "http://3080ti:8000"
+    assert settings.ocr_base_url == "http://3080ti:8000"
     assert settings.lean_mcp_api_key == "test-api-key"
     assert settings.embedding_model == "LiquidAI/LFM2.5-Embedding-350M"
     assert settings.embedding_dim == 1024
@@ -40,12 +40,12 @@ def test_settings_defaults_for_optional_fields(monkeypatch) -> None:
     monkeypatch.setenv("SUPABASE_DB_URL", "postgresql://localhost/postgres")
     monkeypatch.setenv("HF_TOKEN", "token")
     monkeypatch.setenv("LEAN_MCP_API_KEY", "apikey")
-    # VLLM_BASE_URL not set — should use default
+    # OCR_BASE_URL not set — should use default from config.yaml or empty
 
     from lean.config.settings import Settings
 
     settings = Settings()
-    assert settings.vllm_base_url  # non-empty: from config.yaml or env
+    assert settings.ocr_base_url is not None
 
 
 def test_get_settings_factory_returns_fresh_instance(monkeypatch) -> None:

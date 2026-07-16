@@ -1,5 +1,5 @@
 .PHONY: install hooks-install format format-check lint typecheck test verify \
-        db-init db-reset vllm-health ingest-all ingest-one search \
+        db-init db-reset ocr-health ingest-all ingest-one search \
         mcp-serve mcp-serve-http api-serve smoke build up down
 
 install:
@@ -26,16 +26,17 @@ test:
 verify: format-check lint typecheck test
 
 db-init:
-	psql "$(SUPABASE_DB_URL)" -f db/schemas/001_extensions.sql
-	psql "$(SUPABASE_DB_URL)" -f db/schemas/002_documents.sql
-	psql "$(SUPABASE_DB_URL)" -f db/schemas/003_chunks.sql
-	psql "$(SUPABASE_DB_URL)" -f supabase/seed.sql
+	for f in db/schemas/*.sql; do \
+		echo "applying $$f..."; \
+		psql "$(SUPABASE_DB_URL)" -f "$$f"; \
+	done
+	@echo "schema applied."
 
 db-reset:
 	supabase db reset
 
-vllm-health:
-	@./scripts/smoke-vllm.sh
+ocr-health:
+	@./scripts/smoke-ocr.sh
 
 ingest-all:
 	uv run python -m lean.cli ingest data/*.pdf
@@ -58,7 +59,7 @@ api-serve:
 	uv run uvicorn lean.api.routes:app --reload --port 8766
 
 smoke:
-	./scripts/smoke-vllm.sh
+	./scripts/smoke-ocr.sh
 	./scripts/smoke-pgvector.sh
 
 build:

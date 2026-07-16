@@ -52,6 +52,35 @@ class AnalyticsRepo:
             )
             self._conn.conn.commit()
 
+    def save_eval_run(
+        self,
+        *,
+        config: dict[str, object],
+        hit_rate: float,
+        mrr: float,
+        mean_latency_ms: int,
+        sample_count: int,
+        k: int,
+    ) -> None:
+        """Persist a retrieval evaluation run for trending."""
+        with self._conn.conn.cursor() as cur:
+            cur.execute(
+                """
+                insert into public.eval_runs
+                    (config, hit_rate, mrr, mean_latency_ms, sample_count, k)
+                values (%s::jsonb, %s, %s, %s, %s, %s)
+                """,
+                (
+                    json.dumps(config),
+                    hit_rate,
+                    mrr,
+                    mean_latency_ms,
+                    sample_count,
+                    k,
+                ),
+            )
+            self._conn.conn.commit()
+
     def count_documents(self) -> int:
         with self._conn.conn.cursor() as cur:
             cur.execute("select count(*) from public.documents")

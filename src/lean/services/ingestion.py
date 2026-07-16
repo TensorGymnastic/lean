@@ -33,7 +33,7 @@ async def ingest_pdf(path: str) -> IngestResult:
 
     Steps:
         1. SHA-256 the source PDF (dedup key).
-        2. Extract markdown via Unlimited-OCR (vLLM) or markitdown fallback.
+        2. Extract markdown via Unlimited-OCR (remote server) or markitdown fallback.
         3. Build section AST and split into token-bounded chunks.
         4. Embed all chunks with the singleton LiquidLMF embedder.
         5. Extract PDF metadata (title, authors, publisher, year).
@@ -53,7 +53,7 @@ async def ingest_pdf(path: str) -> IngestResult:
     markdown, page_count, method = await anyio.to_thread.run_sync(
         lambda: extract_pdf_markdown(
             pdf_path,
-            vllm_base_url=settings.vllm_base_url,
+            ocr_base_url=settings.ocr_base_url,
             hf_token=settings.hf_token,
             ocr_model=settings.ocr_model,
             ocr_dpi=settings.ocr_dpi,
@@ -65,7 +65,7 @@ async def ingest_pdf(path: str) -> IngestResult:
 
     warnings: list[str] = []
     if method == ExtractionMethod.MARKITDOWN:
-        warnings.append("vLLM unavailable, fell back to markitdown")
+        warnings.append("OCR server unavailable, fell back to markitdown")
 
     sections = await anyio.to_thread.run_sync(
         lambda: build_sections(markdown, max_heading_level=settings.max_section_heading_level)

@@ -11,20 +11,22 @@ Supabase pgvector, and exposes the corpus via fastmcp tools/resources/prompts.
 
 ## Architecture
 
-- `src/lean/settings.py` — pydantic-settings, all env-driven config
+- `src/lean/config/settings.py` — pydantic-settings: `.env` (secrets) + `config.yaml` (app config)
 - `src/lean/models/schemas.py` — Pydantic types shared across modules
-- `src/lean/extraction/` — PDF→markdown (markitdown fallback, Unlimited-OCR via vLLM, pipeline orchestrator)
+- `src/lean/extraction/` — PDF→markdown (Unlimited-OCR remote server, markitdown fallback, pipeline orchestrator)
 - `src/lean/chunker/` — markdown AST section parser (mistune) + recursive token splitter (tiktoken)
-- `src/lean/embeddings/liquid_lmf.py` — sentence-transformers wrapper for LFM2.5-Embedding-350M
-- `src/lean/store/pgvector.py` — direct Postgres+pgvector CRUD and cosine search
-- `src/lean/retrieval/search.py` — embed query → pgvector top-k
+- `src/lean/embeddings/` — `liquid_lmf.py` (local CPU) + `remote_ollama.py` (remote GPU)
+- `src/lean/infrastructure/embedder.py` — singleton factory: remote Ollama when configured, else local CPU
+- `src/lean/store/` — focused repos: `base`, `documents`, `chunks`, `search`, `analytics`
+- `src/lean/retrieval/` — cross-encoder reranker + postprocessors
+- `src/lean/services/` — business logic: `ingestion`, `search`, `corpus`
 - `src/lean/mcp_server/` — 8 tools, 4 resources, 3 prompts, stdio/http entrypoint
 - `src/lean/api/routes.py` — FastAPI mirror (bearer-authed REST)
 - `src/lean/auth/bearer.py` — ASGI middleware for bearer token auth
-- `src/lean/cli.py` — Typer CLI (ingest, search, mcp-serve, db-init)
-- `db/schemas/` — SQL migrations (extensions, documents, chunks)
-- `supabase/` — Supabase CLI config + seed (storage buckets)
-- `scripts/` — smoke checks, 3080 Ti setup guide
+- `src/lean/cli.py` — Typer CLI (full parity with MCP tools)
+- `src/lean/eval/` — retrieval evaluation harness (hit_rate@k, MRR@k)
+- `db/schemas/` — SQL migrations (001-006)
+- `scripts/` — reingest-all, smoke checks, GPU server setup
 
 ## Engineering Rules
 
@@ -41,15 +43,12 @@ Supabase pgvector, and exposes the corpus via fastmcp tools/resources/prompts.
 - `make verify` — ruff + mypy + pytest (unit only, excludes integration/slow/e2e)
 - `make verify-all` — all tests
 - Integration tests need `SUPABASE_DB_URL` env var set
-- E2E tests need full stack running (Supabase + vLLM)
+- E2E tests need full stack running (Supabase + OCR server + models)
 
 ## Key Decisions
 
-See `docs/superpowers/specs/2026-07-12-lean-mcp-pipeline-design.md` §9 for the
-full decision log. Critical ones:
-
-- Unlimited-OCR primary (vLLM on remote 3080 Ti), markitdown fallback
-- LiquidAI/LFM2.5-Embedding-350M (1024-dim, asymmetric prompts)
-- Local Supabase via CLI (zero cloud cost)
+- Unlimited-OCR primary (remote transformers server, NOT vLLM), markitdown fallback
+- LiquidAI/LFM2.5-Embedding-350M (1024-dim), remote Ollama when configured, local CPU fallback
+- Local Supabase via Docker (zero cloud cost)
 - fastmcp v3.4.4 standalone
 - Bearer token auth on HTTP transport; stdio is local-trusted

@@ -1,14 +1,12 @@
-vllm:
-  base_url: http://192.168.2.37:8000
-
 embedding:
   model: LiquidAI/LFM2.5-Embedding-350M
   dim: 1024
   device: cpu
-  remote_url: http://192.168.2.37:11434
+  remote_url: ""          # set to http://<gpu-host>:11434 to use remote Ollama
   remote_model: lfm2.5-embed-32k
 
 ocr:
+  base_url: ""            # set to http://<gpu-host>:8000 to use Unlimited-OCR
   model: baidu/Unlimited-OCR
   dpi: 300
   timeout_s: 1800.0

@@ -1,81 +1,192 @@
 # lean
 
-Dockerized MCP server for Lean Six Sigma PDF corpus ingestion and retrieval.
+An MCP server for ingesting Lean Six Sigma PDFs into a searchable knowledge base.
+Uses vision-based OCR for high-quality extraction, section-aware chunking,
+GPU-accelerated embeddings, and hybrid BM25 + vector search via pgvector.
 
-## What it does
+## Features
 
-Ingests PDFs into a queryable knowledge base and exposes it to AI agents over
-the Model Context Protocol (MCP). Pipeline: PDF → Unlimited-OCR → markdown →
-section-aware chunks → Liquid LMF embeddings → Supabase pgvector → hybrid search.
+- **Vision-based PDF extraction** — `baidu/Unlimited-OCR` via a remote GPU server, with `markitdown` fallback when the OCR server is unavailable
+- **Section-aware chunking** — mistune AST parser splits markdown by headings, then a recursive tiktoken-based splitter bounds chunks to a target token window
+- **GPU-accelerated embeddings** — LiquidAI/LFM2.5-Embedding-350M (1024-dim) served via Ollama on the GPU server, with automatic local CPU fallback
+- **Hybrid search** — BM25 full-text (PostgreSQL tsvector) fused with pgvector cosine similarity via Reciprocal Rank Fusion (RRF)
+- **MCP server** — 8 tools, 4 resources, 3 prompts exposed over stdio or HTTP (FastAPI REST mirror included)
+- **Retrieval evaluation** — built-in `lean eval` command computing hit_rate@k and MRR@k, with results persisted for trending
+- **Thin transport layers** — CLI, MCP server, and REST API are all thin delegates to a shared services layer; no business logic in the transport tier
 
-## Architecture
+## Tech Stack
 
-| Service | Location | Purpose |
-|---|---|---|
-| `supabase-db` | Local docker | Postgres 15 + pgvector, port 54322 |
-| `lean-app` | Local | fastmcp server (stdio/http:8765) + FastAPI mirror (8766) |
-| `ocr-serve` | Remote 3080 Ti (:8000) | `baidu/Unlimited-OCR` via transformers (batched, 20 pages/request) |
-| `ollama` | Remote 3080 Ti (:11434) | LFM2.5-Embedding-350M (32K context) for GPU-accelerated embeddings |
+| Layer | Technology |
+|---|---|
+| MCP | fastmcp v3.4.4 |
+| OCR | `baidu/Unlimited-OCR` via transformers (remote GPU) |
+| Embeddings | LiquidAI/LFM2.5-Embedding-350M via Ollama (remote GPU) |
+| Search | pgvector cosine + PostgreSQL tsvector BM25 + RRF fusion |
+| Storage | Supabase (Postgres 15 + pgvector) via Docker |
+| Framework | Python 3.12+, uv-managed, strict mypy + ruff |
 
-### Retrieval pipeline
+## Prerequisites
 
-```
-Query → embed (remote Ollama) → hybrid search (BM25 tsvector + pgvector cosine)
-      → RRF fusion → similarity cutoff → long-context reorder → top-k results
-```
+- **Python 3.12+** with [uv](https://docs.astral.sh/uv/)
+- **Docker** (for local Supabase)
+- **Remote GPU server** (NVIDIA, 12GB+ VRAM) running:
+  - OCR server: `baidu/Unlimited-OCR` served via transformers on port 8000
+  - Ollama: `lfm2.5-embed-32k` model (LFM2.5-Embedding-350M, 32K context) on port 11434
 
-### Ingestion pipeline
+> The OCR and embedding servers are optional — `lean` falls back to markitdown extraction and local CPU embeddings when they are not configured.
 
-```
-PDF → render pages (fitz, DPI=300) → batch 20 pages → OCR server →
-      clean annotations → section-aware chunk (mistune + tiktoken) →
-      embed (remote Ollama) → pgvector upsert
-```
-
-## Quick start
-
-### 1. Prerequisites
-
-- Python 3.12+, uv-managed
-- Docker (for Supabase local)
-- Remote GPU server with:
-  - `baidu/Unlimited-OCR` served via transformers on port 8000
-  - Ollama with `lfm2.5-embed-32k` model on port 11434
-
-### 2. Setup
+## Installation
 
 ```bash
+git clone <repo-url> && cd lean
+
+# 1. Install dependencies
 uv sync --all-groups
+
+# 2. Install git hooks
 make hooks-install
-cp .env.example .env  # edit: Supabase keys, HF token, MCP API key
+
+# 3. Configure secrets
+cp .env.example .env
+# Edit .env: set SUPABASE keys, HF_TOKEN, LEAN_MCP_API_KEY
+
+# 4. Configure remote servers (optional — edit if using remote GPU)
+#    Edit src/lean/config/config.yaml:
+#      ocr.base_url: http://<gpu-host>:8000
+#      embedding.remote_url: http://<gpu-host>:11434
+
+# 5. Start local database
+docker compose up -d supabase-db
+
+# 6. Apply database migrations
+make db-init
+
+# 7. Ingest PDFs
+uv run lean ingest data/*.pdf
+# Or: make ingest-all
 ```
 
-### 3. Configure remote servers
+### Remote GPU Server Setup
 
-Edit `src/lean/config/config.yaml`:
-
-```yaml
-vllm:
-  base_url: http://<gpu-server-ip>:8000    # OCR server
-
-embedding:
-  remote_url: http://<gpu-server-ip>:11434  # Ollama
-  remote_model: lfm2.5-embed-32k            # 32K context model
-```
-
-### 4. Start
+See `docs/ocr-server-deployment.md` for the full guide. Summary:
 
 ```bash
-supabase start
-make db-init          # apply migrations (001-006)
-make ingest-all       # ingest data/*.pdf
-make search QUERY="What is DMAIC?"
-make mcp-serve        # start MCP server
+# OCR server (Unlimited-OCR via transformers)
+# On the GPU server — requires no_repeat_ngram_size=3 in model.infer_multi()
+mkdir -p ~/ocr-serve && cd ~/ocr-serve
+uv init && uv add "transformers>=4.57.1,<5" torch accelerate PyMuPDF \
+  fastapi uvicorn pillow torchvision addict matplotlib easydict einops
+uv run python -c "from huggingface_hub import snapshot_download; snapshot_download('baidu/Unlimited-OCR')"
+# Create server.py — see docs/ocr-server-deployment.md
+sudo systemd-run uv run python server.py  # serves on :8000
+
+# Ollama (LFM2.5 embeddings with 32K context)
+ollama create lfm2.5-embed-32k -f - << 'EOF'
+FROM hf.co/LiquidAI/LFM2.5-Embedding-350M-GGUF:Q8_0
+PARAMETER num_ctx 32768
+EOF
 ```
 
-### 5. Connect MCP client
+## File and Folder Structure
 
-Add to `~/.config/opencode/opencode.json` (or Claude Desktop config):
+```
+lean/
+├── src/lean/
+│   ├── config/
+│   │   ├── settings.py          # pydantic-settings: .env (secrets) + config.yaml (app config)
+│   │   └── config.yaml          # app config (OCR/embedding URLs, chunk sizes, search params)
+│   ├── infrastructure/
+│   │   └── embedder.py          # singleton factory: remote Ollama when configured, else local CPU
+│   ├── services/                # business logic (thin transport delegates here)
+│   │   ├── ingestion.py         # PDF → extract → chunk → embed → store
+│   │   ├── search.py            # hybrid BM25 + vector search with RRF fusion
+│   │   └── corpus.py            # list, get, delete, stats
+│   ├── store/                   # focused Postgres repositories
+│   │   ├── base.py              # StoreConnection wrapper
+│   │   ├── documents.py         # DocumentRepo (CRUD)
+│   │   ├── chunks.py            # ChunkRepo (upsert + replace)
+│   │   ├── search.py            # SearchEngine (vector + hybrid)
+│   │   └── analytics.py         # AnalyticsRepo (query logs, eval runs, corpus stats)
+│   ├── extraction/              # PDF → markdown
+│   │   ├── unlimited_ocr.py     # OCR client (batched, OpenAI-compatible API)
+│   │   ├── ocr_postprocess.py   # annotation stripper + empty paragraph filter
+│   │   ├── markitdown_fallback.py
+│   │   ├── metadata.py          # PDF metadata extraction (title, authors, year)
+│   │   └── pipeline.py          # orchestrator: OCR → fallback
+│   ├── chunker/                 # markdown → token-bounded chunks
+│   │   ├── markdown_ast.py      # mistune section parser
+│   │   └── recursive.py         # tiktoken recursive splitter
+│   ├── embeddings/
+│   │   ├── liquid_lmf.py        # local CPU embedder (sentence-transformers)
+│   │   └── remote_ollama.py     # remote Ollama embedder (GPU)
+│   ├── retrieval/
+│   │   ├── reranker.py          # cross-encoder reranker (optional)
+│   │   └── postprocessors.py    # similarity cutoff, long-context reorder
+│   ├── eval/
+│   │   └── runner.py            # hit_rate@k, MRR@k harness
+│   ├── mcp_server/              # MCP transport (8 tools, 4 resources, 3 prompts)
+│   ├── api/                     # FastAPI REST mirror (bearer-authed)
+│   ├── auth/bearer.py           # ASGI bearer token middleware
+│   ├── models/schemas.py        # shared Pydantic types
+│   └── cli.py                   # Typer CLI (full parity with MCP tools)
+├── db/schemas/                  # SQL migrations (001-006)
+├── scripts/                     # reingest-all, smoke checks, GPU setup
+├── docker-compose.yml           # Supabase DB + lean-app
+├── Makefile                     # dev commands
+└── pyproject.toml               # uv project config
+```
+
+## Commands
+
+### CLI (`lean`)
+
+All commands support `--json` for structured output.
+
+| Command | Description |
+|---|---|
+| `lean ingest <path>` | Ingest a PDF into the corpus |
+| `lean search "<query>"` | Semantic + hybrid search (`--k`, `--doc-id`, `--section`, `--author`, `--year-min`, `--year-max`, `--min-score`) |
+| `lean list-documents` | List all documents in the corpus |
+| `lean corpus-stats` | Show document/chunk counts and extraction breakdown |
+| `lean get-chunk <chunk_id>` | Retrieve a single chunk by UUID |
+| `lean get-markdown <doc_id>` | Get extracted markdown for a document |
+| `lean delete <doc_id>` | Delete a document and all its chunks |
+| `lean reingest <doc_id>` | Re-extract a document with current settings |
+| `lean eval` | Run retrieval evaluation (`--sample-size`, `--k`) |
+| `lean mcp-serve` | Start the MCP server (`--transport stdio\|http`, `--port`) |
+| `lean db-init` | Apply all SQL migrations to the database |
+
+### Makefile
+
+| Target | Description |
+|---|---|
+| `make verify` | ruff check + mypy + pytest (unit only) |
+| `make verify-all` | all tests including integration |
+| `make format` / `make lint` / `make typecheck` | individual checks |
+| `make db-init` | apply all SQL migrations |
+| `make ingest-all` | ingest all `data/*.pdf` |
+| `make search QUERY="..."` | search from the command line |
+| `make mcp-serve` | start MCP server (stdio) |
+| `make api-serve` | start FastAPI REST mirror (port 8766) |
+| `make smoke` | health checks: OCR server + pgvector |
+| `make ocr-health` | OCR server health check only |
+| `make build` / `make up` / `make down` | Docker lifecycle |
+
+### Scripts
+
+| Script | Description |
+|---|---|
+| `scripts/reingest-all.sh [--force]` | Reingest all documents (smallest first, skips OCR'd unless `--force`) |
+| `scripts/smoke-ocr.sh` | OCR server health check |
+| `scripts/smoke-pgvector.sh` | pgvector extension check |
+
+> GPU server setup is documented in `docs/ocr-server-deployment.md`.
+
+## Usage
+
+### MCP Client (Claude Desktop, opencode, etc.)
+
+Add to your MCP client config:
 
 ```json
 {
@@ -88,36 +199,6 @@ Add to `~/.config/opencode/opencode.json` (or Claude Desktop config):
 }
 ```
 
-## Remote GPU server setup
-
-### OCR server (Unlimited-OCR via transformers)
-
-```bash
-# On the GPU server:
-mkdir -p ~/ocr-serve && cd ~/ocr-serve
-uv init && uv add "transformers>=4.57.1,<5" torch accelerate PyMuPDF \
-  fastapi uvicorn pillow torchvision addict matplotlib easydict einops
-
-# Download model weights
-uv run python -c "from huggingface_hub import snapshot_download; \
-  snapshot_download('baidu/Unlimited-OCR')"
-
-# Create server.py (see scripts/setup-3080ti.sh for template)
-sudo systemd-run uv run python server.py  # serves on :8000
-```
-
-### Ollama (LFM2.5 embeddings with 32K context)
-
-```bash
-# On the GPU server:
-ollama create lfm2.5-embed-32k -f - << 'EOF'
-FROM hf.co/LiquidAI/LFM2.5-Embedding-350M-GGUF:Q8_0
-PARAMETER num_ctx 32768
-EOF
-```
-
-## MCP surface
-
 **8 tools:** `ingest_pdf`, `search`, `get_chunk`, `list_documents`,
 `get_document_markdown`, `delete_document`, `reingest`, `corpus_stats`
 
@@ -129,69 +210,80 @@ EOF
 
 **3 prompts:** `lean_qa`, `lean_glossary`, `lean_compare_concepts`
 
-## CLI
+### REST API
 
 ```bash
-lean ingest <path>              # ingest a PDF
-lean search "<query>" --k 5     # hybrid search
-lean list-documents             # list corpus
-lean corpus-stats               # stats
-lean eval --sample-size 50      # retrieval eval (hit_rate, MRR)
-lean reingest <doc_id>          # re-extract with current settings
-lean delete <doc_id>            # remove a document
-lean mcp-serve                  # start MCP server
-lean db-init                    # apply SQL migrations
+# Start the API server
+make api-serve   # http://localhost:8766
+
+# Search (bearer-authed)
+curl -H "Authorization: Bearer $LEAN_MCP_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"query": "What is DMAIC?", "k": 5}' \
+     http://localhost:8766/search
 ```
 
-All commands support `--json` for structured output.
-
-## Development
+### CLI Quick Start
 
 ```bash
-make verify      # ruff + mypy + pytest (unit only)
-make verify-all  # all tests including integration
-make format      # ruff format
-make lint        # ruff check
+# Ingest a PDF
+lean ingest "data/My Lean Six Sigma Book.pdf"
+
+# Search the corpus
+lean search "What is DMAIC?" --k 5
+
+# Check corpus stats
+lean corpus-stats
+
+# Reingest everything with OCR
+./scripts/reingest-all.sh
+
+# Evaluate retrieval quality
+lean eval --sample-size 50 --k 5
 ```
 
-## Project structure
+## Configuration
+
+Secrets go in `.env`, app config goes in `src/lean/config/config.yaml`. Environment variables override YAML values.
+
+### `.env` (secrets — not committed)
 
 ```
-src/lean/
-  config/           .env (secrets) + config.yaml (app config)
-  infrastructure/   Singleton factories (embedder)
-  services/         Business logic (ingestion, search, corpus)
-  store/            Focused repos (base, documents, chunks, search, analytics)
-  extraction/       PDF→markdown (OCR, markitdown, metadata, post-process)
-  chunker/          Section parser + recursive token splitter
-  embeddings/       LiquidLMF + remote Ollama
-  retrieval/        Cross-encoder reranker + postprocessors
-  eval/             hit_rate/MRR harness
-  mcp_server/       Thin MCP tool delegates
-  api/              Thin REST delegates
-  cli.py            Thin CLI delegates
+SUPABASE_URL=http://127.0.0.1:54321
+SUPABASE_SERVICE_KEY=<your-key>
+SUPABASE_DB_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres
+HF_TOKEN=<your-token>
+LEAN_MCP_API_KEY=<your-key>
 ```
 
-## Database migrations
+### `config.yaml` (app config — committed, override URLs for your setup)
+
+```yaml
+ocr:
+  base_url: http://<gpu-host>:8000    # empty = markitdown only
+embedding:
+  remote_url: http://<gpu-host>:11434  # empty = local CPU
+  remote_model: lfm2.5-embed-32k
+chunking:
+  target_min: 350
+  target_max: 450
+  hard_cap: 500
+retrieval:
+  top_k: 5
+  hybrid_search: true
+```
+
+## Database Migrations
 
 | # | File | Purpose |
 |---|---|---|
-| 001 | extensions.sql | vector, uuid-ossp, pg_trgm |
-| 002 | documents.sql | documents table |
-| 003 | chunks.sql | chunks + ivfflat + trigram |
-| 004 | query_logs.sql | search analytics |
-| 005 | tsvector.sql | BM25 full-text index |
-| 006 | eval_runs.sql | eval metrics tracking |
-
-## Tech stack
-
-- **MCP:** fastmcp v3.4.4
-- **OCR:** baidu/Unlimited-OCR (transformers-based, batched 20p/request)
-- **Embeddings:** LiquidAI/LFM2.5-Embedding-350M (1024-dim, via Ollama GPU)
-- **Search:** pgvector cosine + PostgreSQL tsvector BM25 + RRF fusion
-- **Storage:** Supabase (Postgres 15 + pgvector)
-- **Python:** 3.12, uv-managed, strict mypy
+| 001 | `extensions.sql` | vector, uuid-ossp, pg_trgm |
+| 002 | `documents.sql` | documents table |
+| 003 | `chunks.sql` | chunks + ivfflat index + trigram |
+| 004 | `query_logs.sql` | search query analytics |
+| 005 | `tsvector.sql` | BM25 full-text GIN index |
+| 006 | `eval_runs.sql` | eval metrics tracking |
 
 ## License
 
-MIT for project code. See `NOTICE` for third-party model licenses.
+MIT for project code. See model licenses for third-party weights (`baidu/Unlimited-OCR`, `LiquidAI/LFM2.5-Embedding-350M`).

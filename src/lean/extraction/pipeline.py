@@ -1,9 +1,9 @@
 """Orchestrator: try Unlimited-OCR, fall back to markitdown.
 
-The pipeline tries vLLM first (best quality for tables, formulas, layout).
-If vLLM is unreachable or errors, it falls back to markitdown (lighter
-but no vision understanding). The chosen method is recorded on the document
-so downstream code knows which path ran.
+The pipeline tries the OCR server first (best quality for tables, formulas,
+layout). If it is unreachable or errors, it falls back to markitdown
+(lighter but no vision understanding). The chosen method is recorded on the
+document so downstream code knows which path ran.
 """
 
 from __future__ import annotations
@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 def extract_pdf_markdown(
     pdf_path: Path,
     *,
-    vllm_base_url: str,
+    ocr_base_url: str,
     hf_token: str | None,
     ocr_model: str = "baidu/Unlimited-OCR",
     ocr_dpi: int = 300,
@@ -41,7 +41,7 @@ def extract_pdf_markdown(
     try:
         raw_markdown, page_count = extract_ocr(
             pdf_path,
-            vllm_base_url=vllm_base_url,
+            ocr_base_url=ocr_base_url,
             hf_token=hf_token,
             model=ocr_model,
             dpi=ocr_dpi,
@@ -52,6 +52,6 @@ def extract_pdf_markdown(
         markdown = clean_ocr_output(raw_markdown)
         return markdown, page_count, ExtractionMethod.UNLIMITED_OCR
     except OCRBackendUnavailable as exc:
-        logger.warning("vLLM unavailable (%s); falling back to markitdown", exc)
+        logger.warning("OCR server unavailable (%s); falling back to markitdown", exc)
         markdown, page_count = extract_markitdown(pdf_path)
         return markdown, page_count, ExtractionMethod.MARKITDOWN

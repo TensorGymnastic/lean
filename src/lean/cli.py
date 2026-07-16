@@ -131,30 +131,45 @@ def get_chunk(
 
 
 @app.command(name="get-markdown")
-def get_markdown(doc_id: str) -> None:
+def get_markdown(
+    doc_id: str,
+    json_output: bool = typer.Option(False, "--json"),
+) -> None:
     """Get the extracted markdown for a document."""
     from lean.services.corpus import get_document_markdown as _md
 
     md = _md(doc_id)
-    typer.echo(md)
+    if json_output:
+        typer.echo(json.dumps({"doc_id": doc_id, "markdown": md}, indent=2))
+    else:
+        typer.echo(md)
 
 
 @app.command()
-def delete(doc_id: str) -> None:
+def delete(
+    doc_id: str,
+    json_output: bool = typer.Option(False, "--json"),
+) -> None:
     """Delete a document and all its chunks."""
     from lean.services.corpus import delete_document as _del
 
     result = _del(doc_id)
-    typer.echo(f"Deleted: {result}")
+    if json_output:
+        typer.echo(json.dumps({"deleted": result}, indent=2))
+    else:
+        typer.echo(f"Deleted: {result}")
 
 
 @app.command()
-def reingest(doc_id: str) -> None:
+def reingest(
+    doc_id: str,
+    json_output: bool = typer.Option(False, "--json"),
+) -> None:
     """Re-ingest a document (re-extract with current settings)."""
     from lean.services.ingestion import reingest as _re
 
     result = asyncio.run(_re(doc_id))
-    _output(result, False)
+    _output(result, json_output)
 
 
 @app.command(name="mcp-serve")
@@ -194,11 +209,11 @@ def eval(
     k: int = typer.Option(5, help="Top-k for hit_rate/MRR"),
 ) -> None:
     """Run retrieval evaluation (hit_rate@k, MRR@k)."""
-    import json
     import os
 
     from lean.config.settings import Settings
     from lean.eval.runner import build_eval_dataset, evaluate
+    from lean.store.analytics import AnalyticsRepo
     from lean.store.base import StoreConnection
 
     db_url = os.environ.get("SUPABASE_DB_URL") or Settings().supabase_db_url
@@ -214,24 +229,14 @@ def eval(
         typer.echo(f"  MRR:          {result.mrr:.4f}")
         typer.echo(f"  mean_latency: {result.mean_latency_ms:.0f}ms")
 
-        config = {"sample_size": sample_size, "k": k}
-        with conn.conn.cursor() as cur:
-            cur.execute(
-                """
-                insert into public.eval_runs
-                    (config, hit_rate, mrr, mean_latency_ms, sample_count, k)
-                values (%s::jsonb, %s, %s, %s, %s, %s)
-                """,
-                (
-                    json.dumps(config),
-                    result.hit_rate,
-                    result.mrr,
-                    int(result.mean_latency_ms),
-                    result.sample_count,
-                    result.k,
-                ),
-            )
-            conn.conn.commit()
+        AnalyticsRepo(conn).save_eval_run(
+            config={"sample_size": sample_size, "k": k},
+            hit_rate=result.hit_rate,
+            mrr=result.mrr,
+            mean_latency_ms=int(result.mean_latency_ms),
+            sample_count=result.sample_count,
+            k=result.k,
+        )
         typer.echo("\nEval run saved to eval_runs table.")
     finally:
         conn.close()

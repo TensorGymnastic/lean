@@ -22,7 +22,7 @@ services:
     env_file: .env
     environment:
       # Override config.yaml defaults for docker deployment
-      VLLM_BASE_URL: ${VLLM_BASE_URL:-http://192.168.2.37:8000}
+      OCR_BASE_URL: ${OCR_BASE_URL:-}
     volumes:
       - ./src/lean/config/config.yaml:/app/src/lean/config/config.yaml:ro
       - ./data:/app/data:ro

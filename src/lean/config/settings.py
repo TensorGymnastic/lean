@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     lean_mcp_api_key: str = Field(description="Bearer token for MCP HTTP transport")
 
     # --- App config (from config.yaml, overridable by env) ---
-    vllm_base_url: str = _yaml.get("vllm", {}).get("base_url", "http://localhost:8000")
+    ocr_base_url: str = _yaml.get("ocr", {}).get("base_url", "")
 
     embedding_model: str = _yaml.get("embedding", {}).get("model", "LiquidAI/LFM2.5-Embedding-350M")
     embedding_dim: int = _yaml.get("embedding", {}).get("dim", 1024)
