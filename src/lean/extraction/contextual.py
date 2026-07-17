@@ -56,7 +56,7 @@ def add_context_to_chunks(
         try:
             context = llm.generate(
                 _CONTEXTUAL_PROMPT.format(document=doc_text, chunk=chunk.content[:1000]),
-                max_tokens=100,
+                max_tokens=500,
                 temperature=0.0,
             )
             contextualized = f"{context}\n\n{chunk.content}" if context else chunk.content

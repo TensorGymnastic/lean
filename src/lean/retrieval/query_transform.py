@@ -45,7 +45,7 @@ def hyde_transform(query: str, llm: LLMClient) -> str:
     try:
         passage = llm.generate(
             _HYDE_PROMPT.format(query=query),
-            max_tokens=300,
+            max_tokens=500,
             temperature=0.0,
         )
         if passage.strip():
@@ -64,7 +64,7 @@ def multi_query_transform(query: str, llm: LLMClient, *, num_queries: int = 4) -
     try:
         raw = llm.generate(
             _MULTI_QUERY_PROMPT.format(query=query, num_queries=num_queries - 1),
-            max_tokens=200,
+            max_tokens=500,
             temperature=0.0,
         )
         generated = [line.strip() for line in raw.strip().split("\n") if line.strip()]
