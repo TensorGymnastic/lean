@@ -21,7 +21,7 @@ _reranker: Any = None
 _reranker_model: str | None = None
 
 
-def _get_reranker(model_name: str, device: str = "cpu") -> Any:
+def _get_reranker(model_name: str, device: str) -> Any:
     global _reranker, _reranker_model
     if _reranker is None or _reranker_model != model_name:
         from sentence_transformers import CrossEncoder
@@ -36,9 +36,9 @@ def rerank(
     hits: list[SearchHit],
     query: str,
     *,
-    model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2",
-    top_n: int = 5,
-    device: str = "cpu",
+    model: str,
+    top_n: int,
+    device: str,
 ) -> list[SearchHit]:
     """Re-sort hits using a cross-encoder model. Returns top_n results."""
     if not hits:

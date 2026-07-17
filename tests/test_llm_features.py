@@ -127,7 +127,7 @@ def test_multi_query_falls_back_on_error() -> None:
     """Multi-query returns [original] when LLM fails."""
     from lean.retrieval.query_transform import multi_query_transform
 
-    result = multi_query_transform("What is DMAIC?", FailingLLM())
+    result = multi_query_transform("What is DMAIC?", FailingLLM(), num_queries=4)
     assert result == ["What is DMAIC?"]
 
 

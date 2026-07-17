@@ -31,11 +31,11 @@ def extract_pdf_markdown(
     *,
     ocr_base_url: str,
     hf_token: str | None,
-    ocr_model: str = "baidu/Unlimited-OCR",
-    ocr_dpi: int = 300,
-    ocr_timeout_s: float = 1800.0,
-    ocr_max_tokens: int = 32768,
-    ocr_batch_size: int = 20,
+    ocr_model: str,
+    ocr_dpi: int,
+    ocr_timeout_s: float,
+    ocr_max_tokens: int,
+    ocr_batch_size: int,
 ) -> tuple[str, int, ExtractionMethod]:
     """Extract markdown from a PDF, preferring Unlimited-OCR."""
     try:

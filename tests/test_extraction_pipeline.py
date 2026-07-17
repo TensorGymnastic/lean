@@ -38,6 +38,11 @@ def test_pipeline_uses_ocr_when_available(tmp_path: Path) -> None:
             pdf_path,
             ocr_base_url="http://fake:8000",
             hf_token="x",
+            ocr_model="baidu/Unlimited-OCR",
+            ocr_dpi=300,
+            ocr_timeout_s=1800.0,
+            ocr_max_tokens=32768,
+            ocr_batch_size=20,
         )
 
     assert method == ExtractionMethod.UNLIMITED_OCR
@@ -67,6 +72,11 @@ def test_pipeline_falls_back_when_ocr_unavailable(tmp_path: Path) -> None:
             pdf_path,
             ocr_base_url="http://fake:8000",
             hf_token="x",
+            ocr_model="baidu/Unlimited-OCR",
+            ocr_dpi=300,
+            ocr_timeout_s=1800.0,
+            ocr_max_tokens=32768,
+            ocr_batch_size=20,
         )
 
     assert method == ExtractionMethod.MARKITDOWN

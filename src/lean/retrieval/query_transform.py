@@ -55,7 +55,7 @@ def hyde_transform(query: str, llm: LLMClient) -> str:
     return query
 
 
-def multi_query_transform(query: str, llm: LLMClient, *, num_queries: int = 4) -> list[str]:
+def multi_query_transform(query: str, llm: LLMClient, *, num_queries: int) -> list[str]:
     """Generate paraphrased queries for multi-query retrieval.
 
     Returns a list of queries (original + generated paraphrases).
