@@ -58,6 +58,8 @@ class AnalyticsRepo:
         config: dict[str, object],
         hit_rate: float,
         mrr: float,
+        ndcg: float = 0.0,
+        recall: float = 0.0,
         mean_latency_ms: int,
         sample_count: int,
         k: int,
@@ -67,13 +69,15 @@ class AnalyticsRepo:
             cur.execute(
                 """
                 insert into public.eval_runs
-                    (config, hit_rate, mrr, mean_latency_ms, sample_count, k)
-                values (%s::jsonb, %s, %s, %s, %s, %s)
+                    (config, hit_rate, mrr, ndcg, recall, mean_latency_ms, sample_count, k)
+                values (%s::jsonb, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 (
                     json.dumps(config),
                     hit_rate,
                     mrr,
+                    ndcg,
+                    recall,
                     mean_latency_ms,
                     sample_count,
                     k,

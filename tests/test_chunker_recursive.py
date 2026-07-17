@@ -60,3 +60,25 @@ def test_chunk_preserves_section_metadata() -> None:
     assert len(results) == 1
     assert results[0].section_path == "Chapter 3 > DMAIC > Measure"
     assert results[0].heading_text == "Measure"
+
+
+def test_chunk_overlap_links_adjacent_chunks() -> None:
+    """With overlap > 0, each chunk starts with tokens from the previous chunk's end."""
+    long_text = ". ".join(f"Sentence {i}" for i in range(200))
+    sections = [Section(path="Ch 1", level=1, heading="Ch 1", content=long_text)]
+    results = chunk_sections(sections, target_min=20, target_max=40, hard_cap=50, overlap=10)
+    assert len(results) > 1
+    for i in range(1, len(results)):
+        prev_tail = results[i - 1].content[-50:]
+        curr_head = results[i].content[:50]
+        assert any(word in curr_head for word in prev_tail.split()[-5:]), (
+            f"chunk {i} should overlap with chunk {i - 1}'s tail"
+        )
+
+
+def test_chunk_overlap_zero_no_overlap() -> None:
+    """With overlap=0, chunks are independent (backward compatible)."""
+    long_text = ". ".join(f"Sentence {i}" for i in range(200))
+    sections = [Section(path="Ch 1", level=1, heading="Ch 1", content=long_text)]
+    no_overlap = chunk_sections(sections, target_min=20, target_max=40, hard_cap=50, overlap=0)
+    assert len(no_overlap) > 1

@@ -4,6 +4,7 @@ embedding:
   device: cpu
   remote_url: ""          # set to http://<gpu-host>:11434 to use remote Ollama
   remote_model: lfm2.5-embed-32k
+  num_ctx: 32768          # must match Ollama model's PARAMETER num_ctx
 
 ocr:
   base_url: ""            # set to http://<gpu-host>:8000 to use Unlimited-OCR
@@ -17,6 +18,7 @@ chunking:
   target_min: 350
   target_max: 450
   hard_cap: 500
+  overlap: 50             # token overlap between adjacent chunks (prevents context loss at boundaries)
   max_heading_level: 4
   token_encoding: cl100k_base
 
@@ -24,8 +26,9 @@ retrieval:
   top_k: 5
   min_similarity: 0.0
   hybrid_search: true
+  fetch_multiplier: 8       # fetch_k = max(k * fetch_multiplier, 40) — wider candidate set for reranking
   rerank:
-    enabled: false
+    enabled: true           # cross-encoder reranking (ms-marco-MiniLM-L-6-v2), ~100ms/query on CPU
     model: cross-encoder/ms-marco-MiniLM-L-6-v2
     top_n: 5
 

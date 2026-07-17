@@ -46,6 +46,7 @@ class Settings(BaseSettings):
     embedding_device: str = _yaml.get("embedding", {}).get("device", "cpu")
     embedding_remote_url: str = _yaml.get("embedding", {}).get("remote_url", "")
     embedding_remote_model: str = _yaml.get("embedding", {}).get("remote_model", "")
+    embedding_num_ctx: int = _yaml.get("embedding", {}).get("num_ctx", 32768)
 
     ocr_model: str = _yaml.get("ocr", {}).get("model", "baidu/Unlimited-OCR")
     ocr_dpi: int = _yaml.get("ocr", {}).get("dpi", 300)
@@ -56,12 +57,14 @@ class Settings(BaseSettings):
     chunk_target_min: int = _yaml.get("chunking", {}).get("target_min", 350)
     chunk_target_max: int = _yaml.get("chunking", {}).get("target_max", 450)
     chunk_hard_cap: int = _yaml.get("chunking", {}).get("hard_cap", 500)
+    chunk_overlap: int = _yaml.get("chunking", {}).get("overlap", 50)
     max_section_heading_level: int = _yaml.get("chunking", {}).get("max_heading_level", 4)
     token_counter_encoding: str = _yaml.get("chunking", {}).get("token_encoding", "cl100k_base")
 
     search_top_k: int = _yaml.get("retrieval", {}).get("top_k", 5)
     min_similarity: float = _yaml.get("retrieval", {}).get("min_similarity", 0.0)
     hybrid_search_enabled: bool = _yaml.get("retrieval", {}).get("hybrid_search", True)
+    fetch_multiplier: int = _yaml.get("retrieval", {}).get("fetch_multiplier", 8)
     rerank_enabled: bool = _yaml.get("retrieval", {}).get("rerank", {}).get("enabled", False)
     rerank_model: str = (
         _yaml.get("retrieval", {})

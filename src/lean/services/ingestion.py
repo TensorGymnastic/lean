@@ -76,6 +76,7 @@ async def ingest_pdf(path: str) -> IngestResult:
             target_min=settings.chunk_target_min,
             target_max=settings.chunk_target_max,
             hard_cap=settings.chunk_hard_cap,
+            overlap=settings.chunk_overlap,
             encoding=settings.token_counter_encoding,
         )
     )

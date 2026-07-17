@@ -60,7 +60,7 @@ def search(
         analytics = AnalyticsRepo(conn)
 
         if settings.hybrid_search_enabled:
-            fetch_k = max(k * 4, 20)
+            fetch_k = max(k * settings.fetch_multiplier, 40)
             vector_hits = engine.vector_search(
                 query_embedding=query_vec,
                 k=fetch_k,

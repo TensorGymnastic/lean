@@ -40,9 +40,15 @@ def chunk_sections(
     target_min: int,
     target_max: int,
     hard_cap: int,
+    overlap: int = 0,
     encoding: str = "cl100k_base",
 ) -> list[ChunkResult]:
-    """Split each section's content into token-bounded chunks."""
+    """Split each section's content into token-bounded chunks.
+
+    When ``overlap > 0``, adjacent chunks within the same section share
+    ``overlap`` tokens of trailing/leading text. This prevents context loss
+    at chunk boundaries — a standard RAG technique.
+    """
     enc = _get_encoding(encoding)
     results: list[ChunkResult] = []
     for section in sections:
@@ -53,6 +59,8 @@ def chunk_sections(
             hard_cap=hard_cap,
             enc=enc,
         )
+        if overlap > 0 and len(chunks) > 1:
+            chunks = _apply_overlap(chunks, overlap, enc)
         for i, (content, token_count) in enumerate(chunks):
             results.append(
                 ChunkResult(
@@ -174,3 +182,27 @@ def _split_by_words(
         joined = " ".join(buf)
         chunks.append((joined, buf_tokens))
     return chunks
+
+
+def _apply_overlap(
+    chunks: list[tuple[str, int]],
+    overlap: int,
+    enc: tiktoken.Encoding,
+) -> list[tuple[str, int]]:
+    """Prepend the last ``overlap`` tokens of each chunk to the next chunk.
+
+    This creates sliding windows so that information near chunk boundaries
+    appears in both chunks, improving retrieval continuity.
+    """
+    if len(chunks) <= 1 or overlap <= 0:
+        return chunks
+    result: list[tuple[str, int]] = [chunks[0]]
+    for i in range(1, len(chunks)):
+        prev_text = chunks[i - 1][0]
+        prev_tokens = enc.encode(prev_text)
+        tail_tokens = prev_tokens[-overlap:] if len(prev_tokens) > overlap else prev_tokens
+        tail_text = enc.decode(tail_tokens)
+        merged = f"{tail_text}\n\n{chunks[i][0]}"
+        merged_tokens = len(enc.encode(merged))
+        result.append((merged, merged_tokens))
+    return result

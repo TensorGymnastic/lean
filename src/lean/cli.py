@@ -227,12 +227,16 @@ def eval(
         typer.echo(f"\nResults (n={result.sample_count}, k={result.k}):")
         typer.echo(f"  hit_rate:     {result.hit_rate:.4f}")
         typer.echo(f"  MRR:          {result.mrr:.4f}")
+        typer.echo(f"  NDCG:         {result.ndcg:.4f}")
+        typer.echo(f"  Recall:       {result.recall:.4f}")
         typer.echo(f"  mean_latency: {result.mean_latency_ms:.0f}ms")
 
         AnalyticsRepo(conn).save_eval_run(
             config={"sample_size": sample_size, "k": k},
             hit_rate=result.hit_rate,
             mrr=result.mrr,
+            ndcg=result.ndcg,
+            recall=result.recall,
             mean_latency_ms=int(result.mean_latency_ms),
             sample_count=result.sample_count,
             k=result.k,

@@ -9,9 +9,10 @@ GPU-accelerated embeddings, and hybrid BM25 + vector search via pgvector.
 - **Vision-based PDF extraction** — `baidu/Unlimited-OCR` via a remote GPU server, with `markitdown` fallback when the OCR server is unavailable
 - **Section-aware chunking** — mistune AST parser splits markdown by headings, then a recursive tiktoken-based splitter bounds chunks to a target token window
 - **GPU-accelerated embeddings** — LiquidAI/LFM2.5-Embedding-350M (1024-dim) served via Ollama on the GPU server, with automatic local CPU fallback
-- **Hybrid search** — BM25 full-text (PostgreSQL tsvector) fused with pgvector cosine similarity via Reciprocal Rank Fusion (RRF)
+- **Hybrid search** — BM25 full-text (PostgreSQL tsvector) fused with pgvector cosine similarity via Reciprocal Rank Fusion (RRF, k=60)
+- **Cross-encoder reranking** — fetch wide candidate set (fetch_k = 8×top_k), rerank with `ms-marco-MiniLM-L-6-v2`, return top-k
 - **MCP server** — 8 tools, 4 resources, 3 prompts exposed over stdio or HTTP (FastAPI REST mirror included)
-- **Retrieval evaluation** — built-in `lean eval` command computing hit_rate@k and MRR@k, with results persisted for trending
+- **Retrieval evaluation** — built-in `lean eval` command computing hit_rate@k, MRR@k, NDCG@k, and Recall@k, with results persisted for trending
 - **Thin transport layers** — CLI, MCP server, and REST API are all thin delegates to a shared services layer; no business logic in the transport tier
 
 ## Tech Stack
@@ -264,13 +265,18 @@ ocr:
 embedding:
   remote_url: http://<gpu-host>:11434  # empty = local CPU
   remote_model: lfm2.5-embed-32k
+  num_ctx: 32768
 chunking:
   target_min: 350
   target_max: 450
   hard_cap: 500
+  overlap: 50
 retrieval:
   top_k: 5
   hybrid_search: true
+  fetch_multiplier: 8
+  rerank:
+    enabled: true
 ```
 
 ## Database Migrations

@@ -37,6 +37,7 @@ def get_embedder() -> Embedder:
                 base_url=s.embedding_remote_url,
                 model=s.embedding_remote_model,
                 dim=s.embedding_dim,
+                num_ctx=s.embedding_num_ctx,
             )
         else:
             from lean.embeddings.liquid_lmf import LiquidLMFEmbedder
