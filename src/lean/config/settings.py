@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -91,6 +92,12 @@ class Settings(BaseSettings):
     llm_multi_query_count: int = _yaml.get("llm", {}).get("multi_query_count", 4)
 
 
+@lru_cache(maxsize=1)
 def get_settings() -> Settings:
-    """Factory that re-reads env on each call (test-friendly)."""
+    """Cached singleton — same Settings instance on every call.
+
+    Use this everywhere instead of ``Settings()``. Critical for hot paths
+    (api/routes.py:_verify_token runs per request, services/search.py per
+    query). Call ``get_settings.cache_clear()`` to force re-read of env.
+    """
     return Settings()

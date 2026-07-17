@@ -7,13 +7,12 @@ in its constructor; the repos never open or close connections themselves.
 
 from __future__ import annotations
 
-import os
 from typing import Any, Self
 
 import psycopg
 from pgvector.psycopg import register_vector
 
-from lean.config.settings import Settings
+from lean.config.settings import get_settings
 
 
 class StoreConnection:
@@ -31,11 +30,8 @@ class StoreConnection:
 
     @classmethod
     def from_env(cls) -> Self:
-        """Create from ``SUPABASE_DB_URL`` environment variable or Settings."""
-        db_url = os.environ.get("SUPABASE_DB_URL")
-        if db_url is None:
-            db_url = Settings().supabase_db_url
-        return cls(db_url=db_url)
+        """Create from ``SUPABASE_DB_URL`` via Settings (single source of truth)."""
+        return cls(db_url=get_settings().supabase_db_url)
 
     @property
     def conn(self) -> psycopg.Connection[Any]:

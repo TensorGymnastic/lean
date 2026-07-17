@@ -301,12 +301,9 @@ def mcp_serve(
 @app.command(name="db-init")
 def db_init() -> None:
     """Apply db/schemas/*.sql to local Supabase."""
-    import os
+    from lean.config.settings import get_settings
 
-    db_url = os.environ.get("SUPABASE_DB_URL")
-    if not db_url:
-        typer.echo("Error: SUPABASE_DB_URL not set", err=True)
-        raise typer.Exit(1)
+    db_url = get_settings().supabase_db_url
     for sql_file in sorted(Path("db/schemas").glob("*.sql")):
         typer.echo(f"applying {sql_file}...")
         subprocess.run(["psql", db_url, "-f", str(sql_file)], check=True)
@@ -319,15 +316,12 @@ def eval(
     k: int = typer.Option(5, help="Top-k for hit_rate/MRR"),
 ) -> None:
     """Run retrieval evaluation (hit_rate@k, MRR@k, NDCG@k, Recall@k)."""
-    import os
-
-    from lean.config.settings import Settings
+    from lean.config.settings import get_settings
     from lean.eval.runner import build_eval_dataset, evaluate
     from lean.store.analytics import AnalyticsRepo
     from lean.store.base import StoreConnection
 
-    db_url = os.environ.get("SUPABASE_DB_URL") or Settings().supabase_db_url
-    conn = StoreConnection(db_url)
+    conn = StoreConnection(get_settings().supabase_db_url)
     try:
         typer.echo(f"Building eval dataset ({sample_size} samples)...")
         samples = build_eval_dataset(conn, sample_size=sample_size)
