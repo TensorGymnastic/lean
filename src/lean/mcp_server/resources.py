@@ -31,36 +31,23 @@ async def markdown_resource(doc_id: str) -> str:
 @mcp.resource("lean://documents/{doc_id}/chunks")
 async def chunks_resource(doc_id: str) -> str:
     """Chunk metadata for a document (JSON array, no embeddings)."""
-    from uuid import UUID
+    import anyio
 
-    from psycopg.rows import dict_row
+    from lean.services.corpus import list_chunks_by_document
 
-    from lean.store.base import StoreConnection
-
-    conn = StoreConnection.from_env()
-    try:
-        with conn.conn.cursor(row_factory=dict_row) as cur:
-            cur.execute(
-                "select id, chunk_index, section_path, heading_text, "
-                "page_start, page_end, token_count "
-                "from public.chunks where document_id = %s order by chunk_index",
-                (UUID(doc_id),),
-            )
-            rows = cur.fetchall()
-    finally:
-        conn.close()
+    chunks = await anyio.to_thread.run_sync(lambda: list_chunks_by_document(doc_id))
     return json.dumps(
         [
             {
-                "id": str(r["id"]),
-                "chunk_index": r["chunk_index"],
-                "section_path": r["section_path"],
-                "heading_text": r["heading_text"],
-                "page_start": r["page_start"],
-                "page_end": r["page_end"],
-                "token_count": r["token_count"],
+                "id": c.id,
+                "chunk_index": c.chunk_index,
+                "section_path": c.section_path,
+                "heading_text": c.heading_text,
+                "page_start": c.page_start,
+                "page_end": c.page_end,
+                "token_count": c.token_count,
             }
-            for r in rows
+            for c in chunks
         ],
         indent=2,
     )

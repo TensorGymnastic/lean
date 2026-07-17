@@ -15,7 +15,6 @@ ocr:
   batch_size: 20
 
 chunking:
-  target_min: 350
   target_max: 450
   hard_cap: 500
   overlap: 50             # token overlap between adjacent chunks (prevents context loss at boundaries)

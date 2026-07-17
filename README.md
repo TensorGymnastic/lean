@@ -267,7 +267,6 @@ embedding:
   remote_model: lfm2.5-embed-32k
   num_ctx: 32768
 chunking:
-  target_min: 350
   target_max: 450
   hard_cap: 500
   overlap: 50

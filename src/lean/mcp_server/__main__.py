@@ -27,7 +27,13 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.transport == "http":
-        mcp.run(transport="streamable-http", host=args.host, port=args.port)
+        import uvicorn
+
+        from lean.auth.bearer import BearerTokenMiddleware
+
+        app = mcp.http_app(transport="http")
+        secured = BearerTokenMiddleware(app, token=settings.lean_mcp_api_key)
+        uvicorn.run(secured, host=args.host, port=args.port)
     else:
         mcp.run(transport="stdio")
 

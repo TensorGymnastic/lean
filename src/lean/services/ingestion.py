@@ -73,7 +73,6 @@ async def ingest_pdf(path: str) -> IngestResult:
     chunk_results = await anyio.to_thread.run_sync(
         lambda: chunk_sections(
             sections,
-            target_min=settings.chunk_target_min,
             target_max=settings.chunk_target_max,
             hard_cap=settings.chunk_hard_cap,
             overlap=settings.chunk_overlap,
@@ -165,15 +164,9 @@ async def reingest(document_id: str) -> IngestResult:
     doc_uuid = UUID(document_id)
     conn = StoreConnection.from_env()
     try:
-        with conn.conn.cursor() as cur:
-            cur.execute(
-                "select source_path from public.documents where id = %s",
-                (doc_uuid,),
-            )
-            row = cur.fetchone()
+        source_path = DocumentRepo(conn).get_source_path(doc_uuid)
     finally:
         conn.close()
-    if row is None:
+    if source_path is None:
         raise KeyError(f"document {document_id} not found")
-    source_path = str(row[0])
     return await ingest_pdf(source_path)

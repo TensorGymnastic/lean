@@ -89,7 +89,8 @@ class AnalyticsRepo:
         with self._conn.conn.cursor() as cur:
             cur.execute("select count(*) from public.documents")
             row = cur.fetchone()
-            assert row is not None, "count(*) returned no row"
+            if row is None:
+                raise RuntimeError("count(*) returned no row")
             return int(row[0])
 
     def corpus_stats(
@@ -102,15 +103,18 @@ class AnalyticsRepo:
         with self._conn.conn.cursor(row_factory=dict_row) as cur:
             cur.execute("select count(*) from public.documents")
             row = cur.fetchone()
-            assert row is not None
+            if row is None:
+                raise RuntimeError("count(*) returned no row")
             doc_count: int = row["count"]
             cur.execute("select count(*) from public.chunks")
             row = cur.fetchone()
-            assert row is not None
+            if row is None:
+                raise RuntimeError("count(*) returned no row")
             chunk_count: int = row["count"]
             cur.execute("select coalesce(sum(token_count), 0) as total from public.chunks")
             row = cur.fetchone()
-            assert row is not None
+            if row is None:
+                raise RuntimeError("count(*) returned no row")
             total_tokens: int = row["total"]
             cur.execute(
                 "select extraction_method, count(*) as cnt "

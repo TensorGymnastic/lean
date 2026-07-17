@@ -14,6 +14,7 @@ create table if not exists public.documents (
         check (extraction_method in ('unlimited_ocr', 'markitdown')),
     source_storage_path   text not null,
     markdown_storage_path text not null,
+    markdown_content      text,
     ingested_at           timestamptz not null default now(),
     reingested_at         timestamptz,
     metadata              jsonb not null default '{}'::jsonb

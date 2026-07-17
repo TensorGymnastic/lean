@@ -9,8 +9,6 @@ from __future__ import annotations
 
 import base64
 import logging
-import os
-import tempfile
 from pathlib import Path
 
 import fitz  # PyMuPDF
@@ -30,7 +28,7 @@ def extract_markdown(
     hf_token: str | None = None,
     model: str = "baidu/Unlimited-OCR",
     dpi: int = 300,
-    timeout: float = 600.0,
+    timeout: float = 1800.0,
     max_tokens: int = 32768,
     batch_size: int = 20,
 ) -> tuple[str, int]:
@@ -112,20 +110,15 @@ def extract_markdown(
 
 
 def _pdf_to_base64_images(pdf_path: Path, *, dpi: int) -> list[str]:
-    """Render each PDF page to a PNG and return base64-encoded strings.
-
-    Uses a temp directory for intermediate PNG files.
-    """
+    """Render each PDF page to a PNG and return base64-encoded strings."""
     doc = fitz.open(str(pdf_path))
-    tmp_dir = tempfile.mkdtemp(prefix="lean_ocr_")
     mat = fitz.Matrix(dpi / 72, dpi / 72)
     images: list[str] = []
     try:
-        for i, page in enumerate(doc):
-            out = os.path.join(tmp_dir, f"page_{i:04d}.png")
-            page.get_pixmap(matrix=mat).save(out)
-            with open(out, "rb") as f:
-                images.append(base64.b64encode(f.read()).decode("ascii"))
+        for page in doc:
+            pixmap = page.get_pixmap(matrix=mat)
+            png_bytes = pixmap.tobytes("png")
+            images.append(base64.b64encode(png_bytes).decode("ascii"))
     finally:
         doc.close()
     return images

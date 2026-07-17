@@ -48,6 +48,10 @@ class DocumentRepo:
                 on conflict (source_sha256) do update set
                     source_path = excluded.source_path,
                     title = excluded.title,
+                    authors = excluded.authors,
+                    publisher = excluded.publisher,
+                    year = excluded.year,
+                    page_count = excluded.page_count,
                     extraction_method = excluded.extraction_method,
                     reingested_at = now()
                 returning id
@@ -67,7 +71,8 @@ class DocumentRepo:
             )
             row = cur.fetchone()
             self._conn.conn.commit()
-            assert row is not None, "upsert_document returned no row"
+            if row is None:
+                raise RuntimeError("upsert_document returned no row")
             return UUID(str(row[0]))
 
     def delete_document(self, document_id: UUID) -> None:
@@ -109,6 +114,18 @@ class DocumentRepo:
             )
             for r in rows
         ]
+
+    def get_source_path(self, document_id: UUID) -> str | None:
+        """Return the ``source_path`` for a document, or None if not found."""
+        with self._conn.conn.cursor() as cur:
+            cur.execute(
+                "select source_path from public.documents where id = %s",
+                (document_id,),
+            )
+            row = cur.fetchone()
+        if row is None:
+            return None
+        return str(row[0])
 
     def get_document_storage_paths(self, document_id: UUID) -> tuple[str, str] | None:
         """Return ``(source_storage_path, markdown_storage_path)`` or None."""

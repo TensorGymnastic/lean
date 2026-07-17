@@ -1,8 +1,8 @@
 """Recursive text chunker that respects section boundaries.
 
-Splits each section's content into chunks between ``target_min`` and
-``hard_cap`` tokens. Splits on paragraph boundaries first, then sentence
-boundaries, then word boundaries as a last resort.
+Splits each section's content into chunks bounded by ``hard_cap`` tokens.
+Splits on paragraph boundaries first, then sentence boundaries, then word
+boundaries as a last resort.
 """
 
 from __future__ import annotations
@@ -37,7 +37,6 @@ class ChunkResult:
 def chunk_sections(
     sections: list[Section],
     *,
-    target_min: int,
     target_max: int,
     hard_cap: int,
     overlap: int = 0,
@@ -54,7 +53,6 @@ def chunk_sections(
     for section in sections:
         chunks = _split_text(
             section.content,
-            target_min=target_min,
             target_max=target_max,
             hard_cap=hard_cap,
             enc=enc,
@@ -77,7 +75,6 @@ def chunk_sections(
 def _split_text(
     text: str,
     *,
-    target_min: int,
     target_max: int,
     hard_cap: int,
     enc: tiktoken.Encoding | None = None,

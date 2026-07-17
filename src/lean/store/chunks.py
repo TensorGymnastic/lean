@@ -104,5 +104,41 @@ class ChunkRepo:
         with self._conn.conn.cursor() as cur:
             cur.execute("select count(*) from public.chunks")
             row = cur.fetchone()
-            assert row is not None, "count(*) returned no row"
+            if row is None:
+                raise RuntimeError("count(*) returned no row")
             return int(row[0])
+
+    def get_chunks_by_document(self, doc_id: UUID, limit: int = 1000) -> list[Chunk]:
+        """Fetch chunks for a document, ordered by chunk_index. No embeddings.
+
+        Returns up to ``limit`` chunks. Empty list if the document has none.
+        """
+        from psycopg.rows import dict_row
+
+        with self._conn.conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                """
+                select id, document_id, chunk_index, section_path, heading_text,
+                       page_start, page_end, token_count, content
+                from public.chunks
+                where document_id = %s
+                order by chunk_index
+                limit %s
+                """,
+                (doc_id, limit),
+            )
+            rows = cur.fetchall()
+        return [
+            Chunk(
+                id=str(r["id"]),
+                document_id=str(r["document_id"]),
+                chunk_index=r["chunk_index"],
+                section_path=r["section_path"],
+                heading_text=r["heading_text"],
+                page_start=r["page_start"],
+                page_end=r["page_end"],
+                token_count=r["token_count"],
+                content=r["content"],
+            )
+            for r in rows
+        ]

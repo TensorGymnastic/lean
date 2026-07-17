@@ -91,7 +91,7 @@ class RemoteOllamaEmbedder:
                 )
                 time.sleep(wait)
         resp.raise_for_status()
-        return []
+        raise AssertionError("unreachable")
 
     def close(self) -> None:
         self._client.close()

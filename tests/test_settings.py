@@ -24,7 +24,6 @@ def test_settings_from_env(monkeypatch) -> None:
     assert settings.lean_mcp_api_key == "test-api-key"
     assert settings.embedding_model == "LiquidAI/LFM2.5-Embedding-350M"
     assert settings.embedding_dim == 1024
-    assert settings.chunk_target_min == 350
     assert settings.chunk_target_max == 450
     assert settings.chunk_hard_cap == 500
     assert settings.mcp_http_port == 8765

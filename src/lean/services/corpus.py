@@ -67,21 +67,27 @@ def get_chunk(chunk_id: str) -> Chunk | None:
         conn.close()
 
 
-def get_document_markdown(document_id: str) -> str:
-    """Return a placeholder string pointing at the document's markdown storage path.
+def list_chunks_by_document(document_id: str) -> list[Chunk]:
+    """List chunks for a document, ordered by chunk_index. No embeddings."""
+    doc_uuid = UUID(document_id)
+    conn = StoreConnection.from_env()
+    try:
+        return ChunkRepo(conn).get_chunks_by_document(doc_uuid)
+    finally:
+        conn.close()
 
-    The document's full markdown is stored in Supabase Storage; fetching
-    the object will be wired in a follow-up. Raises ``KeyError`` if the
-    document id does not exist.
+
+def get_document_markdown(document_id: str) -> str:
+    """Return the document's markdown by reconstructing from stored chunks.
+
+    Raises ``KeyError`` if the document id does not exist.
     """
     doc_uuid = UUID(document_id)
     conn = StoreConnection.from_env()
     try:
-        paths = DocumentRepo(conn).get_document_storage_paths(doc_uuid)
+        chunks = ChunkRepo(conn).get_chunks_by_document(doc_uuid)
     finally:
         conn.close()
-    if paths is None:
-        raise KeyError(f"document {document_id} not found")
-    # paths = (source_storage_path, markdown_storage_path)
-    markdown_storage_path = paths[1]
-    return f"[markdown at storage path {markdown_storage_path}]"
+    if not chunks:
+        raise KeyError(f"document {document_id} not found or has no chunks")
+    return "\n\n".join(c.content for c in chunks)

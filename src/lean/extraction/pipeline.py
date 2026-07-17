@@ -33,7 +33,7 @@ def extract_pdf_markdown(
     hf_token: str | None,
     ocr_model: str = "baidu/Unlimited-OCR",
     ocr_dpi: int = 300,
-    ocr_timeout_s: float = 600.0,
+    ocr_timeout_s: float = 1800.0,
     ocr_max_tokens: int = 32768,
     ocr_batch_size: int = 20,
 ) -> tuple[str, int, ExtractionMethod]:
