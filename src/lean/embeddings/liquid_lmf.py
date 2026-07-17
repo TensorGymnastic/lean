@@ -8,7 +8,6 @@ dot product equals cosine similarity.
 from __future__ import annotations
 
 import logging
-import os
 
 from sentence_transformers import SentenceTransformer
 
@@ -31,13 +30,12 @@ class LiquidLMFEmbedder:
         device: str = "cpu",
         dim: int = 1024,
     ) -> None:
-        if hf_token:
-            os.environ["HF_TOKEN"] = hf_token
         logger.info("loading embedding model %s on %s", model, device)
         self._model = SentenceTransformer(
             model,
             trust_remote_code=True,
             device=device,
+            token=hf_token,
         )
         self._dim = dim
 

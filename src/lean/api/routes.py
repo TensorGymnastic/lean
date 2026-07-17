@@ -8,6 +8,7 @@ Serves on port 8766 when started via ``make api-serve``.
 from __future__ import annotations
 
 import hmac
+from importlib.metadata import version as _pkg_version
 from typing import Annotated, Any
 
 import anyio
@@ -20,7 +21,11 @@ from lean.services.corpus import list_documents as _list
 from lean.services.ingestion import ingest_pdf as _ingest
 from lean.services.search import search as _search
 
-app = FastAPI(title="lean", version="0.1.0", description="Lean Six Sigma MCP corpus API")
+app = FastAPI(
+    title="lean",
+    version=_pkg_version("lean"),
+    description="Lean Six Sigma MCP corpus API",
+)
 _security = HTTPBearer(auto_error=False)
 
 TokenCreds = Annotated[HTTPAuthorizationCredentials | None, Security(_security)]
