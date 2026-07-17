@@ -32,8 +32,8 @@ class Settings(BaseSettings):
     )
 
     # --- Secrets (from .env only) ---
-    supabase_url: str = Field(description="Supabase project URL")
-    supabase_service_key: str = Field(description="Supabase service_role key")
+    supabase_url: str = Field(default="", description="Supabase project URL")
+    supabase_service_key: str = Field(default="", description="Supabase service_role key")
     supabase_db_url: str = Field(description="Direct Postgres DSN for pgvector")
     hf_token: str = Field(default="", description="HF token for gated models")
     lean_mcp_api_key: str = Field(description="Bearer token for MCP HTTP transport")
@@ -72,9 +72,6 @@ class Settings(BaseSettings):
         .get("model", "cross-encoder/ms-marco-MiniLM-L-6-v2")
     )
     rerank_top_n: int = _yaml.get("retrieval", {}).get("rerank", {}).get("top_n", 5)
-
-    sources_bucket: str = _yaml.get("storage", {}).get("sources_bucket", "sources")
-    markdown_bucket: str = _yaml.get("storage", {}).get("markdown_bucket", "markdown")
 
     mcp_http_host: str = _yaml.get("transport", {}).get("mcp_host", "127.0.0.1")
     mcp_http_port: int = _yaml.get("transport", {}).get("mcp_port", 8765)

@@ -27,8 +27,6 @@ def test_settings_from_env(monkeypatch) -> None:
     assert settings.chunk_target_min == 350
     assert settings.chunk_target_max == 450
     assert settings.chunk_hard_cap == 500
-    assert settings.sources_bucket == "sources"
-    assert settings.markdown_bucket == "markdown"
     assert settings.mcp_http_port == 8765
     assert settings.api_port == 8766
 

@@ -35,7 +35,6 @@ class OpenAICompatibleLLM:
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._model = model
-        self._timeout = timeout
         self._client = httpx.Client(timeout=timeout)
         self._headers: dict[str, str] = {"Content-Type": "application/json"}
         if api_key:

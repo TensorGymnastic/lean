@@ -32,10 +32,6 @@ retrieval:
     model: cross-encoder/ms-marco-MiniLM-L-6-v2
     top_n: 5
 
-storage:
-  sources_bucket: sources
-  markdown_bucket: markdown
-
 transport:
   mcp_host: 127.0.0.1
   mcp_port: 8765

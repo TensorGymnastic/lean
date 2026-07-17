@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 def search(
     query: str,
     *,
-    k: int = 5,
+    k: int | None = None,
     doc_id: str | None = None,
     section: str | None = None,
     author: str | None = None,
@@ -45,6 +45,8 @@ def search(
         6. Truncate to k.
     """
     settings = Settings()
+    if k is None:
+        k = settings.search_top_k
     embedder = get_embedder()
 
     start = time.monotonic()

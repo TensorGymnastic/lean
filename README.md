@@ -251,11 +251,10 @@ Secrets go in `.env`, app config goes in `src/lean/config/config.yaml`. Environm
 ### `.env` (secrets — not committed)
 
 ```
-SUPABASE_URL=http://127.0.0.1:54321
-SUPABASE_SERVICE_KEY=<your-key>
 SUPABASE_DB_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres
 HF_TOKEN=<your-token>
 LEAN_MCP_API_KEY=<your-key>
+MINIMAX_API_KEY=<your-key>
 ```
 
 ### `config.yaml` (app config — committed, override URLs for your setup)
