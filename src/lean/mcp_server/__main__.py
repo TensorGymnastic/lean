@@ -6,14 +6,14 @@ import argparse
 import logging
 import sys
 
-from lean.config.settings import Settings
+from lean.config.settings import get_settings
 from lean.mcp_server.tools import mcp
 
 
 def main(argv: list[str] | None = None) -> None:
     logging.basicConfig(level=logging.INFO, stream=sys.stderr)
 
-    settings = Settings()
+    settings = get_settings()
 
     parser = argparse.ArgumentParser(description="lean MCP server")
     parser.add_argument(

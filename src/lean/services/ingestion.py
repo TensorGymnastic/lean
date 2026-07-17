@@ -16,7 +16,7 @@ import anyio
 
 from lean.chunker.markdown_ast import build_sections
 from lean.chunker.recursive import chunk_sections
-from lean.config.settings import Settings
+from lean.config.settings import get_settings
 from lean.extraction.metadata import extract_metadata
 from lean.extraction.pipeline import extract_pdf_markdown
 from lean.infrastructure.embedder import get_embedder
@@ -43,7 +43,7 @@ async def ingest_pdf(path: str) -> IngestResult:
     document row and replaces its chunks.
     """
     start = time.monotonic()
-    settings = Settings()
+    settings = get_settings()
     pdf_path = Path(path)
     if not pdf_path.is_file():
         raise FileNotFoundError(f"PDF not found: {path}")

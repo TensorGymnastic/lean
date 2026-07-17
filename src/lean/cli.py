@@ -228,9 +228,9 @@ def health(
     """Check health of OCR server, database, and Ollama embedding server."""
     import httpx
 
-    from lean.config.settings import Settings
+    from lean.config.settings import get_settings
 
-    settings = Settings()
+    settings = get_settings()
     checks: dict[str, dict[str, object]] = {}
 
     if settings.ocr_base_url:

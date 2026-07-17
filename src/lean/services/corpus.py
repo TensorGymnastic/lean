@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from lean.config.settings import Settings
+from lean.config.settings import get_settings
 from lean.models.schemas import Chunk, CorpusStats, DocumentSummary
 from lean.store.analytics import AnalyticsRepo
 from lean.store.base import StoreConnection
@@ -47,7 +47,7 @@ def corpus_stats() -> CorpusStats:
     ``embedding_dim`` and ``embedding_model`` are sourced from ``Settings``
     so the response is self-describing without an embedding round-trip.
     """
-    settings = Settings()
+    settings = get_settings()
     conn = StoreConnection.from_env()
     try:
         return AnalyticsRepo(conn).corpus_stats(

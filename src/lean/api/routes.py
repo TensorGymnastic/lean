@@ -14,7 +14,7 @@ import anyio
 from fastapi import Depends, FastAPI, HTTPException, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from lean.config.settings import Settings
+from lean.config.settings import get_settings
 from lean.services.corpus import corpus_stats as _corpus_stats
 from lean.services.corpus import list_documents as _list
 from lean.services.ingestion import ingest_pdf as _ingest
@@ -27,7 +27,7 @@ TokenCreds = Annotated[HTTPAuthorizationCredentials | None, Security(_security)]
 
 
 async def _verify_token(creds: TokenCreds) -> None:
-    settings = Settings()
+    settings = get_settings()
     expected = settings.lean_mcp_api_key
     if not creds or not hmac.compare_digest(creds.credentials, expected):
         raise HTTPException(

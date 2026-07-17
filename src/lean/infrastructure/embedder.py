@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from lean.config.settings import Settings
+from lean.config.settings import get_settings
 
 
 class Embedder(Protocol):
@@ -29,7 +29,7 @@ def get_embedder() -> Embedder:
     """
     global _embedder
     if _embedder is None:
-        s = Settings()
+        s = get_settings()
         if s.embedding_remote_url and s.embedding_remote_model:
             from lean.embeddings.remote_ollama import RemoteOllamaEmbedder
 

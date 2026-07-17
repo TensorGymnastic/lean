@@ -11,7 +11,7 @@ import logging
 import time
 from uuid import UUID
 
-from lean.config.settings import Settings
+from lean.config.settings import get_settings
 from lean.infrastructure.embedder import get_embedder
 from lean.llm.base import get_llm
 from lean.models.schemas import Chunk
@@ -44,7 +44,7 @@ def search(
         5. Similarity filter + long-context reorder.
         6. Truncate to k.
     """
-    settings = Settings()
+    settings = get_settings()
     if k is None:
         k = settings.search_top_k
     embedder = get_embedder()

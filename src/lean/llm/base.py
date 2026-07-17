@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from typing import Protocol
 
-from lean.config.settings import Settings
+from lean.config.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +49,7 @@ def get_llm() -> LLMClient | None:
         return _llm
     _llm_checked = True
 
-    s = Settings()
+    s = get_settings()
 
     if s.minimax_api_key:
         from lean.llm.openai_compatible import OpenAICompatibleLLM
