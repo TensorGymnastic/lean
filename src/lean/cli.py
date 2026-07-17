@@ -306,12 +306,32 @@ def mcp_serve(
 @app.command(name="db-init")
 def db_init() -> None:
     """Apply db/schemas/*.sql to local Supabase."""
+    import os
+    from urllib.parse import unquote, urlparse
+
     from lean.config.settings import get_settings
 
     db_url = get_settings().supabase_db_url
+    parsed = urlparse(db_url)
+    pg_env = {**os.environ}
+    if parsed.hostname:
+        pg_env["PGHOST"] = parsed.hostname
+    if parsed.port:
+        pg_env["PGPORT"] = str(parsed.port)
+    if parsed.username:
+        pg_env["PGUSER"] = parsed.username
+    if parsed.password:
+        pg_env["PGPASSWORD"] = unquote(parsed.password)
+    if parsed.path and len(parsed.path) > 1:
+        pg_env["PGDATABASE"] = parsed.path[1:]
+
     for sql_file in sorted(Path("db/schemas").glob("*.sql")):
         typer.echo(f"applying {sql_file}...")
-        subprocess.run(["psql", db_url, "-f", str(sql_file)], check=True)
+        subprocess.run(
+            ["psql", "-v", "ON_ERROR_STOP=1", "-f", str(sql_file)],
+            env=pg_env,
+            check=True,
+        )
     typer.echo("schema applied.")
 
 

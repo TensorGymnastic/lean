@@ -66,6 +66,8 @@ def search(
         )
 
     conn = StoreConnection.from_env()
+    hits: list[SearchHit] = []
+    latency_ms = -1
     try:
         engine = SearchEngine(conn)
         analytics = AnalyticsRepo(conn)
@@ -181,17 +183,17 @@ def search(
             )
         except Exception:
             logger.warning("failed to log query", exc_info=True)
+
+        return [h.chunk for h in hits]
     finally:
         conn.close()
-
-    logger.info(
-        "search q=%r k=%d hits=%d latency=%dms hybrid=%s reranked=%s queries=%d",
-        query[:60],
-        k,
-        len(hits),
-        latency_ms,
-        settings.hybrid_search_enabled,
-        settings.rerank_enabled,
-        len(queries),
-    )
-    return [h.chunk for h in hits]
+        logger.info(
+            "search q=%r k=%d hits=%d latency=%dms hybrid=%s reranked=%s queries=%d",
+            query[:60],
+            k,
+            len(hits),
+            latency_ms,
+            settings.hybrid_search_enabled,
+            settings.rerank_enabled,
+            len(queries),
+        )

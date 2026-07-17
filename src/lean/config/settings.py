@@ -84,6 +84,7 @@ class Settings(BaseSettings):
     # --- Storage paths ---
     storage_source_prefix: str = _yaml.get("storage", {}).get("source_prefix", "sources/")
     storage_markdown_prefix: str = _yaml.get("storage", {}).get("markdown_prefix", "markdown/")
+    corpus_root: str = _yaml.get("storage", {}).get("corpus_root", "data")
 
     # --- Health checks ---
     health_http_timeout: float = _yaml.get("health", {}).get("http_timeout", 10.0)

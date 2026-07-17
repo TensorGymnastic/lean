@@ -32,21 +32,30 @@ async def ingest_pdf(path: str) -> IngestResult:
     """Full pipeline: PDF → extract → metadata → chunk → embed → store.
 
     Steps:
-        1. SHA-256 the source PDF (dedup key).
-        2. Extract markdown via Unlimited-OCR (remote server) or markitdown fallback.
-        3. Build section AST and split into token-bounded chunks.
-        4. Embed all chunks with the singleton LiquidLMF embedder.
-        5. Extract PDF metadata (title, authors, publisher, year).
-        6. Upsert document and replace its chunks in a single connection.
+        1. Validate path is within the configured corpus root (security).
+        2. SHA-256 the source PDF (dedup key).
+        3. Extract markdown via Unlimited-OCR (remote server) or markitdown fallback.
+        4. Build section AST and split into token-bounded chunks.
+        5. Embed all chunks with the singleton LiquidLMF embedder.
+        6. Extract PDF metadata (title, authors, publisher, year).
+        7. Upsert document and replace its chunks in a single connection.
 
     Re-ingesting the same PDF (matched by SHA-256) updates the existing
     document row and replaces its chunks.
+
+    Raises ``PermissionError`` if the path resolves outside the corpus root.
     """
     start = time.monotonic()
     settings = get_settings()
     pdf_path = Path(path)
     if not pdf_path.is_file():
         raise FileNotFoundError(f"PDF not found: {path}")
+
+    # Security: confine to corpus root to prevent path traversal
+    corpus_root = Path(settings.corpus_root).resolve()
+    resolved = pdf_path.resolve()
+    if not resolved.is_relative_to(corpus_root):
+        raise PermissionError(f"path outside corpus root ({settings.corpus_root}): {path}")
 
     source_sha256 = hashlib.sha256(pdf_path.read_bytes()).hexdigest()
 

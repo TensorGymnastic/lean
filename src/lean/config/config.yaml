@@ -48,6 +48,7 @@ transport:
 storage:
   source_prefix: "sources/"    # storage path prefix for source PDFs
   markdown_prefix: "markdown/" # storage path prefix for extracted markdown
+  corpus_root: "data"          # root directory for ingestible PDFs; paths outside are rejected (security)
 
 health:
   http_timeout: 10          # timeout for OCR/Ollama health check requests (seconds)

@@ -10,6 +10,7 @@ Disabled by default. Enable via ``settings.rerank_enabled = True``.
 from __future__ import annotations
 
 import logging
+from functools import lru_cache
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -17,19 +18,13 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_reranker: Any = None
-_reranker_model: str | None = None
 
-
+@lru_cache(maxsize=4)
 def _get_reranker(model_name: str, device: str) -> Any:
-    global _reranker, _reranker_model
-    if _reranker is None or _reranker_model != model_name:
-        from sentence_transformers import CrossEncoder
+    from sentence_transformers import CrossEncoder
 
-        logger.info("loading cross-encoder reranker: %s on %s", model_name, device)
-        _reranker = CrossEncoder(model_name, device=device)
-        _reranker_model = model_name
-    return _reranker
+    logger.info("loading cross-encoder reranker: %s on %s", model_name, device)
+    return CrossEncoder(model_name, device=device)
 
 
 def rerank(
@@ -50,14 +45,13 @@ def rerank(
 
     scored = sorted(zip(hits, scores, strict=True), key=lambda x: x[1], reverse=True)
 
-    from lean.models.schemas import Chunk
     from lean.store.search import SearchHit as SH
 
     result: list[SH] = []
     for hit, score in scored[:top_n]:
         result.append(
             SH(
-                chunk=Chunk(**{**hit.chunk.model_dump(), "score": float(score)}),
+                chunk=hit.chunk.model_copy(update={"score": float(score)}),
                 score=float(score),
             )
         )
