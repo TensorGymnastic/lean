@@ -238,11 +238,8 @@ lean ingest "data/My Lean Six Sigma Book.pdf"
 # Search the corpus
 lean search "What is DMAIC?" --k 5
 
-# Check corpus stats
-lean corpus-stats
-
 # Reingest everything with OCR
-./scripts/reingest-all.sh
+lean reingest-all --force
 
 # Evaluate retrieval quality
 lean eval --sample-size 50 --k 5
@@ -250,7 +247,7 @@ lean eval --sample-size 50 --k 5
 
 ## Configuration
 
-Secrets go in `.env`, app config goes in `src/lean/config/config.yaml`. Environment variables override YAML values.
+Secrets go in `.env`, app config goes in `src/lean/config/config.yaml`. Environment variables override YAML values. The `get_settings()` factory caches a single Settings instance (`@lru_cache`) — all consumers share it.
 
 ### `.env` (secrets — not committed)
 
@@ -278,9 +275,24 @@ retrieval:
   top_k: 5
   hybrid_search: true
   fetch_multiplier: 8
+  fetch_k_floor: 40         # minimum candidate set size
+  rrf_k: 60                 # Reciprocal Rank Fusion constant
   rerank:
     enabled: true
+eval:
+  sample_size: 50
+  k: 5
+  seed: 42
+storage:
+  source_prefix: "sources/"
+  markdown_prefix: "markdown/"
+health:
+  http_timeout: 10
+logging:
+  level: INFO
 llm:
+  generate_max_tokens: 500
+  generate_temperature: 0.0
   contextual_retrieval: false  # set true + add MINIMAX_API_KEY to .env
   multi_query: false           # set true for multi-query generation
   hyde: false                  # set true for HyDE
