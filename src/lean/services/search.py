@@ -1,9 +1,8 @@
-"""Search service: embed query → vector/BM25 search → rerank → postprocess.
+"""Search service: query transform → embed → search → rerank → postprocess.
 
-Orchestrates the retrieval pipeline end-to-end. Extracted from
-``retrieval.search.search`` so transports can call it without inheriting
-the module-level store singleton. Each call opens its own
-``StoreConnection`` and closes it when done.
+Orchestrates the retrieval pipeline end-to-end. Supports optional LLM-powered
+query transforms (HyDE, multi-query) when an LLM sidecar is configured.
+Each call opens its own StoreConnection and closes it when done.
 """
 
 from __future__ import annotations
@@ -14,10 +13,11 @@ from uuid import UUID
 
 from lean.config.settings import Settings
 from lean.infrastructure.embedder import get_embedder
+from lean.llm.base import get_llm
 from lean.models.schemas import Chunk
 from lean.store.analytics import AnalyticsRepo
 from lean.store.base import StoreConnection
-from lean.store.search import SearchEngine
+from lean.store.search import SearchEngine, SearchHit
 
 logger = logging.getLogger(__name__)
 
@@ -34,64 +34,84 @@ def search(
     min_score: float | None = None,
     agent_id: str | None = None,
 ) -> list[Chunk]:
-    """Embed query → search (hybrid if enabled) → rerank (if enabled) → postprocess.
+    """Embed query → search (hybrid if enabled) → rerank → postprocess.
 
     Pipeline:
-        1. Embed the query with the singleton LiquidLMF embedder.
-        2. If ``hybrid_search_enabled``: fan out to vector + BM25 and fuse
-           via Reciprocal Rank Fusion. Otherwise vector search only.
-        3. If ``rerank_enabled`` and there are hits: cross-encoder rerank.
-        4. Apply ``similarity_filter`` (min_score cutoff, defaulting to
-           ``settings.min_similarity`` when not supplied).
-        5. Apply ``long_context_reorder`` to combat "lost in the middle".
-        6. Truncate to ``k``.
-        7. Log the query (best-effort) via ``AnalyticsRepo``.
+        1. (Optional) Multi-query: generate N paraphrases via LLM.
+        2. (Optional) HyDE: generate hypothetical doc for vector embedding.
+        3. Embed query → vector search + BM25 → RRF fusion.
+        4. (Optional) Cross-encoder rerank.
+        5. Similarity filter + long-context reorder.
+        6. Truncate to k.
     """
     settings = Settings()
     embedder = get_embedder()
 
     start = time.monotonic()
-    query_vec = embedder.embed_query(query)
     doc_uuid = UUID(doc_id) if doc_id else None
+
+    queries = [query]
+    llm = get_llm()
+    if settings.llm_multi_query and llm:
+        from lean.retrieval.query_transform import multi_query_transform
+
+        queries = multi_query_transform(query, llm, num_queries=settings.llm_multi_query_count)
 
     conn = StoreConnection.from_env()
     try:
         engine = SearchEngine(conn)
         analytics = AnalyticsRepo(conn)
 
-        if settings.hybrid_search_enabled:
-            fetch_k = max(k * settings.fetch_multiplier, 40)
-            vector_hits = engine.vector_search(
-                query_embedding=query_vec,
-                k=fetch_k,
-                doc_id=doc_uuid,
-                section_substring=section,
-                author=author,
-                year_min=year_min,
-                year_max=year_max,
-                min_score=min_score,
-            )
-            bm25_hits = engine.bm25_search(
-                query_text=query,
-                k=fetch_k,
-                doc_id=doc_uuid,
-                section_substring=section,
-                author=author,
-                year_min=year_min,
-                year_max=year_max,
-            )
-            hits = engine.reciprocal_rank_fusion(vector_hits, bm25_hits, k=fetch_k)
-        else:
-            hits = engine.vector_search(
-                query_embedding=query_vec,
-                k=k,
-                doc_id=doc_uuid,
-                section_substring=section,
-                author=author,
-                year_min=year_min,
-                year_max=year_max,
-                min_score=min_score,
-            )
+        fetch_k = max(k * settings.fetch_multiplier, 40) if settings.hybrid_search_enabled else k
+
+        fused_lists: list[list[SearchHit]] = []
+        for q in queries:
+            embed_text = q
+            if settings.llm_hyde and llm:
+                from lean.retrieval.query_transform import hyde_transform
+
+                embed_text = hyde_transform(q, llm)
+
+            query_vec = embedder.embed_query(embed_text)
+
+            if settings.hybrid_search_enabled:
+                vector_hits = engine.vector_search(
+                    query_embedding=query_vec,
+                    k=fetch_k,
+                    doc_id=doc_uuid,
+                    section_substring=section,
+                    author=author,
+                    year_min=year_min,
+                    year_max=year_max,
+                    min_score=min_score,
+                )
+                bm25_hits = engine.bm25_search(
+                    query_text=q,
+                    k=fetch_k,
+                    doc_id=doc_uuid,
+                    section_substring=section,
+                    author=author,
+                    year_min=year_min,
+                    year_max=year_max,
+                )
+                fused_lists.append(engine.reciprocal_rank_fusion(vector_hits, bm25_hits, k=fetch_k))
+            else:
+                fused_lists.append(
+                    engine.vector_search(
+                        query_embedding=query_vec,
+                        k=fetch_k,
+                        doc_id=doc_uuid,
+                        section_substring=section,
+                        author=author,
+                        year_min=year_min,
+                        year_max=year_max,
+                        min_score=min_score,
+                    )
+                )
+
+        hits = fused_lists[0]
+        for extra in fused_lists[1:]:
+            hits = engine.reciprocal_rank_fusion(hits, extra, k=fetch_k)
 
         if settings.rerank_enabled and hits:
             from lean.retrieval.reranker import rerank as _rerank
@@ -125,6 +145,8 @@ def search(
             "min_score": min_score,
             "hybrid": settings.hybrid_search_enabled,
             "reranked": settings.rerank_enabled,
+            "multi_query": len(queries) > 1,
+            "hyde": settings.llm_hyde and llm is not None,
         }
         try:
             analytics.log_query(
@@ -142,12 +164,13 @@ def search(
         conn.close()
 
     logger.info(
-        "search q=%r k=%d hits=%d latency=%dms hybrid=%s reranked=%s",
+        "search q=%r k=%d hits=%d latency=%dms hybrid=%s reranked=%s queries=%d",
         query[:60],
         k,
         len(hits),
         latency_ms,
         settings.hybrid_search_enabled,
         settings.rerank_enabled,
+        len(queries),
     )
     return [h.chunk for h in hits]

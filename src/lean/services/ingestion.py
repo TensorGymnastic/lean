@@ -81,6 +81,18 @@ async def ingest_pdf(path: str) -> IngestResult:
         )
     )
 
+    if settings.llm_contextual_retrieval:
+        from lean.extraction.contextual import add_context_to_chunks
+        from lean.llm.base import get_llm
+
+        llm = get_llm()
+        if llm:
+            chunk_results = await anyio.to_thread.run_sync(
+                lambda: add_context_to_chunks(chunk_results, sections, llm)
+            )
+        else:
+            warnings.append("contextual_retrieval enabled but no LLM configured")
+
     embedder = get_embedder()
     chunk_texts = [c.content for c in chunk_results]
     embeddings = await anyio.to_thread.run_sync(lambda: embedder.embed_documents(chunk_texts))

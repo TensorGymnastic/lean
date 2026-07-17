@@ -80,6 +80,20 @@ class Settings(BaseSettings):
     mcp_http_port: int = _yaml.get("transport", {}).get("mcp_port", 8765)
     api_port: int = _yaml.get("transport", {}).get("api_port", 8766)
 
+    # --- LLM (optional sidecar for Contextual Retrieval + query transforms) ---
+    minimax_api_key: str = Field(default="", description="MiniMax API key")
+    llm_minimax_base_url: str = _yaml.get("llm", {}).get(
+        "minimax_base_url", "https://api.minimax.io"
+    )
+    llm_minimax_model: str = _yaml.get("llm", {}).get("minimax_model", "MiniMax-Text-01")
+    llm_ollama_url: str = _yaml.get("llm", {}).get("ollama_url", "")
+    llm_ollama_model: str = _yaml.get("llm", {}).get("ollama_model", "qwen3.5:9b")
+    llm_timeout_s: float = _yaml.get("llm", {}).get("timeout_s", 60.0)
+    llm_contextual_retrieval: bool = _yaml.get("llm", {}).get("contextual_retrieval", False)
+    llm_multi_query: bool = _yaml.get("llm", {}).get("multi_query", False)
+    llm_hyde: bool = _yaml.get("llm", {}).get("hyde", False)
+    llm_multi_query_count: int = _yaml.get("llm", {}).get("multi_query_count", 4)
+
 
 def get_settings() -> Settings:
     """Factory that re-reads env on each call (test-friendly)."""

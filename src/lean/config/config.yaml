@@ -40,3 +40,14 @@ transport:
   mcp_host: 127.0.0.1
   mcp_port: 8765
   api_port: 8766
+
+llm:
+  minimax_base_url: https://api.minimax.io
+  minimax_model: MiniMax-Text-01
+  ollama_url: ""              # e.g. http://gpu-host:11434 (alternative to MiniMax)
+  ollama_model: qwen3.5:9b
+  timeout_s: 60.0
+  contextual_retrieval: false  # set true to prepend LLM context per chunk at ingestion
+  multi_query: false           # set true to generate N paraphrased queries at search time
+  hyde: false                  # set true to use HyDE (hypothetical document embeddings)
+  multi_query_count: 4

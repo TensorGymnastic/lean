@@ -13,6 +13,7 @@ GPU-accelerated embeddings, and hybrid BM25 + vector search via pgvector.
 - **Cross-encoder reranking** — fetch wide candidate set (fetch_k = 8×top_k), rerank with `ms-marco-MiniLM-L-6-v2`, return top-k
 - **MCP server** — 8 tools, 4 resources, 3 prompts exposed over stdio or HTTP (FastAPI REST mirror included)
 - **Retrieval evaluation** — built-in `lean eval` command computing hit_rate@k, MRR@k, NDCG@k, and Recall@k, with results persisted for trending
+- **Optional LLM sidecar** — Contextual Retrieval (Anthropic technique), HyDE, and multi-query generation via MiniMax or local Ollama — all opt-in, pipeline works without LLM
 - **Thin transport layers** — CLI, MCP server, and REST API are all thin delegates to a shared services layer; no business logic in the transport tier
 
 ## Tech Stack
@@ -277,6 +278,10 @@ retrieval:
   fetch_multiplier: 8
   rerank:
     enabled: true
+llm:
+  contextual_retrieval: false  # set true + add MINIMAX_API_KEY to .env
+  multi_query: false           # set true for multi-query generation
+  hyde: false                  # set true for HyDE
 ```
 
 ## Database Migrations
