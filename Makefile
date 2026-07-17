@@ -59,7 +59,7 @@ mcp-serve-http:
 	uv run lean mcp-serve --transport http
 
 api-serve:
-	uv run uvicorn lean.api.routes:app --reload --port 8766
+	uv run lean api-serve
 
 smoke:
 	uv run lean health

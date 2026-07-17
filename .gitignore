@@ -31,3 +31,11 @@ data/*.pdf
 .DS_Store
 .idea/
 .vscode/
+
+# Stale build artifacts
+app/
+
+# Supabase CLI state (per-machine, not shared)
+supabase/.branches/
+supabase/.temp/
+supabase/snippets/

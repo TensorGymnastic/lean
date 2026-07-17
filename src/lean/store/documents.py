@@ -6,9 +6,11 @@ Holds upsert, delete, listing, and storage-path lookup. Takes a
 
 from __future__ import annotations
 
+from typing import Any
 from uuid import UUID  # noqa: TC003
 
 from psycopg.rows import dict_row
+from psycopg.types.json import Jsonb
 
 from lean.models.schemas import DocumentSummary
 from lean.store.base import StoreConnection
@@ -33,6 +35,7 @@ class DocumentRepo:
         publisher: str | None = None,
         year: int | None = None,
         page_count: int | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> UUID:
         """Insert or update a document. Returns the document UUID.
 
@@ -45,8 +48,8 @@ class DocumentRepo:
                 insert into public.documents
                     (source_path, source_sha256, title, authors, publisher, year,
                      page_count, extraction_method, source_storage_path,
-                     markdown_storage_path)
-                values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     markdown_storage_path, metadata)
+                values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 on conflict (source_sha256) do update set
                     source_path = excluded.source_path,
                     title = excluded.title,
@@ -55,6 +58,7 @@ class DocumentRepo:
                     year = excluded.year,
                     page_count = excluded.page_count,
                     extraction_method = excluded.extraction_method,
+                    metadata = excluded.metadata,
                     reingested_at = now()
                 returning id
                 """,
@@ -69,6 +73,7 @@ class DocumentRepo:
                     extraction_method,
                     source_storage_path,
                     markdown_storage_path,
+                    Jsonb(metadata or {}),
                 ),
             )
             row = cur.fetchone()

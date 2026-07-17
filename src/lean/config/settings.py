@@ -33,8 +33,6 @@ class Settings(BaseSettings):
     )
 
     # --- Secrets (from .env only) ---
-    supabase_url: str = Field(default="", description="Supabase project URL")
-    supabase_service_key: str = Field(default="", description="Supabase service_role key")
     supabase_db_url: str = Field(description="Direct Postgres DSN for pgvector")
     hf_token: str = Field(default="", description="HF token for gated models")
     lean_mcp_api_key: str = Field(description="Bearer token for MCP HTTP transport")

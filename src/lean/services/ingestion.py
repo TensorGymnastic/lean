@@ -131,6 +131,11 @@ async def ingest_pdf(path: str) -> IngestResult:
             publisher=pdf_meta.publisher,
             year=pdf_meta.year,
             page_count=page_count,
+            metadata={
+                "keywords": pdf_meta.keywords,
+                "subject": pdf_meta.subject,
+                "toc": pdf_meta.toc,
+            },
         )
         chunk_rows = [
             ChunkRow(

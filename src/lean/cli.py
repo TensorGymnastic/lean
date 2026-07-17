@@ -303,6 +303,24 @@ def mcp_serve(
     main(["--transport", transport, "--port", str(port)])
 
 
+@app.command(name="api-serve")
+def api_serve(
+    reload: bool = typer.Option(False, "--reload", help="Enable auto-reload"),
+) -> None:
+    """Start the FastAPI REST API server (bearer-authed)."""
+    import uvicorn
+
+    from lean.config.settings import get_settings
+
+    settings = get_settings()
+    uvicorn.run(
+        "lean.api.routes:app",
+        host=settings.mcp_http_host,
+        port=settings.api_port,
+        reload=reload,
+    )
+
+
 @app.command(name="db-init")
 def db_init() -> None:
     """Apply db/schemas/*.sql to local Supabase."""

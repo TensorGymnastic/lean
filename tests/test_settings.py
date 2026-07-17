@@ -5,8 +5,6 @@ from __future__ import annotations
 
 def test_settings_from_env(monkeypatch) -> None:
     """Settings load correctly from environment variables."""
-    monkeypatch.setenv("SUPABASE_URL", "http://localhost:54321")
-    monkeypatch.setenv("SUPABASE_SERVICE_KEY", "test-service-key")
     monkeypatch.setenv("SUPABASE_DB_URL", "postgresql://postgres:postgres@localhost:54322/postgres")
     monkeypatch.setenv("HF_TOKEN", "test-hf-token")
     monkeypatch.setenv("OCR_BASE_URL", "http://3080ti:8000")
@@ -16,8 +14,6 @@ def test_settings_from_env(monkeypatch) -> None:
 
     settings = Settings()
 
-    assert settings.supabase_url == "http://localhost:54321"
-    assert settings.supabase_service_key == "test-service-key"
     assert settings.supabase_db_url == "postgresql://postgres:postgres@localhost:54322/postgres"
     assert settings.hf_token == "test-hf-token"
     assert settings.ocr_base_url == "http://3080ti:8000"
@@ -32,12 +28,9 @@ def test_settings_from_env(monkeypatch) -> None:
 
 def test_settings_defaults_for_optional_fields(monkeypatch) -> None:
     """Required fields come from env; optional fields use defaults."""
-    monkeypatch.setenv("SUPABASE_URL", "http://localhost:54321")
-    monkeypatch.setenv("SUPABASE_SERVICE_KEY", "key")
     monkeypatch.setenv("SUPABASE_DB_URL", "postgresql://localhost/postgres")
     monkeypatch.setenv("HF_TOKEN", "token")
     monkeypatch.setenv("LEAN_MCP_API_KEY", "apikey")
-    # OCR_BASE_URL not set — should use default from config.yaml or empty
 
     from lean.config.settings import Settings
 
@@ -46,14 +39,7 @@ def test_settings_defaults_for_optional_fields(monkeypatch) -> None:
 
 
 def test_get_settings_factory_caches_singleton(monkeypatch) -> None:
-    """get_settings() returns the SAME cached instance each call.
-
-    Critical for hot paths: api/routes.py:_verify_token runs per authed HTTP
-    request, services/search.py runs per query. A non-caching factory rebuilds
-    pydantic env-parsing on every call.
-    """
-    monkeypatch.setenv("SUPABASE_URL", "http://localhost:54321")
-    monkeypatch.setenv("SUPABASE_SERVICE_KEY", "key")
+    """get_settings() returns the SAME cached instance each call."""
     monkeypatch.setenv("SUPABASE_DB_URL", "postgresql://localhost/postgres")
     monkeypatch.setenv("HF_TOKEN", "token")
     monkeypatch.setenv("LEAN_MCP_API_KEY", "apikey")
@@ -73,8 +59,6 @@ def test_get_settings_factory_caches_singleton(monkeypatch) -> None:
 
 def test_get_settings_picks_up_env_changes_after_cache_clear(monkeypatch) -> None:
     """After cache_clear(), get_settings() reflects new env values."""
-    monkeypatch.setenv("SUPABASE_URL", "http://localhost:54321")
-    monkeypatch.setenv("SUPABASE_SERVICE_KEY", "key")
     monkeypatch.setenv("SUPABASE_DB_URL", "postgresql://localhost/postgres")
     monkeypatch.setenv("HF_TOKEN", "token")
     monkeypatch.setenv("LEAN_MCP_API_KEY", "apikey")
