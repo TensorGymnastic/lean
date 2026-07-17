@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import Field
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -110,6 +110,37 @@ class Settings(BaseSettings):
     llm_multi_query: bool = _yaml.get("llm", {}).get("multi_query", False)
     llm_hyde: bool = _yaml.get("llm", {}).get("hyde", False)
     llm_multi_query_count: int = _yaml.get("llm", {}).get("multi_query_count", 4)
+
+    @field_validator("lean_mcp_api_key")
+    @classmethod
+    def _validate_api_key(cls, v: str) -> str:
+        if len(v) < 16:
+            raise ValueError("LEAN_MCP_API_KEY must be at least 16 characters")
+        if v == "change-me":
+            raise ValueError("LEAN_MCP_API_KEY must not be the default 'change-me'")
+        return v
+
+    @field_validator("mcp_http_port", "api_port")
+    @classmethod
+    def _validate_port(cls, v: int) -> int:
+        if not 1 <= v <= 65535:
+            raise ValueError("port must be between 1 and 65535")
+        return v
+
+    @model_validator(mode="after")
+    def _validate_cross_field(self) -> Settings:
+        if self.chunk_hard_cap <= self.chunk_target_max:
+            raise ValueError(
+                f"chunk_hard_cap ({self.chunk_hard_cap}) must be > "
+                f"chunk_target_max ({self.chunk_target_max})"
+            )
+        if self.rrf_k <= 0:
+            raise ValueError(f"rrf_k must be > 0, got {self.rrf_k}")
+        if self.fetch_multiplier < 1:
+            raise ValueError(f"fetch_multiplier must be >= 1, got {self.fetch_multiplier}")
+        if self.eval_k <= 0:
+            raise ValueError(f"eval_k must be > 0, got {self.eval_k}")
+        return self
 
 
 @lru_cache(maxsize=1)

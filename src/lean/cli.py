@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import subprocess
+import sys
 from pathlib import Path
 
 import typer
@@ -14,6 +16,27 @@ app = typer.Typer(
     help="Lean Six Sigma corpus MCP server and CLI.",
     no_args_is_help=True,
 )
+
+
+@app.callback()
+def _main(
+    ctx: typer.Context,
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable DEBUG logging"),
+) -> None:
+    if verbose:
+        level = logging.DEBUG
+    else:
+        try:
+            from lean.config.settings import get_settings
+
+            level = getattr(logging, get_settings().log_level.upper(), logging.INFO)
+        except Exception:
+            level = logging.INFO
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        stream=sys.stderr,
+    )
 
 
 def _output(data: object, json_mode: bool) -> None:
