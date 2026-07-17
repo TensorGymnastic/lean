@@ -38,7 +38,14 @@ def get_embedder() -> Embedder:
             timeout=s.embedding_http_timeout,
             max_retries=s.embedding_max_retries,
         )
-    from lean.embeddings.liquid_lmf import LiquidLMFEmbedder
+    try:
+        from lean.embeddings.liquid_lmf import LiquidLMFEmbedder
+    except ImportError as e:
+        raise ImportError(
+            "Local embedding models require optional deps. "
+            "Install with: uv sync --extra local-models "
+            "(or set embedding.remote_url to use remote Ollama)"
+        ) from e
 
     return LiquidLMFEmbedder(
         model=s.embedding_model,

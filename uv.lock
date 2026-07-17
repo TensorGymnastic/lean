@@ -1158,12 +1158,16 @@ dependencies = [
     { name = "pydantic-settings" },
     { name = "pymupdf" },
     { name = "pyyaml" },
-    { name = "sentence-transformers" },
     { name = "tiktoken" },
-    { name = "torch" },
-    { name = "transformers" },
     { name = "typer" },
     { name = "uvicorn", extra = ["standard"] },
+]
+
+[package.optional-dependencies]
+local-models = [
+    { name = "sentence-transformers" },
+    { name = "torch" },
+    { name = "transformers" },
 ]
 
 [package.dev-dependencies]
@@ -1194,13 +1198,14 @@ requires-dist = [
     { name = "pydantic-settings", specifier = ">=2.3" },
     { name = "pymupdf", specifier = ">=1.24" },
     { name = "pyyaml", specifier = ">=6.0.3" },
-    { name = "sentence-transformers", specifier = ">=3.0" },
+    { name = "sentence-transformers", marker = "extra == 'local-models'", specifier = ">=3.0" },
     { name = "tiktoken", specifier = ">=0.7" },
-    { name = "torch", specifier = ">=2.3" },
-    { name = "transformers", specifier = ">=4.57.1,<5" },
+    { name = "torch", marker = "extra == 'local-models'", specifier = ">=2.3" },
+    { name = "transformers", marker = "extra == 'local-models'", specifier = ">=4.57.1,<5" },
     { name = "typer", specifier = ">=0.12" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.30" },
 ]
+provides-extras = ["local-models"]
 
 [package.metadata.requires-dev]
 dev = [

@@ -14,7 +14,7 @@ WORKDIR /app
 COPY --from=ghcr.io/astral-sh/uv:0.5.11 /uv /usr/local/bin/uv
 
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev
+RUN uv sync --frozen --no-dev --extra local-models
 
 COPY src ./src
 
@@ -39,4 +39,4 @@ USER lean
 
 EXPOSE 8765
 
-CMD ["uv", "run", "python", "-m", "lean.mcp_server", "--transport", "http", "--host", "0.0.0.0", "--port", "8765"]
+CMD ["/app/.venv/bin/python", "-m", "lean.mcp_server", "--transport", "http", "--host", "0.0.0.0", "--port", "8765"]
