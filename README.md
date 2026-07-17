@@ -15,6 +15,8 @@ GPU-accelerated embeddings, and hybrid BM25 + vector search via pgvector.
 - **Retrieval evaluation** — built-in `lean eval` command computing hit_rate@k, MRR@k, NDCG@k, and Recall@k, with results persisted for trending
 - **Optional LLM sidecar** — Contextual Retrieval (Anthropic technique), HyDE, and multi-query generation via MiniMax or local Ollama — all opt-in, pipeline works without LLM
 - **Thin transport layers** — CLI, MCP server, and REST API are all thin delegates to a shared services layer; no business logic in the transport tier
+- **Security hardening** — corpus-root path confinement on ingest, API key validation (min 16 chars), HuggingFace model revisions pinned to SHA hashes (`trust_remote_code` safety), non-root Docker user, multi-stage build
+- **Optional ML dependencies** — torch/transformers/sentence-transformers install only when local CPU embeddings are needed (`uv sync --extra local-models`); remote-Ollama-only deployments skip the 2 GB download
 
 ## Tech Stack
 
@@ -44,6 +46,10 @@ git clone <repo-url> && cd lean
 
 # 1. Install dependencies
 uv sync --all-groups
+
+# (optional) Install local CPU embeddings + reranker (~2GB torch)
+# Skip if using remote Ollama for embeddings
+uv sync --extra local-models
 
 # 2. Install git hooks
 make hooks-install
@@ -131,7 +137,7 @@ lean/
 │   ├── auth/bearer.py           # ASGI bearer token middleware
 │   ├── models/schemas.py        # shared Pydantic types
 │   └── cli.py                   # Typer CLI (full parity with MCP tools)
-├── db/schemas/                  # SQL migrations (001-006)
+├── db/schemas/                  # SQL migrations (001-007)
 ├── scripts/                     # canonical-queries.json (eval data)
 ├── docker-compose.yml           # Supabase DB + lean-app
 ├── Makefile                     # dev commands
@@ -142,7 +148,7 @@ lean/
 
 ### CLI (`lean`)
 
-All commands support `--json` for structured output.
+All commands support `--json` for structured output. Use `-v` / `--verbose` for debug logging.
 
 | Command | Description |
 |---|---|
@@ -158,6 +164,7 @@ All commands support `--json` for structured output.
 | `lean eval` | Run retrieval evaluation (`--sample-size`, `--k`) |
 | `lean health` | Check OCR server, database, and Ollama connectivity |
 | `lean mcp-serve` | Start the MCP server (`--transport stdio\|http`, `--port`) |
+| `lean api-serve` | Start the FastAPI REST API server (`--reload` for dev) |
 | `lean db-init` | Apply all SQL migrations to the database |
 
 ### Makefile
@@ -248,7 +255,8 @@ Secrets go in `.env`, app config goes in `src/lean/config/config.yaml`. Environm
 ```
 SUPABASE_DB_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres
 HF_TOKEN=<your-token>
-LEAN_MCP_API_KEY=<your-key>
+LEAN_MCP_API_KEY=<your-key-min-16-chars>
+OCR_BASE_URL=http://<gpu-host>:8000
 MINIMAX_API_KEY=<your-key>
 ```
 
@@ -258,7 +266,9 @@ MINIMAX_API_KEY=<your-key>
 ocr:
   base_url: http://<gpu-host>:8000    # empty = markitdown only
 embedding:
-  remote_url: http://<gpu-host>:11434  # empty = local CPU
+  model: LiquidAI/LFM2.5-Embedding-350M
+  model_revision: f35ae2c9...        # pinned for trust_remote_code safety
+  remote_url: http://<gpu-host>:11434  # empty = local CPU (needs --extra local-models)
   remote_model: lfm2.5-embed-32k
   num_ctx: 32768
 chunking:
@@ -273,6 +283,7 @@ retrieval:
   rrf_k: 60                 # Reciprocal Rank Fusion constant
   rerank:
     enabled: true
+    model_revision: c5ee24cb...  # pinned for reproducibility
 eval:
   sample_size: 50
   k: 5
@@ -280,6 +291,7 @@ eval:
 storage:
   source_prefix: "sources/"
   markdown_prefix: "markdown/"
+  corpus_root: "data"        # ingest paths must be within this directory (security)
 health:
   http_timeout: 10
 logging:
