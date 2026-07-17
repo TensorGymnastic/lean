@@ -176,14 +176,6 @@ All commands support `--json` for structured output.
 | `make health` | check OCR server, database, and Ollama (`lean health`) |
 | `make build` / `make up` / `make down` | Docker lifecycle |
 
-### Scripts
-
-| Script | Description |
-|---|---|
-| `scripts/reingest-all.sh [--force]` | Reingest all documents (smallest first, skips OCR'd unless `--force`) |
-| `scripts/smoke-ocr.sh` | OCR server health check |
-| `scripts/smoke-pgvector.sh` | pgvector extension check |
-
 > GPU server setup is documented in `docs/ocr-server-deployment.md`.
 
 ## Usage
@@ -222,11 +214,13 @@ All CLI operations are Python — no bash scripts for core functionality.
 # Start the API server
 make api-serve   # http://localhost:8766
 
-# Search (bearer-authed)
+# Search (bearer-authed, GET with query params)
 curl -H "Authorization: Bearer $LEAN_MCP_API_KEY" \
-     -H "Content-Type: application/json" \
-     -d '{"query": "What is DMAIC?", "k": 5}' \
-     http://localhost:8766/search
+     "http://localhost:8766/search?query=What+is+DMAIC%3F&k=5"
+
+# List documents
+curl -H "Authorization: Bearer $LEAN_MCP_API_KEY" \
+     http://localhost:8766/documents
 ```
 
 ### CLI Quick Start
@@ -308,6 +302,7 @@ llm:
 | 004 | `query_logs.sql` | search query analytics |
 | 005 | `tsvector.sql` | BM25 full-text GIN index |
 | 006 | `eval_runs.sql` | eval metrics tracking |
+| 007 | `drop_markdown_content.sql` | drop unused column |
 
 ## License
 

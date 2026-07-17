@@ -25,8 +25,8 @@ Supabase pgvector, and exposes the corpus via fastmcp tools/resources/prompts.
 - `src/lean/auth/bearer.py` — ASGI middleware for bearer token auth
 - `src/lean/cli.py` — Typer CLI (full parity with MCP tools)
 - `src/lean/eval/` — retrieval evaluation harness (hit_rate@k, MRR@k)
-- `db/schemas/` — SQL migrations (001-006)
-- `scripts/` — reingest-all, smoke checks, canonical queries
+- `db/schemas/` — SQL migrations (001-007)
+- `scripts/` — canonical-queries.json (eval fixture)
 
 ## Engineering Rules
 
