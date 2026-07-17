@@ -11,9 +11,11 @@ from lean.mcp_server.tools import mcp
 
 
 def main(argv: list[str] | None = None) -> None:
-    logging.basicConfig(level=logging.INFO, stream=sys.stderr)
-
     settings = get_settings()
+    logging.basicConfig(
+        level=getattr(logging, settings.log_level.upper(), logging.INFO),
+        stream=sys.stderr,
+    )
 
     parser = argparse.ArgumentParser(description="lean MCP server")
     parser.add_argument(

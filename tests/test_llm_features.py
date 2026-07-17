@@ -62,7 +62,7 @@ def test_contextual_retrieval_prepends_context() -> None:
     ]
     llm = FakeLLM(response="Context for this chunk.")
 
-    result = add_context_to_chunks(chunks, sections, llm)
+    result = add_context_to_chunks(chunks, sections, llm, max_tokens=500, temperature=0.0)
 
     assert len(result) == 2
     assert result[0].content.startswith("Context for this chunk.")
@@ -87,7 +87,7 @@ def test_contextual_retrieval_falls_back_on_error() -> None:
         ),
     ]
 
-    result = add_context_to_chunks(chunks, sections, FailingLLM())
+    result = add_context_to_chunks(chunks, sections, FailingLLM(), max_tokens=500, temperature=0.0)
 
     assert result[0].content == "Important content"
 
@@ -97,7 +97,7 @@ def test_hyde_transform_returns_passage() -> None:
     from lean.retrieval.query_transform import hyde_transform
 
     llm = FakeLLM(response="DMAIC stands for Define, Measure, Analyze, Improve, Control.")
-    result = hyde_transform("What is DMAIC?", llm)
+    result = hyde_transform("What is DMAIC?", llm, max_tokens=500, temperature=0.0)
 
     assert "DMAIC" in result
     assert result != "What is DMAIC?"
@@ -107,7 +107,7 @@ def test_hyde_transform_falls_back_on_error() -> None:
     """HyDE returns original query when LLM fails."""
     from lean.retrieval.query_transform import hyde_transform
 
-    result = hyde_transform("What is DMAIC?", FailingLLM())
+    result = hyde_transform("What is DMAIC?", FailingLLM(), max_tokens=500, temperature=0.0)
     assert result == "What is DMAIC?"
 
 
@@ -116,7 +116,9 @@ def test_multi_query_returns_original_plus_variants() -> None:
     from lean.retrieval.query_transform import multi_query_transform
 
     llm = FakeLLM(response="What does DMAIC mean?\nExplain DMAIC methodology\nDMAIC process steps")
-    result = multi_query_transform("What is DMAIC?", llm, num_queries=4)
+    result = multi_query_transform(
+        "What is DMAIC?", llm, num_queries=4, max_tokens=500, temperature=0.0
+    )
 
     assert len(result) == 4
     assert result[0] == "What is DMAIC?"
@@ -127,7 +129,9 @@ def test_multi_query_falls_back_on_error() -> None:
     """Multi-query returns [original] when LLM fails."""
     from lean.retrieval.query_transform import multi_query_transform
 
-    result = multi_query_transform("What is DMAIC?", FailingLLM(), num_queries=4)
+    result = multi_query_transform(
+        "What is DMAIC?", FailingLLM(), num_queries=4, max_tokens=500, temperature=0.0
+    )
     assert result == ["What is DMAIC?"]
 
 
@@ -136,7 +140,7 @@ def test_multi_query_trims_excess() -> None:
     from lean.retrieval.query_transform import multi_query_transform
 
     llm = FakeLLM(response="Q1\nQ2\nQ3\nQ4\nQ5\nQ6\nQ7\nQ8")
-    result = multi_query_transform("original", llm, num_queries=4)
+    result = multi_query_transform("original", llm, num_queries=4, max_tokens=500, temperature=0.0)
 
     assert len(result) == 4
     assert result[0] == "original"

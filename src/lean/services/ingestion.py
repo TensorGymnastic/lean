@@ -87,7 +87,13 @@ async def ingest_pdf(path: str) -> IngestResult:
         llm = get_llm()
         if llm:
             chunk_results = await anyio.to_thread.run_sync(
-                lambda: add_context_to_chunks(chunk_results, sections, llm)
+                lambda: add_context_to_chunks(
+                    chunk_results,
+                    sections,
+                    llm,
+                    max_tokens=settings.llm_generate_max_tokens,
+                    temperature=settings.llm_generate_temperature,
+                )
             )
         else:
             warnings.append("contextual_retrieval enabled but no LLM configured")
@@ -96,8 +102,8 @@ async def ingest_pdf(path: str) -> IngestResult:
     chunk_texts = [c.content for c in chunk_results]
     embeddings = await anyio.to_thread.run_sync(lambda: embedder.embed_documents(chunk_texts))
 
-    source_storage_path = f"sources/{source_sha256}.pdf"
-    markdown_storage_path = f"markdown/{source_sha256}.md"
+    source_storage_path = f"{settings.storage_source_prefix}{source_sha256}.pdf"
+    markdown_storage_path = f"{settings.storage_markdown_prefix}{source_sha256}.md"
 
     pdf_meta = await anyio.to_thread.run_sync(lambda: extract_metadata(pdf_path))
 

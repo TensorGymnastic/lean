@@ -38,6 +38,8 @@ def get_embedder() -> Embedder:
                 model=s.embedding_remote_model,
                 dim=s.embedding_dim,
                 num_ctx=s.embedding_num_ctx,
+                timeout=s.embedding_http_timeout,
+                max_retries=s.embedding_max_retries,
             )
         else:
             from lean.embeddings.liquid_lmf import LiquidLMFEmbedder

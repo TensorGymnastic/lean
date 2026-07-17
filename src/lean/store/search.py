@@ -155,8 +155,8 @@ class SearchEngine:
         vector_hits: list[SearchHit],
         bm25_hits: list[SearchHit],
         *,
-        k: int = 5,
-        rrf_k: int = 60,
+        k: int,
+        rrf_k: int,
     ) -> list[SearchHit]:
         """Fuse two ranked lists using Reciprocal Rank Fusion.
 

@@ -119,7 +119,9 @@ def test_minimax_hyde_returns_passage() -> None:
     from lean.retrieval.query_transform import hyde_transform
 
     llm = _make_minimax()
-    passage = hyde_transform("What is DMAIC in Lean Six Sigma?", llm)
+    passage = hyde_transform(
+        "What is DMAIC in Lean Six Sigma?", llm, max_tokens=500, temperature=0.0
+    )
     assert len(passage) > 50
     assert any(kw in passage.lower() for kw in ["dmaic", "define", "measure", "analyze", "control"])
 
@@ -130,7 +132,9 @@ def test_minimax_multi_query_returns_variants() -> None:
     from lean.retrieval.query_transform import multi_query_transform
 
     llm = _make_minimax()
-    queries = multi_query_transform("What is DMAIC?", llm, num_queries=4)
+    queries = multi_query_transform(
+        "What is DMAIC?", llm, num_queries=4, max_tokens=500, temperature=0.0
+    )
     assert len(queries) == 4
     assert queries[0] == "What is DMAIC?"
     assert all(len(q) > 5 for q in queries)
@@ -143,7 +147,7 @@ def test_minimax_contextual_adds_context() -> None:
 
     llm = _make_minimax()
     chunks, sections = _make_test_chunks()
-    result = add_context_to_chunks(chunks, sections, llm)
+    result = add_context_to_chunks(chunks, sections, llm, max_tokens=500, temperature=0.0)
     assert len(result) == 1
     assert len(result[0].content) > len(chunks[0].content)
     assert "DMAIC" in result[0].content or "Six Sigma" in result[0].content
@@ -173,7 +177,7 @@ def test_ollama_lfm_hyde_returns_passage() -> None:
 
     try:
         llm = _make_ollama()
-        passage = hyde_transform("What is DMAIC?", llm)
+        passage = hyde_transform("What is DMAIC?", llm, max_tokens=500, temperature=0.0)
         assert len(passage) > 30
         assert any(
             kw in passage.lower() for kw in ["dmaic", "define", "measure", "methodology", "sigma"]
@@ -190,7 +194,9 @@ def test_ollama_lfm_multi_query_returns_variants() -> None:
 
     try:
         llm = _make_ollama()
-        queries = multi_query_transform("What is DMAIC?", llm, num_queries=3)
+        queries = multi_query_transform(
+            "What is DMAIC?", llm, num_queries=3, max_tokens=500, temperature=0.0
+        )
         assert len(queries) >= 2
         assert queries[0] == "What is DMAIC?"
     except Exception as e:
@@ -206,7 +212,7 @@ def test_ollama_lfm_contextual_adds_context() -> None:
     try:
         llm = _make_ollama()
         chunks, sections = _make_test_chunks()
-        result = add_context_to_chunks(chunks, sections, llm)
+        result = add_context_to_chunks(chunks, sections, llm, max_tokens=500, temperature=0.0)
         assert len(result) == 1
         assert len(result[0].content) >= len(chunks[0].content)
     except Exception as e:

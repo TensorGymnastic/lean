@@ -48,6 +48,8 @@ class Settings(BaseSettings):
     embedding_remote_url: str = _yaml.get("embedding", {}).get("remote_url", "")
     embedding_remote_model: str = _yaml.get("embedding", {}).get("remote_model", "")
     embedding_num_ctx: int = _yaml.get("embedding", {}).get("num_ctx", 32768)
+    embedding_http_timeout: float = _yaml.get("embedding", {}).get("http_timeout", 30.0)
+    embedding_max_retries: int = _yaml.get("embedding", {}).get("max_retries", 3)
 
     ocr_model: str = _yaml.get("ocr", {}).get("model", "baidu/Unlimited-OCR")
     ocr_dpi: int = _yaml.get("ocr", {}).get("dpi", 300)
@@ -65,6 +67,8 @@ class Settings(BaseSettings):
     min_similarity: float = _yaml.get("retrieval", {}).get("min_similarity", 0.0)
     hybrid_search_enabled: bool = _yaml.get("retrieval", {}).get("hybrid_search", True)
     fetch_multiplier: int = _yaml.get("retrieval", {}).get("fetch_multiplier", 8)
+    fetch_k_floor: int = _yaml.get("retrieval", {}).get("fetch_k_floor", 40)
+    rrf_k: int = _yaml.get("retrieval", {}).get("rrf_k", 60)
     rerank_enabled: bool = _yaml.get("retrieval", {}).get("rerank", {}).get("enabled", False)
     rerank_model: str = (
         _yaml.get("retrieval", {})
@@ -77,6 +81,21 @@ class Settings(BaseSettings):
     mcp_http_port: int = _yaml.get("transport", {}).get("mcp_port", 8765)
     api_port: int = _yaml.get("transport", {}).get("api_port", 8766)
 
+    # --- Storage paths ---
+    storage_source_prefix: str = _yaml.get("storage", {}).get("source_prefix", "sources/")
+    storage_markdown_prefix: str = _yaml.get("storage", {}).get("markdown_prefix", "markdown/")
+
+    # --- Health checks ---
+    health_http_timeout: float = _yaml.get("health", {}).get("http_timeout", 10.0)
+
+    # --- Logging ---
+    log_level: str = _yaml.get("logging", {}).get("level", "INFO")
+
+    # --- Eval ---
+    eval_sample_size: int = _yaml.get("eval", {}).get("sample_size", 50)
+    eval_k: int = _yaml.get("eval", {}).get("k", 5)
+    eval_seed: int = _yaml.get("eval", {}).get("seed", 42)
+
     # --- LLM (optional sidecar for Contextual Retrieval + query transforms) ---
     minimax_api_key: str = Field(default="", description="MiniMax API key")
     llm_minimax_base_url: str = _yaml.get("llm", {}).get(
@@ -86,6 +105,8 @@ class Settings(BaseSettings):
     llm_ollama_url: str = _yaml.get("llm", {}).get("ollama_url", "")
     llm_ollama_model: str = _yaml.get("llm", {}).get("ollama_model", "qwen3.5:9b")
     llm_timeout_s: float = _yaml.get("llm", {}).get("timeout_s", 60.0)
+    llm_generate_max_tokens: int = _yaml.get("llm", {}).get("generate_max_tokens", 500)
+    llm_generate_temperature: float = _yaml.get("llm", {}).get("generate_temperature", 0.0)
     llm_contextual_retrieval: bool = _yaml.get("llm", {}).get("contextual_retrieval", False)
     llm_multi_query: bool = _yaml.get("llm", {}).get("multi_query", False)
     llm_hyde: bool = _yaml.get("llm", {}).get("hyde", False)

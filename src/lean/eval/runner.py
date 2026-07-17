@@ -46,8 +46,8 @@ class EvalResult:
 def build_eval_dataset(
     store: StoreConnection,
     *,
-    sample_size: int = 50,
-    seed: int = 42,
+    sample_size: int,
+    seed: int,
 ) -> list[EvalSample]:
     """Build an eval dataset by sampling chunks from the corpus.
 
@@ -84,7 +84,7 @@ def evaluate(
     store: StoreConnection,
     samples: list[EvalSample],
     *,
-    k: int = 5,
+    k: int,
 ) -> EvalResult:
     """Run retrieval evaluation: compute hit_rate@k, MRR@k, NDCG@k, Recall@k.
 

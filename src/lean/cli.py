@@ -235,7 +235,9 @@ def health(
 
     if settings.ocr_base_url:
         try:
-            resp = httpx.get(f"{settings.ocr_base_url.rstrip('/')}/health", timeout=10)
+            resp = httpx.get(
+                f"{settings.ocr_base_url.rstrip('/')}/health", timeout=settings.health_http_timeout
+            )
             checks["ocr"] = {
                 "status": "ok" if resp.status_code == 200 else "error",
                 "url": settings.ocr_base_url,
@@ -259,7 +261,10 @@ def health(
 
     if settings.embedding_remote_url:
         try:
-            resp = httpx.get(f"{settings.embedding_remote_url.rstrip('/')}/api/tags", timeout=10)
+            resp = httpx.get(
+                f"{settings.embedding_remote_url.rstrip('/')}/api/tags",
+                timeout=settings.health_http_timeout,
+            )
             checks["ollama"] = {
                 "status": "ok" if resp.status_code == 200 else "error",
                 "url": settings.embedding_remote_url,
@@ -312,8 +317,8 @@ def db_init() -> None:
 
 @app.command()
 def eval(
-    sample_size: int = typer.Option(50, help="Number of chunks to sample for eval"),
-    k: int = typer.Option(5, help="Top-k for hit_rate/MRR"),
+    sample_size: int | None = typer.Option(None, help="Number of chunks to sample for eval"),
+    k: int | None = typer.Option(None, help="Top-k for hit_rate/MRR"),
 ) -> None:
     """Run retrieval evaluation (hit_rate@k, MRR@k, NDCG@k, Recall@k)."""
     from lean.config.settings import get_settings
@@ -321,10 +326,16 @@ def eval(
     from lean.store.analytics import AnalyticsRepo
     from lean.store.base import StoreConnection
 
-    conn = StoreConnection(get_settings().supabase_db_url)
+    settings = get_settings()
+    if sample_size is None:
+        sample_size = settings.eval_sample_size
+    if k is None:
+        k = settings.eval_k
+
+    conn = StoreConnection(settings.supabase_db_url)
     try:
         typer.echo(f"Building eval dataset ({sample_size} samples)...")
-        samples = build_eval_dataset(conn, sample_size=sample_size)
+        samples = build_eval_dataset(conn, sample_size=sample_size, seed=settings.eval_seed)
         typer.echo(f"Running evaluation (k={k})...")
         result = evaluate(conn, samples, k=k)
 

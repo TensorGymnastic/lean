@@ -38,6 +38,8 @@ def add_context_to_chunks(
     sections: list[Section],
     llm: LLMClient,
     *,
+    max_tokens: int,
+    temperature: float,
     max_doc_chars: int = 8000,
 ) -> list[ChunkResult]:
     """Prepend LLM-generated context to each chunk.
@@ -56,8 +58,8 @@ def add_context_to_chunks(
         try:
             context = llm.generate(
                 _CONTEXTUAL_PROMPT.format(document=doc_text, chunk=chunk.content[:1000]),
-                max_tokens=500,
-                temperature=0.0,
+                max_tokens=max_tokens,
+                temperature=temperature,
             )
             contextualized = f"{context}\n\n{chunk.content}" if context else chunk.content
         except Exception:

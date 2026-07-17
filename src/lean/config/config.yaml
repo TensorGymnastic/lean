@@ -5,6 +5,8 @@ embedding:
   remote_url: ""          # set to http://<gpu-host>:11434 to use remote Ollama
   remote_model: lfm2.5-embed-32k
   num_ctx: 32768          # must match Ollama model's PARAMETER num_ctx
+  http_timeout: 30.0      # Ollama embedding HTTP client timeout (seconds)
+  max_retries: 3          # retry attempts on non-200 from Ollama
 
 ocr:
   base_url: ""            # set to http://<gpu-host>:8000 to use Unlimited-OCR
@@ -25,16 +27,33 @@ retrieval:
   top_k: 5
   min_similarity: 0.0
   hybrid_search: true
-  fetch_multiplier: 8       # fetch_k = max(k * fetch_multiplier, 40) — wider candidate set for reranking
+  fetch_multiplier: 8       # fetch_k = max(k * fetch_multiplier, fetch_k_floor) — wider candidate set for reranking
+  fetch_k_floor: 40         # minimum fetch_k regardless of multiplier
+  rrf_k: 60                 # Reciprocal Rank Fusion constant (standard IR value)
   rerank:
     enabled: true           # cross-encoder reranking (ms-marco-MiniLM-L-6-v2), ~100ms/query on CPU
     model: cross-encoder/ms-marco-MiniLM-L-6-v2
     top_n: 5
 
+eval:
+  sample_size: 50           # number of chunks to sample for eval
+  k: 5                      # top-k for hit_rate/MRR/NDCG/Recall
+  seed: 42                  # RNG seed for reproducible sampling
+
 transport:
   mcp_host: 127.0.0.1
   mcp_port: 8765
   api_port: 8766
+
+storage:
+  source_prefix: "sources/"    # storage path prefix for source PDFs
+  markdown_prefix: "markdown/" # storage path prefix for extracted markdown
+
+health:
+  http_timeout: 10          # timeout for OCR/Ollama health check requests (seconds)
+
+logging:
+  level: INFO               # Python logging level (DEBUG/INFO/WARNING/ERROR)
 
 llm:
   minimax_base_url: https://api.minimax.io
@@ -42,6 +61,8 @@ llm:
   ollama_url: ""              # e.g. http://gpu-host:11434 (alternative to MiniMax)
   ollama_model: qwen3.5:9b
   timeout_s: 60.0
+  generate_max_tokens: 500    # default max_tokens for LLM generation calls
+  generate_temperature: 0.0   # default temperature for LLM generation calls
   contextual_retrieval: false  # set true to prepend LLM context per chunk at ingestion
   multi_query: false           # set true to generate N paraphrased queries at search time
   hyde: false                  # set true to use HyDE (hypothetical document embeddings)

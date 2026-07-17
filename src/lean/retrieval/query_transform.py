@@ -33,7 +33,7 @@ _MULTI_QUERY_PROMPT = (
 )
 
 
-def hyde_transform(query: str, llm: LLMClient) -> str:
+def hyde_transform(query: str, llm: LLMClient, *, max_tokens: int, temperature: float) -> str:
     """Generate a hypothetical answer document for the query.
 
     The hypothetical doc is embedded instead of the raw query for the
@@ -45,8 +45,8 @@ def hyde_transform(query: str, llm: LLMClient) -> str:
     try:
         passage = llm.generate(
             _HYDE_PROMPT.format(query=query),
-            max_tokens=500,
-            temperature=0.0,
+            max_tokens=max_tokens,
+            temperature=temperature,
         )
         if passage.strip():
             return passage
@@ -55,7 +55,14 @@ def hyde_transform(query: str, llm: LLMClient) -> str:
     return query
 
 
-def multi_query_transform(query: str, llm: LLMClient, *, num_queries: int) -> list[str]:
+def multi_query_transform(
+    query: str,
+    llm: LLMClient,
+    *,
+    num_queries: int,
+    max_tokens: int,
+    temperature: float,
+) -> list[str]:
     """Generate paraphrased queries for multi-query retrieval.
 
     Returns a list of queries (original + generated paraphrases).
@@ -64,8 +71,8 @@ def multi_query_transform(query: str, llm: LLMClient, *, num_queries: int) -> li
     try:
         raw = llm.generate(
             _MULTI_QUERY_PROMPT.format(query=query, num_queries=num_queries - 1),
-            max_tokens=500,
-            temperature=0.0,
+            max_tokens=max_tokens,
+            temperature=temperature,
         )
         generated = [line.strip() for line in raw.strip().split("\n") if line.strip()]
         if len(generated) > num_queries - 1:

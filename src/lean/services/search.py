@@ -57,14 +57,24 @@ def search(
     if settings.llm_multi_query and llm:
         from lean.retrieval.query_transform import multi_query_transform
 
-        queries = multi_query_transform(query, llm, num_queries=settings.llm_multi_query_count)
+        queries = multi_query_transform(
+            query,
+            llm,
+            num_queries=settings.llm_multi_query_count,
+            max_tokens=settings.llm_generate_max_tokens,
+            temperature=settings.llm_generate_temperature,
+        )
 
     conn = StoreConnection.from_env()
     try:
         engine = SearchEngine(conn)
         analytics = AnalyticsRepo(conn)
 
-        fetch_k = max(k * settings.fetch_multiplier, 40) if settings.hybrid_search_enabled else k
+        fetch_k = (
+            max(k * settings.fetch_multiplier, settings.fetch_k_floor)
+            if settings.hybrid_search_enabled
+            else k
+        )
 
         fused_lists: list[list[SearchHit]] = []
         for q in queries:
@@ -72,7 +82,12 @@ def search(
             if settings.llm_hyde and llm:
                 from lean.retrieval.query_transform import hyde_transform
 
-                embed_text = hyde_transform(q, llm)
+                embed_text = hyde_transform(
+                    q,
+                    llm,
+                    max_tokens=settings.llm_generate_max_tokens,
+                    temperature=settings.llm_generate_temperature,
+                )
 
             query_vec = embedder.embed_query(embed_text)
 
@@ -96,7 +111,11 @@ def search(
                     year_min=year_min,
                     year_max=year_max,
                 )
-                fused_lists.append(engine.reciprocal_rank_fusion(vector_hits, bm25_hits, k=fetch_k))
+                fused_lists.append(
+                    engine.reciprocal_rank_fusion(
+                        vector_hits, bm25_hits, k=fetch_k, rrf_k=settings.rrf_k
+                    )
+                )
             else:
                 fused_lists.append(
                     engine.vector_search(
@@ -113,7 +132,7 @@ def search(
 
         hits = fused_lists[0]
         for extra in fused_lists[1:]:
-            hits = engine.reciprocal_rank_fusion(hits, extra, k=fetch_k)
+            hits = engine.reciprocal_rank_fusion(hits, extra, k=fetch_k, rrf_k=settings.rrf_k)
 
         if settings.rerank_enabled and hits:
             from lean.retrieval.reranker import rerank as _rerank
