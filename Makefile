@@ -1,5 +1,5 @@
 .PHONY: install hooks-install format format-check lint typecheck test verify \
-        db-init db-reset ocr-health ingest-all ingest-one search \
+        verify-all db-init db-reset ocr-health ingest-all ingest-one search \
         mcp-serve mcp-serve-http api-serve smoke build up down
 
 install:
@@ -21,9 +21,12 @@ typecheck:
 	uv run mypy src/lean
 
 test:
-	uv run python3 -m pytest
+	uv run python3 -m pytest -m 'not slow and not integration and not e2e'
 
 verify: format-check lint typecheck test
+
+verify-all: format-check lint typecheck
+	uv run python3 -m pytest
 
 db-init:
 	for f in db/schemas/*.sql; do \

@@ -130,7 +130,7 @@ lean/
 │   ├── models/schemas.py        # shared Pydantic types
 │   └── cli.py                   # Typer CLI (full parity with MCP tools)
 ├── db/schemas/                  # SQL migrations (001-006)
-├── scripts/                     # reingest-all, smoke checks, GPU setup
+├── scripts/                     # reingest-all, smoke checks, canonical queries
 ├── docker-compose.yml           # Supabase DB + lean-app
 ├── Makefile                     # dev commands
 └── pyproject.toml               # uv project config
@@ -160,9 +160,9 @@ All commands support `--json` for structured output.
 
 | Target | Description |
 |---|---|
-| `make verify` | ruff check + mypy + pytest (unit only) |
-| `make verify-all` | all tests including integration |
-| `make format` / `make lint` / `make typecheck` | individual checks |
+| `make verify` | format-check + lint + typecheck + unit tests |
+| `make verify-all` | format-check + lint + typecheck + all tests (incl. integration/e2e) |
+| `make format` / `make format-check` / `make lint` / `make typecheck` | individual checks |
 | `make db-init` | apply all SQL migrations |
 | `make ingest-all` | ingest all `data/*.pdf` |
 | `make search QUERY="..."` | search from the command line |
