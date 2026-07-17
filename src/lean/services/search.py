@@ -145,6 +145,7 @@ def search(
                 model=settings.rerank_model,
                 top_n=settings.rerank_top_n,
                 device=settings.embedding_device,
+                revision=settings.rerank_model_revision,
             )
 
         effective_min = min_score if min_score is not None else settings.min_similarity

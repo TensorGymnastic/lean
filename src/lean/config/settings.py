@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     ocr_base_url: str = _yaml.get("ocr", {}).get("base_url", "")
 
     embedding_model: str = _yaml.get("embedding", {}).get("model", "LiquidAI/LFM2.5-Embedding-350M")
+    embedding_model_revision: str = _yaml.get("embedding", {}).get(
+        "model_revision", "f35ae2c91d687658dbf1f2b449382f0b019b9808"
+    )
     embedding_dim: int = _yaml.get("embedding", {}).get("dim", 1024)
     embedding_device: str = _yaml.get("embedding", {}).get("device", "cpu")
     embedding_remote_url: str = _yaml.get("embedding", {}).get("remote_url", "")
@@ -72,6 +75,11 @@ class Settings(BaseSettings):
         _yaml.get("retrieval", {})
         .get("rerank", {})
         .get("model", "cross-encoder/ms-marco-MiniLM-L-6-v2")
+    )
+    rerank_model_revision: str = (
+        _yaml.get("retrieval", {})
+        .get("rerank", {})
+        .get("model_revision", "c5ee24cb16019beea0893ab7796b1df96625c6b8")
     )
     rerank_top_n: int = _yaml.get("retrieval", {}).get("rerank", {}).get("top_n", 5)
 

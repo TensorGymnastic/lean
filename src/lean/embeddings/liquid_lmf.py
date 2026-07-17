@@ -29,13 +29,15 @@ class LiquidLMFEmbedder:
         hf_token: str | None = None,
         device: str = "cpu",
         dim: int = 1024,
+        revision: str = "f35ae2c91d687658dbf1f2b449382f0b019b9808",
     ) -> None:
-        logger.info("loading embedding model %s on %s", model, device)
+        logger.info("loading embedding model %s@%s on %s", model, revision[:8], device)
         self._model = SentenceTransformer(
             model,
             trust_remote_code=True,
             device=device,
             token=hf_token,
+            revision=revision,
         )
         self._dim = dim
 

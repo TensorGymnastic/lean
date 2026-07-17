@@ -1,5 +1,6 @@
 embedding:
   model: LiquidAI/LFM2.5-Embedding-350M
+  model_revision: f35ae2c91d687658dbf1f2b449382f0b019b9808  # pinned for trust_remote_code safety
   dim: 1024
   device: cpu
   remote_url: ""          # set to http://<gpu-host>:11434 to use remote Ollama
@@ -33,6 +34,7 @@ retrieval:
   rerank:
     enabled: true           # cross-encoder reranking (ms-marco-MiniLM-L-6-v2), ~100ms/query on CPU
     model: cross-encoder/ms-marco-MiniLM-L-6-v2
+    model_revision: c5ee24cb16019beea0893ab7796b1df96625c6b8  # pinned for reproducibility
     top_n: 5
 
 eval:

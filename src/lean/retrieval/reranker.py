@@ -20,11 +20,14 @@ logger = logging.getLogger(__name__)
 
 
 @lru_cache(maxsize=4)
-def _get_reranker(model_name: str, device: str) -> Any:
+def _get_reranker(model_name: str, device: str, revision: str = "") -> Any:
     from sentence_transformers import CrossEncoder
 
+    kwargs: dict[str, Any] = {"device": device}
+    if revision:
+        kwargs["revision"] = revision
     logger.info("loading cross-encoder reranker: %s on %s", model_name, device)
-    return CrossEncoder(model_name, device=device)
+    return CrossEncoder(model_name, **kwargs)
 
 
 def rerank(
@@ -34,12 +37,13 @@ def rerank(
     model: str,
     top_n: int,
     device: str,
+    revision: str = "",
 ) -> list[SearchHit]:
     """Re-sort hits using a cross-encoder model. Returns top_n results."""
     if not hits:
         return []
 
-    encoder = _get_reranker(model, device)
+    encoder = _get_reranker(model, device, revision)
     pairs = [(query, h.chunk.content) for h in hits]
     scores: list[float] = encoder.predict(pairs)
 

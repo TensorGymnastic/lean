@@ -45,4 +45,5 @@ def get_embedder() -> Embedder:
         hf_token=s.hf_token,
         device=s.embedding_device,
         dim=s.embedding_dim,
+        revision=s.embedding_model_revision,
     )
