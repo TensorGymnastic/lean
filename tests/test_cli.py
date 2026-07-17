@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from typer.testing import CliRunner
@@ -173,10 +173,11 @@ def test_cli_delete_json(runner):
 
 
 def test_cli_reingest_all(runner):
+    import json
     from datetime import datetime
 
     from lean.cli import app
-    from lean.models.schemas import DocumentSummary, ExtractionMethod
+    from lean.models.schemas import DocumentSummary, ExtractionMethod, IngestResult
 
     fake_docs = [
         DocumentSummary(
@@ -190,11 +191,59 @@ def test_cli_reingest_all(runner):
             ingested_at=datetime(2026, 7, 12),
         )
     ]
+    fake_result = IngestResult(
+        document_id="00000000-0000-0000-0000-000000000001",
+        source_sha256="abc",
+        page_count=10,
+        extraction_method=ExtractionMethod.MARKITDOWN,
+        chunk_count=8,
+        elapsed_seconds=3.0,
+    )
     with (
         patch("lean.services.corpus.list_documents", return_value=fake_docs),
+        patch("lean.services.ingestion.reingest", new_callable=AsyncMock, return_value=fake_result),
     ):
         result = runner.invoke(app, ["reingest-all", "--json"])
     assert result.exit_code == 0
+    lines = result.stdout.strip().split("\n")
+    json_start = next(i for i, line in enumerate(lines) if line.strip().startswith("{"))
+    output = json.loads("\n".join(lines[json_start:]))
+    assert output["success"] == 1
+    assert output["failed"] == 0
+    assert output["skipped"] == 0
+
+
+def test_cli_reingest_all_skips_ocr_without_force(runner):
+    import json
+    from datetime import datetime
+
+    from lean.cli import app
+    from lean.models.schemas import DocumentSummary, ExtractionMethod
+
+    fake_docs = [
+        DocumentSummary(
+            id="00000000-0000-0000-0000-000000000001",
+            source_path="data/test.pdf",
+            title="Book",
+            authors=[],
+            page_count=10,
+            extraction_method=ExtractionMethod.UNLIMITED_OCR,
+            chunk_count=5,
+            ingested_at=datetime(2026, 7, 12),
+        )
+    ]
+    with (
+        patch("lean.services.corpus.list_documents", return_value=fake_docs),
+        patch("lean.services.ingestion.reingest", new_callable=AsyncMock) as mock_reingest,
+    ):
+        result = runner.invoke(app, ["reingest-all", "--json"])
+    assert result.exit_code == 0
+    lines = result.stdout.strip().split("\n")
+    json_start = next(i for i, line in enumerate(lines) if line.strip().startswith("{"))
+    output = json.loads("\n".join(lines[json_start:]))
+    assert output["skipped"] == 1
+    assert output["success"] == 0
+    mock_reingest.assert_not_called()
 
 
 def test_cli_search_json(runner):

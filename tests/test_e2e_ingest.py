@@ -13,11 +13,21 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from pathlib import Path
 
 import pytest
 
-pytestmark = pytest.mark.e2e
+# Skip the entire module when no database is configured so bare ``pytest``
+# doesn't crash with ``psycopg.OperationalError``. Integration tests use the
+# same guard (see test_store_pgvector.py).
+pytestmark = [
+    pytest.mark.e2e,
+    pytest.mark.skipif(
+        not os.environ.get("SUPABASE_DB_URL"),
+        reason="SUPABASE_DB_URL not set — start Supabase first (make db-init)",
+    ),
+]
 
 
 def test_corpus_has_documents() -> None:

@@ -1,8 +1,7 @@
 FROM python:3.12-slim AS builder
 
 ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=1
+    PYTHONDONTWRITEBYTECODE=1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
@@ -22,21 +21,24 @@ FROM python:3.12-slim AS runtime
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=1
+    HOME=/home/lean
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
     poppler-utils \
     && rm -rf /var/lib/apt/lists/* \
-    && groupadd -r lean && useradd -r -g lean -u 1000 lean
+    && groupadd -r lean && useradd -r -g lean -u 1000 -m lean
 
 WORKDIR /app
 
-COPY --from=builder /app /app
-COPY db ./db
+COPY --from=builder --chown=lean:lean /app /app
+COPY --chown=lean:lean db ./db
 
 USER lean
 
 EXPOSE 8765
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD /app/.venv/bin/python -c "import socket; socket.create_connection(('127.0.0.1', 8765), timeout=2)" || exit 1
 
 CMD ["/app/.venv/bin/python", "-m", "lean.mcp_server", "--transport", "http", "--host", "0.0.0.0", "--port", "8765"]

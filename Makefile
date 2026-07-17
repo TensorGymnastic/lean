@@ -21,7 +21,7 @@ typecheck:
 	uv run mypy src/lean
 
 test:
-	uv run python3 -m pytest -m 'not slow and not integration and not e2e'
+	uv run python3 -m pytest -m 'not slow and not integration and not e2e' --cov=lean --cov-report=term-missing
 
 verify: format-check lint typecheck test
 

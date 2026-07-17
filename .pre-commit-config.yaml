@@ -10,6 +10,8 @@ repos:
       - id: trailing-whitespace
       - id: mixed-line-ending
       - id: detect-private-key
+      - id: check-added-large-files
+        args: [--maxkb=1024]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.14.1
