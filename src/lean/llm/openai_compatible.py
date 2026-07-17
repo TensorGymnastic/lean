@@ -74,7 +74,7 @@ class OpenAICompatibleLLM:
         self._client.close()
 
     def __del__(self) -> None:
-        try:  # noqa: SIM105
+        try:  # noqa: SIM105, S110
             self.close()
-        except Exception:
+        except Exception:  # noqa: S110
             pass
