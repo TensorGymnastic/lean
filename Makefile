@@ -29,11 +29,7 @@ verify-all: format-check lint typecheck
 	uv run python3 -m pytest
 
 db-init:
-	for f in db/schemas/*.sql; do \
-		echo "applying $$f..."; \
-		psql "$(SUPABASE_DB_URL)" -f "$$f"; \
-	done
-	@echo "schema applied."
+	uv run lean db-init
 
 db-reset:
 	supabase db reset

@@ -60,9 +60,15 @@ asyncio_mode = "auto"
 addopts = "-q"
 markers = [
     "integration: requires local Supabase running",
-    "e2e: requires full stack (Supabase + vLLM + real models)",
+    "e2e: requires full stack (Supabase + OCR server + real models)",
     "slow: downloads or computes something large",
 ]
+
+[tool.coverage.run]
+source = ["src/lean"]
+
+[tool.coverage.report]
+fail_under = 80
 
 [tool.ruff]
 target-version = "py312"
