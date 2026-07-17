@@ -1,5 +1,5 @@
 .PHONY: install hooks-install format format-check lint typecheck test verify \
-        verify-all db-init db-reset ocr-health ingest-all ingest-one search \
+        verify-all db-init db-reset health ingest-all ingest-one search \
         mcp-serve mcp-serve-http api-serve smoke build up down
 
 install:
@@ -38,32 +38,31 @@ db-init:
 db-reset:
 	supabase db reset
 
-ocr-health:
-	@./scripts/smoke-ocr.sh
+health:
+	uv run lean health
 
 ingest-all:
-	uv run python -m lean.cli ingest data/*.pdf
+	uv run lean ingest data/*.pdf
 
 ingest-one:
 	@test -n "$(FILE)" || (echo "Usage: make ingest-one FILE=path/to.pdf" && exit 1)
-	uv run python -m lean.cli ingest "$(FILE)"
+	uv run lean ingest "$(FILE)"
 
 search:
 	@test -n "$(QUERY)" || (echo "Usage: make search QUERY='...'" && exit 1)
-	uv run python -m lean.cli search "$(QUERY)"
+	uv run lean search "$(QUERY)"
 
 mcp-serve:
-	uv run python -m lean.mcp_server --transport stdio
+	uv run lean mcp-serve --transport stdio
 
 mcp-serve-http:
-	uv run python -m lean.mcp_server --transport http --port 8765
+	uv run lean mcp-serve --transport http
 
 api-serve:
 	uv run uvicorn lean.api.routes:app --reload --port 8766
 
 smoke:
-	./scripts/smoke-ocr.sh
-	./scripts/smoke-pgvector.sh
+	uv run lean health
 
 build:
 	docker compose build

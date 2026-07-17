@@ -1,8 +1,4 @@
-"""Vector and BM25 search plus Reciprocal Rank Fusion.
-
-Holds the ``SearchHit`` result shape, the two search strategies, and the
-RRF combiner. Takes a ``StoreConnection`` and never opens a connection itself.
-"""
+"""Vector and BM25 search plus Reciprocal Rank Fusion."""
 
 from __future__ import annotations
 
@@ -18,7 +14,7 @@ from lean.store.base import StoreConnection
 
 @dataclass
 class SearchHit:
-    """A search result: a Chunk plus its cosine similarity score."""
+    """A search result: a Chunk plus its similarity score."""
 
     chunk: Chunk
     score: float
@@ -30,19 +26,16 @@ class SearchEngine:
     def __init__(self, conn: StoreConnection) -> None:
         self._conn = conn
 
-    def vector_search(
+    def _build_metadata_filters(
         self,
         *,
-        query_embedding: list[float],
-        k: int = 5,
-        doc_id: UUID | None = None,
-        section_substring: str | None = None,
-        author: str | None = None,
-        year_min: int | None = None,
-        year_max: int | None = None,
-        min_score: float | None = None,
-    ) -> list[SearchHit]:
-        """Cosine similarity search over chunks with metadata filters."""
+        doc_id: UUID | None,
+        section_substring: str | None,
+        author: str | None,
+        year_min: int | None,
+        year_max: int | None,
+    ) -> tuple[str, list[str], list[object]]:
+        """Return (join_clause, conditions, params) for shared metadata filters."""
         needs_join = author is not None or year_min is not None or year_max is not None
         join_clause = " join public.documents d on d.id = c.document_id" if needs_join else ""
 
@@ -63,12 +56,34 @@ class SearchEngine:
         if year_max is not None:
             conditions.append("d.year <= %s")
             params.append(year_max)
+
+        return join_clause, conditions, params
+
+    def vector_search(
+        self,
+        *,
+        query_embedding: list[float],
+        k: int = 5,
+        doc_id: UUID | None = None,
+        section_substring: str | None = None,
+        author: str | None = None,
+        year_min: int | None = None,
+        year_max: int | None = None,
+        min_score: float | None = None,
+    ) -> list[SearchHit]:
+        """Cosine similarity search over chunks with metadata filters."""
+        join_clause, conditions, params = self._build_metadata_filters(
+            doc_id=doc_id,
+            section_substring=section_substring,
+            author=author,
+            year_min=year_min,
+            year_max=year_max,
+        )
         if min_score is not None:
             conditions.append("1 - (c.embedding <=> %s::vector) >= %s")
             params.extend([query_embedding, min_score])
 
         where_clause = " and ".join(conditions)
-
         query = f"""
             select c.id, c.document_id, c.chunk_index, c.section_path,
                    c.heading_text, c.page_start, c.page_end, c.token_count,
@@ -97,27 +112,15 @@ class SearchEngine:
         year_max: int | None = None,
     ) -> list[SearchHit]:
         """Full-text search via tsvector + ts_rank (BM25-style ranking)."""
-        needs_join = author is not None or year_min is not None or year_max is not None
-        join_clause = " join public.documents d on d.id = c.document_id" if needs_join else ""
-
-        conditions = [
-            "c.tsv @@ plainto_tsquery('english', %s)",
-            "(%s::uuid is null or c.document_id = %s)",
-            "(%s::text is null or c.section_path ilike '%%' || %s || '%%')",
-        ]
-        params: list[object] = [query_text, doc_id, doc_id, section_substring, section_substring]
-
-        if author is not None:
-            conditions.append(
-                "exists (select 1 from unnest(d.authors) a where a ilike '%%' || %s || '%%')"
-            )
-            params.append(author)
-        if year_min is not None:
-            conditions.append("d.year >= %s")
-            params.append(year_min)
-        if year_max is not None:
-            conditions.append("d.year <= %s")
-            params.append(year_max)
+        join_clause, conditions, params = self._build_metadata_filters(
+            doc_id=doc_id,
+            section_substring=section_substring,
+            author=author,
+            year_min=year_min,
+            year_max=year_max,
+        )
+        conditions.insert(0, "c.tsv @@ plainto_tsquery('english', %s)")
+        params.insert(0, query_text)
 
         where_clause = " and ".join(conditions)
         sql = f"""
@@ -138,21 +141,10 @@ class SearchEngine:
 
     @staticmethod
     def _rows_to_hits(rows: list[dict[str, Any]]) -> list[SearchHit]:
-        """Build ``SearchHit`` list from dict rows produced by a search query."""
+        """Build ``SearchHit`` list from dict rows."""
         return [
             SearchHit(
-                chunk=Chunk(
-                    id=str(r["id"]),
-                    document_id=str(r["document_id"]),
-                    chunk_index=r["chunk_index"],
-                    section_path=r["section_path"],
-                    heading_text=r["heading_text"],
-                    page_start=r["page_start"],
-                    page_end=r["page_end"],
-                    token_count=r["token_count"],
-                    content=r["content"],
-                    score=float(r["score"]),
-                ),
+                chunk=Chunk.from_row(r).model_copy(update={"score": float(r["score"])}),
                 score=float(r["score"]),
             )
             for r in rows

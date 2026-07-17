@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from uuid import UUID  # noqa: TC003
 
+from psycopg.rows import dict_row
+
 from lean.models.schemas import DocumentSummary
 from lean.store.base import StoreConnection
 
@@ -86,7 +88,6 @@ class DocumentRepo:
 
     def list_documents(self) -> list[DocumentSummary]:
         """List all documents in the corpus with chunk counts, newest first."""
-        from psycopg.rows import dict_row
 
         with self._conn.conn.cursor(row_factory=dict_row) as cur:
             cur.execute(
@@ -126,16 +127,3 @@ class DocumentRepo:
         if row is None:
             return None
         return str(row[0])
-
-    def get_document_storage_paths(self, document_id: UUID) -> tuple[str, str] | None:
-        """Return ``(source_storage_path, markdown_storage_path)`` or None."""
-        with self._conn.conn.cursor() as cur:
-            cur.execute(
-                "select source_storage_path, markdown_storage_path "
-                "from public.documents where id = %s",
-                (document_id,),
-            )
-            row = cur.fetchone()
-        if row is None:
-            return None
-        return str(row[0]), str(row[1])

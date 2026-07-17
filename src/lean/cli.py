@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import json
 import subprocess
-import sys
 from pathlib import Path
 
 import typer
@@ -155,9 +154,9 @@ def delete(
 
     result = _del(doc_id)
     if json_output:
-        typer.echo(json.dumps({"deleted": result}, indent=2))
+        typer.echo(json.dumps(result, indent=2))
     else:
-        typer.echo(f"Deleted: {result}")
+        typer.echo(f"Deleted: {result['deleted']}")
 
 
 @app.command()
@@ -172,6 +171,117 @@ def reingest(
     _output(result, json_output)
 
 
+@app.command(name="reingest-all")
+def reingest_all(
+    force: bool = typer.Option(False, "--force", help="Reingest even if already OCR'd"),
+    json_output: bool = typer.Option(False, "--json"),
+) -> None:
+    """Reingest all documents (smallest first, skips OCR'd unless --force)."""
+    from lean.models.schemas import ExtractionMethod
+    from lean.services.corpus import list_documents
+    from lean.services.ingestion import reingest
+
+    docs = sorted(list_documents(), key=lambda d: d.chunk_count)
+    results: list[dict[str, object]] = []
+    success = failed = skipped = 0
+
+    for doc in docs:
+        if not force and doc.extraction_method == ExtractionMethod.UNLIMITED_OCR:
+            skipped += 1
+            results.append({"id": doc.id, "status": "skipped"})
+            typer.echo(f"SKIP  {doc.id}  (already OCR'd, {doc.chunk_count} chunks)")
+            continue
+        typer.echo(f"START {doc.id}  ({doc.page_count or '?'} pages, was {doc.extraction_method})")
+        try:
+            res = asyncio.run(reingest(doc.id))
+            success += 1
+            results.append(
+                {
+                    "id": doc.id,
+                    "status": "ok",
+                    "chunks": res.chunk_count,
+                    "seconds": res.elapsed_seconds,
+                }
+            )
+            typer.echo(f"DONE  {doc.id}  ({res.chunk_count} chunks, {res.elapsed_seconds:.1f}s)")
+        except Exception as exc:
+            failed += 1
+            results.append({"id": doc.id, "status": "failed", "error": str(exc)})
+            typer.echo(f"FAIL  {doc.id}  ({exc})")
+
+    if json_output:
+        typer.echo(
+            json.dumps(
+                {"success": success, "failed": failed, "skipped": skipped, "details": results},
+                indent=2,
+                default=str,
+            )
+        )
+    else:
+        typer.echo(f"\nSuccess: {success}  Failed: {failed}  Skipped: {skipped}")
+
+
+@app.command()
+def health(
+    json_output: bool = typer.Option(False, "--json"),
+) -> None:
+    """Check health of OCR server, database, and Ollama embedding server."""
+    import httpx
+
+    from lean.config.settings import Settings
+
+    settings = Settings()
+    checks: dict[str, dict[str, object]] = {}
+
+    if settings.ocr_base_url:
+        try:
+            resp = httpx.get(f"{settings.ocr_base_url.rstrip('/')}/health", timeout=10)
+            checks["ocr"] = {
+                "status": "ok" if resp.status_code == 200 else "error",
+                "url": settings.ocr_base_url,
+            }
+        except Exception as exc:
+            checks["ocr"] = {"status": "error", "url": settings.ocr_base_url, "error": str(exc)}
+    else:
+        checks["ocr"] = {"status": "not_configured"}
+
+    try:
+        from lean.store.base import StoreConnection
+
+        conn = StoreConnection.from_env()
+        with conn.conn.cursor() as cur:
+            cur.execute("SELECT extname FROM pg_extension WHERE extname = 'vector'")
+            has_pgvector = cur.fetchone() is not None
+        conn.close()
+        checks["database"] = {"status": "ok", "pgvector": has_pgvector}
+    except Exception as exc:
+        checks["database"] = {"status": "error", "error": str(exc)}
+
+    if settings.embedding_remote_url:
+        try:
+            resp = httpx.get(f"{settings.embedding_remote_url.rstrip('/')}/api/tags", timeout=10)
+            checks["ollama"] = {
+                "status": "ok" if resp.status_code == 200 else "error",
+                "url": settings.embedding_remote_url,
+            }
+        except Exception as exc:
+            checks["ollama"] = {
+                "status": "error",
+                "url": settings.embedding_remote_url,
+                "error": str(exc),
+            }
+    else:
+        checks["ollama"] = {"status": "not_configured"}
+
+    if json_output:
+        typer.echo(json.dumps(checks, indent=2))
+    else:
+        for name, result in checks.items():
+            status = result["status"]
+            label = "[OK]" if status == "ok" else "[--]" if status == "not_configured" else "[FAIL]"
+            typer.echo(f"{label} {name}: {status}")
+
+
 @app.command(name="mcp-serve")
 def mcp_serve(
     transport: str = typer.Option("stdio", help="stdio or http"),
@@ -180,12 +290,12 @@ def mcp_serve(
     """Run the MCP server."""
     from lean.config.settings import get_settings
 
+    settings = get_settings()
     if port is None:
-        port = get_settings().mcp_http_port
-    sys.argv = ["lean-mcp", "--transport", transport, "--port", str(port)]
+        port = settings.mcp_http_port
     from lean.mcp_server.__main__ import main
 
-    main()
+    main(["--transport", transport, "--port", str(port)])
 
 
 @app.command(name="db-init")
@@ -208,7 +318,7 @@ def eval(
     sample_size: int = typer.Option(50, help="Number of chunks to sample for eval"),
     k: int = typer.Option(5, help="Top-k for hit_rate/MRR"),
 ) -> None:
-    """Run retrieval evaluation (hit_rate@k, MRR@k)."""
+    """Run retrieval evaluation (hit_rate@k, MRR@k, NDCG@k, Recall@k)."""
     import os
 
     from lean.config.settings import Settings

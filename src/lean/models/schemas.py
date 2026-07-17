@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime  # noqa: TC003 (needed at runtime by Pydantic)
 from enum import StrEnum
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -44,6 +45,21 @@ class Chunk(BaseModel):
     token_count: int
     content: str
     score: float | None = None
+
+    @classmethod
+    def from_row(cls, r: dict[str, Any]) -> Chunk:
+        """Build a Chunk from a psycopg dict_row (no score)."""
+        return cls(
+            id=str(r["id"]),
+            document_id=str(r["document_id"]),
+            chunk_index=r["chunk_index"],
+            section_path=r["section_path"],
+            heading_text=r["heading_text"],
+            page_start=r["page_start"],
+            page_end=r["page_end"],
+            token_count=r["token_count"],
+            content=r["content"],
+        )
 
 
 class IngestResult(BaseModel):

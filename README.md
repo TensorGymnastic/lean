@@ -132,7 +132,7 @@ lean/
 │   ├── models/schemas.py        # shared Pydantic types
 │   └── cli.py                   # Typer CLI (full parity with MCP tools)
 ├── db/schemas/                  # SQL migrations (001-006)
-├── scripts/                     # reingest-all, smoke checks, canonical queries
+├── scripts/                     # canonical-queries.json (eval data)
 ├── docker-compose.yml           # Supabase DB + lean-app
 ├── Makefile                     # dev commands
 └── pyproject.toml               # uv project config
@@ -154,7 +154,9 @@ All commands support `--json` for structured output.
 | `lean get-markdown <doc_id>` | Get extracted markdown for a document |
 | `lean delete <doc_id>` | Delete a document and all its chunks |
 | `lean reingest <doc_id>` | Re-extract a document with current settings |
+| `lean reingest-all` | Batch reingest all documents (`--force` to re-extract OCR'd docs) |
 | `lean eval` | Run retrieval evaluation (`--sample-size`, `--k`) |
+| `lean health` | Check OCR server, database, and Ollama connectivity |
 | `lean mcp-serve` | Start the MCP server (`--transport stdio\|http`, `--port`) |
 | `lean db-init` | Apply all SQL migrations to the database |
 
@@ -171,7 +173,7 @@ All commands support `--json` for structured output.
 | `make mcp-serve` | start MCP server (stdio) |
 | `make api-serve` | start FastAPI REST mirror (port 8766) |
 | `make smoke` | health checks: OCR server + pgvector |
-| `make ocr-health` | OCR server health check only |
+| `make health` | check OCR server, database, and Ollama (`lean health`) |
 | `make build` / `make up` / `make down` | Docker lifecycle |
 
 ### Scripts
@@ -200,6 +202,8 @@ Add to your MCP client config:
   }
 }
 ```
+
+All CLI operations are Python — no bash scripts for core functionality.
 
 **8 tools:** `ingest_pdf`, `search`, `get_chunk`, `list_documents`,
 `get_document_markdown`, `delete_document`, `reingest`, `corpus_stats`

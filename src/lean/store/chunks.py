@@ -1,13 +1,11 @@
-"""Chunk CRUD operations — the ``chunks`` table.
-
-Holds the ``ChunkRow`` input shape plus replace/get/count operations.
-Takes a ``StoreConnection`` and never opens a connection itself.
-"""
+"""Chunk CRUD operations — the ``chunks`` table."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from uuid import UUID  # noqa: TC003
+
+from psycopg.rows import dict_row
 
 from lean.models.schemas import Chunk
 from lean.store.base import StoreConnection
@@ -15,10 +13,7 @@ from lean.store.base import StoreConnection
 
 @dataclass
 class ChunkRow:
-    """Input shape for inserting a chunk with its embedding.
-
-    ``embedding`` is a plain list[float] of length 1024 (LFM2.5-Embedding-350M).
-    """
+    """Input shape for inserting a chunk with its embedding."""
 
     document_id: UUID
     chunk_index: int
@@ -38,10 +33,7 @@ class ChunkRepo:
         self._conn = conn
 
     def replace_chunks(self, document_id: UUID, chunks: list[ChunkRow]) -> None:
-        """Delete existing chunks for a document and insert new ones.
-
-        Atomic within a single transaction.
-        """
+        """Delete existing chunks for a document and insert new ones."""
         with self._conn.conn.cursor() as cur:
             cur.execute(
                 "delete from public.chunks where document_id = %s",
@@ -74,8 +66,6 @@ class ChunkRepo:
 
     def get_chunk(self, chunk_id: UUID) -> Chunk | None:
         """Fetch a single chunk by ID. Returns None if not found."""
-        from psycopg.rows import dict_row
-
         with self._conn.conn.cursor(row_factory=dict_row) as cur:
             cur.execute(
                 """
@@ -88,17 +78,7 @@ class ChunkRepo:
             r = cur.fetchone()
         if r is None:
             return None
-        return Chunk(
-            id=str(r["id"]),
-            document_id=str(r["document_id"]),
-            chunk_index=r["chunk_index"],
-            section_path=r["section_path"],
-            heading_text=r["heading_text"],
-            page_start=r["page_start"],
-            page_end=r["page_end"],
-            token_count=r["token_count"],
-            content=r["content"],
-        )
+        return Chunk.from_row(r)
 
     def count_chunks(self) -> int:
         with self._conn.conn.cursor() as cur:
@@ -109,12 +89,7 @@ class ChunkRepo:
             return int(row[0])
 
     def get_chunks_by_document(self, doc_id: UUID, limit: int = 1000) -> list[Chunk]:
-        """Fetch chunks for a document, ordered by chunk_index. No embeddings.
-
-        Returns up to ``limit`` chunks. Empty list if the document has none.
-        """
-        from psycopg.rows import dict_row
-
+        """Fetch chunks for a document, ordered by chunk_index. No embeddings."""
         with self._conn.conn.cursor(row_factory=dict_row) as cur:
             cur.execute(
                 """
@@ -128,17 +103,4 @@ class ChunkRepo:
                 (doc_id, limit),
             )
             rows = cur.fetchall()
-        return [
-            Chunk(
-                id=str(r["id"]),
-                document_id=str(r["document_id"]),
-                chunk_index=r["chunk_index"],
-                section_path=r["section_path"],
-                heading_text=r["heading_text"],
-                page_start=r["page_start"],
-                page_end=r["page_end"],
-                token_count=r["token_count"],
-                content=r["content"],
-            )
-            for r in rows
-        ]
+        return [Chunk.from_row(r) for r in rows]
