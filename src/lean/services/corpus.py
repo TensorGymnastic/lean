@@ -46,16 +46,21 @@ def corpus_stats() -> CorpusStats:
 
     ``embedding_dim`` and ``embedding_model`` are sourced from ``Settings``
     so the response is self-describing without an embedding round-trip.
+    ``duplicate_image_hashes`` is a diagnostic surfacing image SHA-256 hashes
+    appearing in more than one chunk (potential dedup candidates).
     """
     settings = get_settings()
     conn = StoreConnection.from_env()
     try:
-        return AnalyticsRepo(conn).corpus_stats(
+        stats = AnalyticsRepo(conn).corpus_stats(
             embedding_dim=settings.embedding_dim,
             embedding_model=settings.embedding_model,
         )
+        duplicates = ChunkRepo(conn).find_duplicate_image_hashes()
     finally:
         conn.close()
+    stats.duplicate_image_hashes = [{"image_hash": h, "count": n} for h, n in duplicates]
+    return stats
 
 
 def get_chunk(chunk_id: str) -> Chunk | None:

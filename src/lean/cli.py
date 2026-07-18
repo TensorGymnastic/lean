@@ -8,8 +8,13 @@ import logging
 import subprocess
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import typer
+
+if TYPE_CHECKING:
+    from lean.eval.runner import EvalResult
+    from lean.store.base import StoreConnection
 
 app = typer.Typer(
     name="lean",
@@ -385,6 +390,33 @@ def db_init() -> None:
     typer.echo("schema applied.")
 
 
+def _print_eval_result(result: EvalResult) -> None:
+    """Print EvalResult metrics in the human-readable eval format."""
+    typer.echo(f"\nResults (n={result.sample_count}, k={result.k}):")
+    typer.echo(f"  hit_rate:     {result.hit_rate:.4f}")
+    typer.echo(f"  MRR:          {result.mrr:.4f}")
+    typer.echo(f"  NDCG:         {result.ndcg:.4f}")
+    typer.echo(f"  Recall:       {result.recall:.4f}")
+    typer.echo(f"  mean_latency: {result.mean_latency_ms:.0f}ms")
+
+
+def _save_eval_run(conn: StoreConnection, result: EvalResult, config: dict[str, object]) -> None:
+    """Persist an EvalResult to the ``eval_runs`` table and confirm to stdout."""
+    from lean.store.analytics import AnalyticsRepo
+
+    AnalyticsRepo(conn).save_eval_run(
+        config=config,
+        hit_rate=result.hit_rate,
+        mrr=result.mrr,
+        ndcg=result.ndcg,
+        recall=result.recall,
+        mean_latency_ms=int(result.mean_latency_ms),
+        sample_count=result.sample_count,
+        k=result.k,
+    )
+    typer.echo("\nEval run saved to eval_runs table.")
+
+
 @app.command()
 def eval(
     sample_size: int | None = typer.Option(None, help="Number of chunks to sample for eval"),
@@ -405,7 +437,6 @@ def eval(
     """
     from lean.config.settings import get_settings
     from lean.eval.runner import build_eval_dataset, evaluate, load_curated_dataset
-    from lean.store.analytics import AnalyticsRepo
     from lean.store.base import StoreConnection
 
     settings = get_settings()
@@ -430,24 +461,8 @@ def eval(
         typer.echo(f"Running evaluation (k={k})...")
         result = evaluate(conn, samples, k=k)
 
-        typer.echo(f"\nResults (n={result.sample_count}, k={result.k}):")
-        typer.echo(f"  hit_rate:     {result.hit_rate:.4f}")
-        typer.echo(f"  MRR:          {result.mrr:.4f}")
-        typer.echo(f"  NDCG:         {result.ndcg:.4f}")
-        typer.echo(f"  Recall:       {result.recall:.4f}")
-        typer.echo(f"  mean_latency: {result.mean_latency_ms:.0f}ms")
-
-        AnalyticsRepo(conn).save_eval_run(
-            config=config,
-            hit_rate=result.hit_rate,
-            mrr=result.mrr,
-            ndcg=result.ndcg,
-            recall=result.recall,
-            mean_latency_ms=int(result.mean_latency_ms),
-            sample_count=result.sample_count,
-            k=result.k,
-        )
-        typer.echo("\nEval run saved to eval_runs table.")
+        _print_eval_result(result)
+        _save_eval_run(conn, result, config)
     finally:
         conn.close()
 

@@ -157,11 +157,14 @@ def test_corpus_stats(monkeypatch_env):
         embedding_dim=1024,
         embedding_model="LiquidAI/LFM2.5-Embedding-350M",
     )
-    mock_repo = MagicMock()
-    mock_repo.corpus_stats.return_value = fake_stats
+    mock_analytics = MagicMock()
+    mock_analytics.corpus_stats.return_value = fake_stats
+    mock_chunks = MagicMock()
+    mock_chunks.find_duplicate_image_hashes.return_value = []
     mock_conn = MagicMock()
     with (
-        patch("lean.services.corpus.AnalyticsRepo", return_value=mock_repo),
+        patch("lean.services.corpus.AnalyticsRepo", return_value=mock_analytics),
+        patch("lean.services.corpus.ChunkRepo", return_value=mock_chunks),
         patch("lean.services.corpus.StoreConnection") as mock_store,
     ):
         mock_store.from_env.return_value = mock_conn
@@ -169,3 +172,38 @@ def test_corpus_stats(monkeypatch_env):
     assert result.document_count == 10
     assert result.chunk_count == 2535
     assert result.embedding_dim == 1024
+    assert result.duplicate_image_hashes == []
+
+
+def test_corpus_stats_includes_duplicate_image_hashes(monkeypatch_env):
+    """duplicate_image_hashes is wired into corpus_stats (gives the store method a reader)."""
+    from lean.services.corpus import corpus_stats
+
+    fake_stats = CorpusStats(
+        document_count=3,
+        chunk_count=100,
+        total_tokens=5000,
+        extraction_method_breakdown={"markitdown": 3},
+        embedding_dim=1024,
+        embedding_model="test-model",
+    )
+    mock_analytics = MagicMock()
+    mock_analytics.corpus_stats.return_value = fake_stats
+    mock_chunks = MagicMock()
+    mock_chunks.find_duplicate_image_hashes.return_value = [
+        ("abc123", 4),
+        ("def456", 2),
+    ]
+    mock_conn = MagicMock()
+    with (
+        patch("lean.services.corpus.AnalyticsRepo", return_value=mock_analytics),
+        patch("lean.services.corpus.ChunkRepo", return_value=mock_chunks),
+        patch("lean.services.corpus.StoreConnection") as mock_store,
+    ):
+        mock_store.from_env.return_value = mock_conn
+        result = corpus_stats()
+    assert result.duplicate_image_hashes == [
+        {"image_hash": "abc123", "count": 4},
+        {"image_hash": "def456", "count": 2},
+    ]
+    mock_chunks.find_duplicate_image_hashes.assert_called_once()

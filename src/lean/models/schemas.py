@@ -99,3 +99,8 @@ class CorpusStats(BaseModel):
     embedding_dim: int
     embedding_model: str
     last_ingested_at: datetime | None = None
+    duplicate_image_hashes: list[dict[str, object]] = Field(default_factory=list)
+    """Diagnostic: image SHA-256 hashes appearing in more than one chunk.
+    Each entry is ``{"image_hash": str, "count": int}``. Empty when no
+    duplicates exist. Surfaced via ``corpus_stats`` so the dedup query has
+    a reader (was previously a store method with no caller)."""
