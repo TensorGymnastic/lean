@@ -179,8 +179,4 @@ Domain errors map to HTTP codes: `ValueError` → 400, `PermissionError` → 403
 
 MIT for project code. See model licenses for third-party weights (`datalab-to/marker`, `baidu/Unlimited-OCR`, `LiquidAI/LFM2.5-Embedding-350M`, MiniMax M3).
 
-## Reference Corpus Scale
-
-The current reference deployment: **10 Lean Six Sigma books, 1,634 pages, 3,557 chunks (2,993 text + 564 image), 100% provenance coverage.** Full reingest via remote GPU marker + MiniMax M3 VLM completes in ~90 minutes. Image chunk types observed: diagram (185), photo (97), line chart (56), flowchart (48), bar chart (42), screenshot (20), table (9), scatter (6), pie (3).
-
-For known caveats at this scale and the scalability path to 100K+ pages, see [`docs/limitations.md`](docs/limitations.md) and [`AGENTS.md`](AGENTS.md) → "Known Structural Debt".
+For known caveats and runtime behavior, see [`docs/limitations.md`](docs/limitations.md) and [`AGENTS.md`](AGENTS.md).

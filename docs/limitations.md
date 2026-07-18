@@ -174,12 +174,3 @@ These have been observed in the codebase and may resurface:
 
 - README previously described `make smoke` and `make health` as
   different — they are identical (`smoke: health` in the Makefile).
-
-Historical drift that has been resolved:
-- README previously marketed the REST API as a "mirror" of all MCP tools
-  without noting `reingest` is CLI-only; now correctly states 7/8.
-- `reranker.py` module docstring previously claimed rerank was
-  "disabled by default" while `config.yaml` enabled it — the docstring
-  now correctly references `retrieval.rerank.enabled: true`.
-- Eval sampling previously used unseeded SQL `ORDER BY random()` —
-  replaced by seeded Python `random.Random(seed).sample(...)`.

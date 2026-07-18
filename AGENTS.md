@@ -54,7 +54,7 @@ No business logic in transports. Each store repo is CRUD-narrow.
 - Coverage gate: `fail_under = 80` enforced in pyproject.toml
 - `from __future__ import annotations` in all modules
 - Each module has one responsibility and is independently testable
-- **File-size ceiling ~500 LOC, function-size ceiling ~50 LOC** — split when approaching (currently `cli.py` at 435 is the only remaining oversized file; `ingest_pdf` and `search` were split to 130/99 LOC)
+- **File-size ceiling ~500 LOC, function-size ceiling ~50 LOC** — split when approaching
 - Heavy operations (DB, extraction, embedding, VLM) run via `anyio.to_thread.run_sync`
   so the MCP event loop stays responsive
 - All singletons use `@lru_cache` (`get_settings`, `get_embedder`, `get_llm`,
@@ -72,7 +72,7 @@ No business logic in transports. Each store repo is CRUD-narrow.
 ## Design Discipline (KISS / YAGNI / DRY / SOLID)
 
 - **KISS** — prefer a 30-line function over a 300-line "flexible" one. Don't add config knobs for hypothetical future needs.
-- **YAGNI** — every column, config field, and parameter must have a reader within 1 commit of being written. Documented exceptions: `bbox` (wiring pending), `image_hash` (dedup query pending).
+- **YAGNI** — every column, config field, and parameter must have a reader within 1 commit of being written. Documented exception: `bbox` (wiring pending).
 - **DRY** — shared helpers live in one place (`_build_metadata_filters`, `infrastructure/embedder.py`). No copy-paste between `vector_search` and `bm25_search`.
 - **SOLID-S** — services own one orchestration concern; stores own CRUD; transports own I/O. `ingest_pdf` currently violates this (extraction+VLM+embed+store in one function) — split is on the roadmap.
 - **SOLID-O** — extraction backends are pluggable via `pipeline.py`. VLM is provider-agnostic at the transport layer (any OpenAI-compatible endpoint).
@@ -85,7 +85,6 @@ No business logic in transports. Each store repo is CRUD-narrow.
 - `make verify-all` — all tests
 - `uv run python scripts/docs_lint.py` — detects drift between
   `config.yaml` / CLI commands / MCP tools and `docs/` + `README.md`
-- 253 unit tests + integration tests + e2e tests (coverage 84.01%)
 - Integration tests need `SUPABASE_DB_URL` env var set
 - E2E tests need full stack running (Supabase + GPU servers)
 - CI: 3 jobs (verify matrix Python 3.12+3.13, security pip-audit+trivy+CodeQL,
@@ -93,7 +92,7 @@ No business logic in transports. Each store repo is CRUD-narrow.
 
 ## Documentation
 
-- `README.md` — onboarding entry point (~170 lines)
+- `README.md` — onboarding entry point
 - `docs/configuration.md` — every `Settings` field, defaults, validators
 - `docs/operations.md` — Docker, healthcheck, post-ingest reindex, reingest semantics
 - `docs/architecture.md` — pipeline + directory layout + transport tier pattern
@@ -108,10 +107,10 @@ tool, update the corresponding doc page in the same commit. Run
 ## Key Decisions
 
 - **Extraction fallback chain**: marker-pdf (local CPU or remote GPU via HTTP) → Unlimited-OCR (remote transformers) → markitdown (pure Python). Marker returns figures; OCR/markitdown do not.
-- **Remote GPU marker server** — pure-Python HTTP wrapper around marker's `PdfConverter` (singleton in GPU memory). 44× faster than local CPU (14s vs 626s for a 29-page PDF). Configured via `marker.remote_url` in `config.yaml`. **Operational note:** the server script currently lives at `/tmp/marker_server.py` on the GPU host — vendor into `scripts/` before relying on it in production.
+- **Remote GPU marker server** — pure-Python HTTP wrapper around marker's `PdfConverter` (singleton in GPU memory). 44× faster than local CPU (14s vs 626s for a 29-page PDF). Configured via `marker.remote_url` in `config.yaml`. Server script vendored at `scripts/marker_server.py`.
 - **VLM enrichment (default: MiniMax M3)** — chart/image descriptions structured as `{title, chart_type, axis_labels, key_data_points, description, source_text}`. MiniMax M3 via API (~3.5s/image, ~$0.004/image, `disable_thinking: true` for clean JSON). Local Ollama Qwen3.5 fallback documented in `config.yaml` comments. **Compliance:** VLM sends chart images to a third-party (Shanghai) — disable for corpora with PII/trade-secret concerns; see `docs/limitations.md`.
-- **Provenance metadata** — migration 011 added `bbox`, `image_hash`, `provenance_model`, `embedding_model`, `embedding_dim`. Currently written on every chunk/image but **not yet read in any WHERE clause** — `image_hash` dedup query and `embedding_model` mismatch warning are on the roadmap. `bbox` is always NULL (marker block-level polygon wiring pending).
-- **Chunk types** — `text` (default) and `image` (VLM-described). Search supports `chunk_type` filter end-to-end (MCP/API/CLI → service → store). No SQL CHECK constraint yet — validation is a roadmap item.
+- **Provenance metadata** — migration 011 added `bbox`, `image_hash`, `provenance_model`, `embedding_model`, `embedding_dim`. `image_hash` is surfaced via `corpus_stats` (`find_duplicate_image_hashes`). `embedding_model` mismatch warning is on the roadmap. `bbox` is always NULL (marker block-level polygon wiring pending).
+- **Chunk types** — `text` (default) and `image` (VLM-described). Search supports `chunk_type` filter end-to-end (MCP/API/CLI → service → store). CHECK constraint enforced by migration 012.
 - **LiquidAI/LFM2.5-Embedding-350M** (1024-dim), remote Ollama when configured, local CPU fallback. Pinned to SHA `f35ae2c91d687658dbf1f2b449382f0b019b9808`.
 - Local Supabase via Docker (zero cloud cost)
 - fastmcp v3.4.4 standalone
@@ -119,27 +118,5 @@ tool, update the corresponding doc page in the same commit. Run
 - Multi-stage Docker build with non-root user (uid=1000), `.dockerignore` excludes
   `.git/`, `.venv/`, caches, PDFs
 - `lean db-init` uses `PGPASSWORD` env (not argv) — Makefile delegates to CLI
-
-## Known Structural Debt (review-derived)
-
-Documented honestly so future agents don't re-derive. Items here are **accepted**, not blocking. Last verified 2026-07-18 against source.
-
-All previously-listed structural debt items have been resolved. The Known Structural Debt list is currently **empty** — see the FIXED section below for the full history of what was addressed.
-
-**Previously listed and since FIXED (do not re-litigate):**
-- `page_start` / `page_end` were always NULL → wired via `_enrich_chunks_with_block_meta` in `services/ingestion.py`; marker's `ChunkRenderer` provides per-block page numbers, enrichment matches chunks to blocks by word overlap. Local path only (remote returns empty block_metas until server is updated).
-- `bbox` column was always NULL → same enrichment path as page_start/page_end; marker's `FlatBlockOutput.bbox` provides `[x0, y0, x1, y1]` per block, stored as JSONB dict.
-- `ingest_pdf` was a 244-LOC god function → split into `_describe_one_image` (40 LOC) + `_describe_images` (47 LOC) + `_build_chunk_rows` (52 LOC) + `_persist_ingest` (48 LOC); `ingest_pdf` is now 130 LOC orchestration.
-- `search` was a 188-LOC function mixing orchestration + business logic → split into `_validate_search_inputs` + `_expand_queries` + `_compute_fetch_k` + `_vector_fetch` + `_hybrid_fetch` + `_fetch_one_query` + `_rerank_hits` + `_postprocess_hits` + `SearchRequest` dataclass; `search` is now 99 LOC orchestration.
-- REST API was a partial mirror (5/8 endpoints) → now 7/8 parity; added `GET /chunks/{id}`, `GET /documents/{id}/markdown`, `DELETE /documents/{id}`. `reingest` intentionally CLI-only.
-- `image_hash` dedup query didn't exist → `ChunkRepo.find_duplicate_image_hashes()` diagnostic method added.
-- Transaction boundary split → fixed by single-transaction pattern at `services/ingestion.py:204-271`.
-- `vlm_max_concurrency` unused → wired via `anyio.Semaphore(settings.vlm_max_concurrency)`.
-- Postgres bound to `0.0.0.0:54322` → bound to `127.0.0.1:54322:5432` at `docker-compose.yml:5`.
-- `chunk_type` had no CHECK constraint → added in `db/schemas/012_add_chunk_type_check.sql`.
-- `marker_server.py` lived in `/tmp/` → vendored at `scripts/marker_server.py`.
-- `_extract_local` / `_get_converter` 0% coverage → covered by mock-module injection tests. Coverage of `marker_converter.py`: 88% → 98%.
-- `executemany` for chunk inserts could hit the 65535-param Postgres limit → batched at `_INSERT_BATCH_SIZE = 1000` in `store/chunks.py`.
-- `vlm_provider` field was dead config → removed from `settings.py`, `config.yaml` examples, and `docs/configuration.md` table.
 
 See `docs/limitations.md` for runtime caveats.
