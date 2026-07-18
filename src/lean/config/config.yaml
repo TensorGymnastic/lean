@@ -78,12 +78,12 @@ llm:
 
 vlm:
   enabled: true
-  provider: vllm
-  base_url: "http://remotesl:8001/v1"  # vLLM serving Qwen3.5-4B on GPU server
-  model: "Qwen/Qwen3.5-4B"              # native multimodal (vision+text), no -VL suffix
-  api_key: ""                           # local vLLM server — no auth needed
+  provider: ollama
+  base_url: "http://192.168.2.37:11434/v1"  # Ollama on GPU server
+  model: "qwen3.5-128k:9b"                   # 128K context, Q4_K_M, native multimodal
+  api_key: ""
   detail: default
-  timeout_s: 120.0
+  timeout_s: 300.0
   max_concurrency: 4
-  max_tokens: 1000
-  disable_thinking: true                # skip reasoning for faster structured output
+  max_tokens: 4096
+  disable_thinking: false                    # Qwen3.5 thinks internally; needs token budget
