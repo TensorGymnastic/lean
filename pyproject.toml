@@ -82,7 +82,7 @@ ignore = ["TC001", "TC002", "TC003", "S603", "S607", "S105"]
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["S101", "S105", "S106"]
 "src/lean/store/search.py" = ["S608"]
-"src/lean/eval/runner.py" = ["S311"]  # TYPE_CHECKING moves are noisy for eager-imported modules
+"src/lean/eval/runner.py" = ["S311"]  # eval sampling uses random.Random(seed) for reproducibility, not secrets
 
 [tool.mypy]
 python_version = "3.12"
