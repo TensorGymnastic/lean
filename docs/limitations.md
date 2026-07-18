@@ -80,22 +80,21 @@ sampling.) See [`evaluation.md`](evaluation.md#sampling-determinism-resolved).
 
 ## Operational
 
-### REST API is a partial mirror, not full parity
+### REST API now mirrors all MCP tools (full parity)
 
 | MCP tool | REST endpoint |
 |---|---|
 | `ingest_pdf` | `POST /ingest` |
 | `search` | `GET /search` |
 | `list_documents` | `GET /documents` |
-| `get_chunk` | ❌ not exposed |
-| `get_document_markdown` | ❌ not exposed |
-| `delete_document` | ❌ not exposed |
-| `reingest` | ❌ not exposed |
-| `corpus_stats` | `GET /stats` (subset) |
+| `get_chunk` | `GET /chunks/{chunk_id}` |
+| `get_document_markdown` | `GET /documents/{doc_id}/markdown` |
+| `delete_document` | `DELETE /documents/{doc_id}` |
+| `reingest` | ❌ not exposed (use CLI `lean reingest`) |
+| `corpus_stats` | `GET /stats` |
 
-This is intentional scope — REST is for HTTP monitoring / scripting,
-not a full client surface. To add an endpoint, see
-[`architecture.md`](architecture.md) on the transport tier pattern.
+7 of 8 MCP tools are exposed over REST. `reingest` is intentionally CLI-only
+(long-running batch operation; better suited to CLI than synchronous HTTP).
 
 ### Docker compose exposes only the MCP port
 

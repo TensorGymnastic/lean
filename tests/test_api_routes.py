@@ -149,3 +149,57 @@ def test_ingest_path_outside_corpus_returns_403(client, auth_headers):
         response = client.post("/ingest", params={"path": "x"}, headers=auth_headers)
     assert response.status_code == 403
     assert "outside corpus root" in response.json()["detail"]
+
+
+def test_get_chunk_found(client, auth_headers):
+    from lean.models.schemas import Chunk
+
+    fake_chunk = Chunk(
+        id="00000000-0000-0000-0000-000000000001",
+        document_id="00000000-0000-0000-0000-000000000002",
+        chunk_index=0,
+        section_path="Ch 1",
+        heading_text="DMAIC",
+        token_count=100,
+        content="DMAIC is a methodology.",
+        score=0.95,
+    )
+    with patch("lean.api.routes._get_chunk", return_value=fake_chunk):
+        response = client.get("/chunks/00000000-0000-0000-0000-000000000001", headers=auth_headers)
+    assert response.status_code == 200
+    assert response.json()["content"] == "DMAIC is a methodology."
+
+
+def test_get_chunk_not_found(client, auth_headers):
+    with patch("lean.api.routes._get_chunk", return_value=None):
+        response = client.get("/chunks/00000000-0000-0000-0000-000000000099", headers=auth_headers)
+    assert response.status_code == 404
+    assert response.json()["detail"] == "chunk not found"
+
+
+def test_get_document_markdown_found(client, auth_headers):
+    with patch("lean.api.routes._get_markdown", return_value="# Test Document\n\nContent"):
+        response = client.get(
+            "/documents/00000000-0000-0000-0000-000000000001/markdown", headers=auth_headers
+        )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["markdown"] == "# Test Document\n\nContent"
+    assert body["document_id"] == "00000000-0000-0000-0000-000000000001"
+
+
+def test_get_document_markdown_not_found(client, auth_headers):
+    with patch("lean.api.routes._get_markdown", side_effect=KeyError("not found")):
+        response = client.get(
+            "/documents/00000000-0000-0000-0000-000000000099/markdown", headers=auth_headers
+        )
+    assert response.status_code == 404
+    assert response.json()["detail"] == "document not found"
+
+
+def test_delete_document(client, auth_headers):
+    doc_id = "00000000-0000-0000-0000-000000000001"
+    with patch("lean.api.routes._delete", return_value={"deleted": doc_id}):
+        response = client.delete(f"/documents/{doc_id}", headers=auth_headers)
+    assert response.status_code == 200
+    assert response.json() == {"deleted": doc_id}

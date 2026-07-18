@@ -143,3 +143,22 @@ class ChunkRepo:
             )
             rows = cur.fetchall()
         return [Chunk.from_row(r) for r in rows]
+
+    def find_duplicate_image_hashes(self) -> list[tuple[str, int]]:
+        """Return ``(image_hash, count)`` pairs for hashes appearing in more than one chunk.
+
+        Diagnostic only — surfaces duplicate images across the corpus. Future ingest
+        optimization could skip VLM description for hashes already in the DB.
+        """
+        with self._conn.conn.cursor() as cur:
+            cur.execute(
+                """
+                select image_hash, count(*) as cnt
+                from public.chunks
+                where image_hash is not null
+                group by image_hash
+                having count(*) > 1
+                order by cnt desc
+                """
+            )
+            return [(row[0], int(row[1])) for row in cur.fetchall()]

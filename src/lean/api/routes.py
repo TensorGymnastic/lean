@@ -18,6 +18,9 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from lean.config.settings import get_settings
 from lean.services.corpus import corpus_stats as _corpus_stats
+from lean.services.corpus import delete_document as _delete
+from lean.services.corpus import get_chunk as _get_chunk
+from lean.services.corpus import get_document_markdown as _get_markdown
 from lean.services.corpus import list_documents as _list
 from lean.services.ingestion import ingest_pdf as _ingest
 from lean.services.search import search as _search
@@ -107,3 +110,27 @@ async def ingest(path: str) -> dict[str, Any]:
 async def stats() -> dict[str, Any]:
     result = await anyio.to_thread.run_sync(_corpus_stats)
     return result.model_dump(mode="json")
+
+
+@app.get("/chunks/{chunk_id}", dependencies=[Depends(_verify_token)])
+async def get_chunk(chunk_id: str) -> dict[str, Any]:
+    chunk = await anyio.to_thread.run_sync(lambda: _get_chunk(chunk_id))
+    if chunk is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="chunk not found")
+    return chunk.model_dump(mode="json")
+
+
+@app.get("/documents/{document_id}/markdown", dependencies=[Depends(_verify_token)])
+async def get_document_markdown(document_id: str) -> dict[str, str]:
+    try:
+        markdown = await anyio.to_thread.run_sync(lambda: _get_markdown(document_id))
+    except KeyError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="document not found"
+        ) from None
+    return {"document_id": document_id, "markdown": markdown}
+
+
+@app.delete("/documents/{document_id}", dependencies=[Depends(_verify_token)])
+async def delete_document(document_id: str) -> dict[str, str]:
+    return await anyio.to_thread.run_sync(lambda: _delete(document_id))
