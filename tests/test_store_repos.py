@@ -64,6 +64,34 @@ def test_replace_chunks_with_data(monkeypatch):
     conn.conn.commit.assert_called_once()
 
 
+def test_replace_chunks_commit_false_skips_commit(monkeypatch):
+    """When commit=False, replace_chunks must NOT commit — caller controls the transaction."""
+    monkeypatch.setenv("LEAN_MCP_API_KEY", _VALID_KEY)
+    from lean.store.chunks import ChunkRepo, ChunkRow
+
+    cursor = _mock_cursor()
+    conn = _mock_conn(cursor)
+    repo = ChunkRepo(conn)
+    doc_id = uuid.uuid4()
+    chunks = [
+        ChunkRow(
+            document_id=doc_id,
+            chunk_index=0,
+            section_path="Ch 1",
+            heading_text="H",
+            page_start=None,
+            page_end=None,
+            token_count=10,
+            content="content",
+            embedding=[0.1] * 1024,
+        )
+    ]
+    repo.replace_chunks(doc_id, chunks, commit=False)
+    cursor.execute.assert_called_once()  # DELETE still runs
+    cursor.executemany.assert_called_once()  # INSERT still runs
+    conn.conn.commit.assert_not_called()  # but no commit
+
+
 def test_get_chunk_found(monkeypatch):
     monkeypatch.setenv("LEAN_MCP_API_KEY", _VALID_KEY)
     from lean.store.chunks import ChunkRepo
@@ -158,6 +186,27 @@ def test_upsert_document(monkeypatch):
     assert result == doc_uuid
     cursor.execute.assert_called_once()
     conn.conn.commit.assert_called_once()
+
+
+def test_upsert_document_commit_false_skips_commit(monkeypatch):
+    """When commit=False, upsert_document must NOT commit — caller controls the transaction."""
+    monkeypatch.setenv("LEAN_MCP_API_KEY", _VALID_KEY)
+    from lean.store.documents import DocumentRepo
+
+    doc_uuid = uuid.uuid4()
+    cursor = _mock_cursor(fetchone_return=(doc_uuid,))
+    conn = _mock_conn(cursor)
+    repo = DocumentRepo(conn)
+    result = repo.upsert_document(
+        source_path="data/test.pdf",
+        source_sha256="abc123",
+        title="Test",
+        extraction_method="markitdown",
+        commit=False,
+    )
+    assert result == doc_uuid
+    cursor.execute.assert_called_once()  # INSERT still runs
+    conn.conn.commit.assert_not_called()  # but no commit
 
 
 def test_delete_document(monkeypatch):

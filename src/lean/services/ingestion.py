@@ -175,6 +175,7 @@ async def ingest_pdf(path: str) -> IngestResult:
     try:
         documents = DocumentRepo(conn)
         chunks_repo = ChunkRepo(conn)
+        # Single-transaction boundary: chunk-replace failure must roll back the doc upsert.
         doc_id = documents.upsert_document(
             source_path=str(pdf_path),
             source_sha256=source_sha256,
@@ -189,6 +190,7 @@ async def ingest_pdf(path: str) -> IngestResult:
                 "subject": pdf_meta.subject,
                 "toc": pdf_meta.toc,
             },
+            commit=False,
         )
         chunk_rows = [
             ChunkRow(
@@ -229,7 +231,12 @@ async def ingest_pdf(path: str) -> IngestResult:
                     embedding_dim=settings.embedding_dim,
                 )
             )
-        chunks_repo.replace_chunks(doc_id, chunk_rows)
+        try:
+            chunks_repo.replace_chunks(doc_id, chunk_rows, commit=False)
+        except Exception:
+            conn.conn.rollback()
+            raise
+        conn.conn.commit()
     finally:
         conn.close()
 

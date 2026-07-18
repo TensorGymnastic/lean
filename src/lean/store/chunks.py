@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from typing import Any
 from uuid import UUID  # noqa: TC003
 
 from psycopg.rows import dict_row
+from psycopg.types.json import Jsonb
 
 from lean.models.schemas import Chunk
 from lean.store.base import StoreConnection
@@ -41,8 +41,19 @@ class ChunkRepo:
     def __init__(self, conn: StoreConnection) -> None:
         self._conn = conn
 
-    def replace_chunks(self, document_id: UUID, chunks: list[ChunkRow]) -> None:
-        """Delete existing chunks for a document and insert new ones."""
+    def replace_chunks(
+        self,
+        document_id: UUID,
+        chunks: list[ChunkRow],
+        *,
+        commit: bool = True,
+    ) -> None:
+        """Delete existing chunks for a document and insert new ones.
+
+        Pass ``commit=False`` when the caller manages the transaction
+        (e.g. to keep doc-upsert and chunk-replace atomic in a single
+        transaction). The caller is then responsible for committing.
+        """
         with self._conn.conn.cursor() as cur:
             cur.execute(
                 "delete from public.chunks where document_id = %s",
@@ -70,8 +81,8 @@ class ChunkRepo:
                             c.content,
                             c.embedding,
                             c.chunk_type,
-                            json.dumps(c.image_meta) if c.image_meta else None,
-                            json.dumps(c.bbox) if c.bbox else None,
+                            Jsonb(c.image_meta) if c.image_meta else None,
+                            Jsonb(c.bbox) if c.bbox else None,
                             c.image_hash,
                             c.provenance_model,
                             c.embedding_model,
@@ -80,7 +91,8 @@ class ChunkRepo:
                         for c in chunks
                     ],
                 )
-        self._conn.conn.commit()
+        if commit:
+            self._conn.conn.commit()
 
     def get_chunk(self, chunk_id: UUID) -> Chunk | None:
         """Fetch a single chunk by ID. Returns None if not found."""

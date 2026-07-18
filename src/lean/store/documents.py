@@ -34,11 +34,16 @@ class DocumentRepo:
         year: int | None = None,
         page_count: int | None = None,
         metadata: dict[str, Any] | None = None,
+        commit: bool = True,
     ) -> UUID:
         """Insert or update a document. Returns the document UUID.
 
         On conflict (same source_sha256), updates the source_path, title,
         and sets reingested_at. Returns the existing or new id.
+
+        Pass ``commit=False`` when the caller manages the transaction
+        (e.g. to keep doc-upsert and chunk-replace atomic in a single
+        transaction). The caller is then responsible for committing.
         """
         with self._conn.conn.cursor() as cur:
             cur.execute(
@@ -72,19 +77,21 @@ class DocumentRepo:
                 ),
             )
             row = cur.fetchone()
-            self._conn.conn.commit()
+            if commit:
+                self._conn.conn.commit()
             if row is None:
                 raise RuntimeError("upsert_document returned no row")
             return UUID(str(row[0]))
 
-    def delete_document(self, document_id: UUID) -> None:
+    def delete_document(self, document_id: UUID, *, commit: bool = True) -> None:
         """Delete a document and cascade-delete its chunks."""
         with self._conn.conn.cursor() as cur:
             cur.execute(
                 "delete from public.documents where id = %s",
                 (document_id,),
             )
-        self._conn.conn.commit()
+        if commit:
+            self._conn.conn.commit()
 
     def list_documents(self) -> list[DocumentSummary]:
         """List all documents in the corpus with chunk counts, newest first."""
