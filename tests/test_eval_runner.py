@@ -132,3 +132,74 @@ def test_evaluate_empty_samples(monkeypatch_env):
 
     assert result.sample_count == 0
     assert result.hit_rate == 0.0
+
+
+def _mock_store_with_rows(rows: list[dict]) -> MagicMock:
+    """Build a mock StoreConnection whose cursor returns the given rows from fetchall."""
+    mock_cur = MagicMock()
+    mock_cur.fetchall.return_value = rows
+    mock_store = MagicMock()
+    mock_store.conn.cursor.return_value.__enter__.return_value = mock_cur
+    return mock_store
+
+
+def _make_eligible_rows(n: int) -> list[dict]:
+    """Generate n eligible chunk rows (heading > 5 chars)."""
+    return [
+        {"id": f"chunk-{i:03d}", "heading_text": f"Section Heading {i}", "content": f"content {i}"}
+        for i in range(n)
+    ]
+
+
+def test_build_eval_dataset_returns_exactly_sample_size(monkeypatch_env):
+    """build_eval_dataset must return exactly sample_size samples, not all eligible rows."""
+    from lean.eval.runner import build_eval_dataset
+
+    rows = _make_eligible_rows(20)
+    store = _mock_store_with_rows(rows)
+
+    samples = build_eval_dataset(store, sample_size=5, seed=42)
+
+    assert len(samples) == 5
+
+
+def test_build_eval_dataset_deterministic_with_same_seed(monkeypatch_env):
+    """Two calls with the same seed must return identical samples (same chunk IDs, same order)."""
+    from lean.eval.runner import build_eval_dataset
+
+    rows = _make_eligible_rows(50)
+    store = _mock_store_with_rows(rows)
+
+    samples_a = build_eval_dataset(store, sample_size=10, seed=42)
+    samples_b = build_eval_dataset(store, sample_size=10, seed=42)
+
+    ids_a = [s.expected_chunk_id for s in samples_a]
+    ids_b = [s.expected_chunk_id for s in samples_b]
+    assert ids_a == ids_b
+
+
+def test_build_eval_dataset_different_seed_different_samples(monkeypatch_env):
+    """Different seeds should (almost certainly) produce different sample sets."""
+    from lean.eval.runner import build_eval_dataset
+
+    rows = _make_eligible_rows(50)
+    store = _mock_store_with_rows(rows)
+
+    samples_a = build_eval_dataset(store, sample_size=10, seed=42)
+    samples_b = build_eval_dataset(store, sample_size=10, seed=999)
+
+    ids_a = {s.expected_chunk_id for s in samples_a}
+    ids_b = {s.expected_chunk_id for s in samples_b}
+    assert ids_a != ids_b
+
+
+def test_build_eval_dataset_clamps_when_fewer_eligible_than_sample_size(monkeypatch_env):
+    """If fewer eligible chunks than sample_size, return all eligible (no crash)."""
+    from lean.eval.runner import build_eval_dataset
+
+    rows = _make_eligible_rows(3)
+    store = _mock_store_with_rows(rows)
+
+    samples = build_eval_dataset(store, sample_size=50, seed=42)
+
+    assert len(samples) == 3

@@ -53,6 +53,9 @@ def build_eval_dataset(
 
     Uses heading_text + first 100 chars of content as the pseudo-query.
     For production eval, replace with hand-curated (query, expected) pairs.
+
+    Sampling is deterministic: the same seed always selects the same chunks,
+    portable across Postgres versions (Python Mersenne Twister, not SQL random()).
     """
     with store.conn.cursor(row_factory=dict_row) as cur:
         cur.execute(
@@ -61,18 +64,16 @@ def build_eval_dataset(
             from public.chunks
             where heading_text is not null
               and length(heading_text) > 5
-            order by random()
-            limit %s
             """,
-            (sample_size,),
         )
         rows = cur.fetchall()
 
     rng = random.Random(seed)
-    rng.shuffle(rows)
+    n = min(sample_size, len(rows))
+    sampled = rng.sample(rows, n)
 
     samples: list[EvalSample] = []
-    for r in rows:
+    for r in sampled:
         heading = r["heading_text"].strip()
         content_preview = r["content"][:100].strip().replace("\n", " ")
         query = f"{heading}: {content_preview}"

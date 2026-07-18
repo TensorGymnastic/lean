@@ -61,33 +61,24 @@ If you want to eval the full pipeline, you need to either:
 
 ---
 
-## Non-deterministic sampling (HIGH)
+## Sampling determinism (resolved)
 
-`build_eval_dataset` does:
+The query now fetches all eligible chunks and samples in Python:
 
-```sql
-select id, heading_text, content
-from public.chunks
-where heading_text is not null
-  and length(heading_text) > 5
-order by random()
-limit %s
+```python
+rng = random.Random(seed)
+n = min(sample_size, len(rows))
+sampled = rng.sample(rows, n)
 ```
 
-Postgres `ORDER BY random()` is **not seeded**. The Python `seed=42`
-shuffles the already-fetched rows but cannot affect which rows were
-fetched. **Two consecutive runs sample different chunks**, so the
-hit_rate / MRR / NDCG / Recall numbers will drift even with identical
-config and identical corpus.
+Python's Mersenne Twister is stable across versions and platforms, so the
+same `seed` always selects the same chunks — portable across Postgres
+versions, machines, and environments. Two consecutive runs on the same
+corpus with the same seed produce identical hit_rate / MRR / NDCG / Recall.
 
-**Implications:**
-
-- Eval results from one run are not directly comparable to another run
-  on the same corpus
-- Trend eval_runs over time is noisy; consider aggregating over many
-  runs or seeding the SQL sample (e.g. via `setseed()` or a TABLESAMPLE
-  strategy)
-- The `seed` setting gives **false confidence** of reproducibility
+Previously, SQL `ORDER BY random()` was unseeded and the Python seed only
+shuffled presentation order — fixed in commit that introduced
+`random.sample()` in `build_eval_dataset`.
 
 ---
 
