@@ -69,10 +69,7 @@ def load_curated_dataset(path: Path) -> list[EvalSample]:
             is not a JSON object.
     """
     path = Path(path)
-    try:
-        raw = path.read_text(encoding="utf-8")
-    except FileNotFoundError:
-        raise
+    raw = path.read_text(encoding="utf-8")
 
     try:
         data = json.loads(raw)
@@ -201,10 +198,13 @@ def _dcg_at_k(rank: int | None, k: int) -> float:
 
     If the relevant item is found at position ``rank`` (1-based), DCG = 1/log2(rank+1).
     IDCG (ideal) = 1/log2(2) = 1. NDCG = DCG/IDCG.
-    If not found, NDCG = 0.
+    If not found or beyond top-k, returns 0.0.
+
+    The ``rank > k`` branch is unreachable from ``evaluate()`` (which calls
+    ``vector_search(..., k=k)`` and so ``rank`` is always ``<= k``), but is
+    retained as a library-grade invariant for any future caller that passes
+    a rank from a wider candidate set.
     """
     if rank is None or rank > k:
         return 0.0
-    dcg = 1.0 / math.log2(rank + 1)
-    idcg = 1.0 / math.log2(2)
-    return dcg / idcg
+    return 1.0 / math.log2(rank + 1)
