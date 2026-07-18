@@ -12,9 +12,13 @@ import logging
 import time
 from functools import partial
 from pathlib import Path
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 import anyio
+
+if TYPE_CHECKING:
+    from PIL.Image import Image as PILImage
 
 from lean.chunker.markdown_ast import build_sections
 from lean.chunker.recursive import chunk_sections
@@ -136,30 +140,45 @@ async def ingest_pdf(path: str) -> IngestResult:
             disable_thinking=settings.vlm_disable_thinking,
         )
         try:
-            for img_name, pil_img in images.items():
-                try:
-                    raw = await anyio.to_thread.run_sync(
-                        partial(
-                            vlm.describe_image,
-                            pil_img,
-                            prompt=CHART_EXTRACTION_PROMPT,
-                            max_tokens=settings.vlm_max_tokens,
+            results: dict[str, tuple[str, dict[str, object], str] | Exception] = {}
+            sem = anyio.Semaphore(settings.vlm_max_concurrency)
+
+            async def _describe_one(img_name: str, pil_img: PILImage) -> None:
+                async with sem:
+                    try:
+                        raw = await anyio.to_thread.run_sync(
+                            partial(
+                                vlm.describe_image,
+                                pil_img,
+                                prompt=CHART_EXTRACTION_PROMPT,
+                                max_tokens=settings.vlm_max_tokens,
+                            )
                         )
-                    )
-                    parsed = parse_description(raw)
-                    embed_text = str(parsed.get("description", raw.strip()))
-                    if parsed.get("title"):
-                        embed_text = f"{parsed['title']}\n\n{embed_text}"
-                    if parsed.get("key_data_points"):
-                        points = parsed["key_data_points"]
-                        if isinstance(points, list):
-                            embed_text += "\n\nKey data: " + "; ".join(str(p) for p in points)
-                    buf = io.BytesIO()
-                    pil_img.save(buf, format="PNG")
-                    img_hash = hashlib.sha256(buf.getvalue()).hexdigest()
-                    image_descriptions.append((embed_text, parsed, img_hash))
-                except VLMError as e:
-                    warnings.append(f"VLM failed for image {img_name}: {e}")
+                        parsed = parse_description(raw)
+                        embed_text = str(parsed.get("description", raw.strip()))
+                        if parsed.get("title"):
+                            embed_text = f"{parsed['title']}\n\n{embed_text}"
+                        if parsed.get("key_data_points"):
+                            points = parsed["key_data_points"]
+                            if isinstance(points, list):
+                                embed_text += "\n\nKey data: " + "; ".join(str(p) for p in points)
+                        buf = io.BytesIO()
+                        pil_img.save(buf, format="PNG")
+                        img_hash = hashlib.sha256(buf.getvalue()).hexdigest()
+                        results[img_name] = (embed_text, parsed, img_hash)
+                    except VLMError as e:
+                        results[img_name] = e
+
+            async with anyio.create_task_group() as tg:
+                for img_name, pil_img in images.items():
+                    tg.start_soon(_describe_one, img_name, pil_img)
+
+            for img_name in images:
+                r = results[img_name]
+                if isinstance(r, tuple):
+                    image_descriptions.append(r)
+                else:
+                    warnings.append(f"VLM failed for image {img_name}: {r}")
         finally:
             vlm.close()
     elif images and not settings.vlm_enabled:

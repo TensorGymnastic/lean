@@ -21,6 +21,8 @@ from lean.store.search import SearchEngine, SearchHit
 
 logger = logging.getLogger(__name__)
 
+VALID_CHUNK_TYPES = frozenset({"text", "image"})
+
 
 def search(
     query: str,
@@ -47,6 +49,10 @@ def search(
     settings = get_settings()
     if not query or not query.strip():
         raise ValueError("query must not be empty")
+    if chunk_type is not None and chunk_type not in VALID_CHUNK_TYPES:
+        raise ValueError(
+            f"chunk_type must be one of {sorted(VALID_CHUNK_TYPES)} or None, got '{chunk_type}'"
+        )
     if len(query) > settings.search_max_query_len:
         raise ValueError(f"query exceeds max length ({settings.search_max_query_len} chars)")
     if k is None:
