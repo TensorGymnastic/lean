@@ -124,8 +124,8 @@ tool, update the corresponding doc page in the same commit. Run
 
 Documented honestly so future agents don't re-derive. Items here are **accepted**, not blocking. Last verified 2026-07-18 against source.
 
-1. **`page_start` / `page_end` are hardcoded `None`** at `services/ingestion.py:231-232` (text chunks) and `:251-252` (image chunks). Chunker doesn't preserve page boundaries; cleanup needs upstream marker/OCR changes.
-2. **`bbox` column is wired through but always NULL** — defined in `models/schemas.py:50`, `store/chunks.py:31`, written at `chunks.py:85`, read at `store/search.py:97,140`; never populated with non-NULL because `ChunkRow.bbox` defaults to `None` and no caller sets it. Awaits marker block-level polygon wiring.
+1. **`page_start` / `page_end` are hardcoded `None`** at `services/ingestion.py:231-232` (text chunks) and `:251-252` (image chunks). **Research complete** — marker's `ChunkRenderer` produces `FlatBlockOutput` with `page: int` per block. Implementation path documented in `docs/marker-integration-research.md`. Estimated 1-1.5 days to wire through chunker.
+2. **`bbox` column is wired through but always NULL**. **Research complete** — marker's `FlatBlockOutput.bbox: List[float]` provides `[x0, y0, x1, y1]` per block. Same implementation path as item 1. `ChunkRenderer` confirmed available in installed marker version.
 
 **Previously listed and since FIXED (do not re-litigate):**
 - `ingest_pdf` was a 244-LOC god function → split into `_describe_one_image` (40 LOC) + `_describe_images` (47 LOC) + `_build_chunk_rows` (52 LOC) + `_persist_ingest` (48 LOC); `ingest_pdf` is now 130 LOC orchestration.
