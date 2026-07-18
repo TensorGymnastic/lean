@@ -81,6 +81,7 @@ async def ingest_pdf(path: str) -> IngestResult:
             ocr_max_tokens=settings.ocr_max_tokens,
             ocr_batch_size=settings.ocr_batch_size,
             marker_force_ocr=settings.marker_force_ocr,
+            marker_remote_url=settings.marker_remote_url,
         )
     )
 

@@ -41,6 +41,7 @@ def extract_pdf_markdown(
     ocr_max_tokens: int,
     ocr_batch_size: int,
     marker_force_ocr: bool = False,
+    marker_remote_url: str = "",
 ) -> tuple[str, int, ExtractionMethod, dict[str, Any]]:
     """Extract markdown from a PDF, preferring marker then OCR then markitdown.
 
@@ -50,7 +51,9 @@ def extract_pdf_markdown(
     try:
         from lean.extraction.marker_converter import extract_markdown as extract_marker
 
-        markdown, page_count, images = extract_marker(pdf_path, force_ocr=marker_force_ocr)
+        markdown, page_count, images = extract_marker(
+            pdf_path, force_ocr=marker_force_ocr, remote_url=marker_remote_url
+        )
         return markdown, page_count, ExtractionMethod.MARKER, images
     except MarkerNotInstalled:
         pass

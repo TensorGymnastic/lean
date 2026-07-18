@@ -59,6 +59,7 @@ class Settings(BaseSettings):
     ocr_batch_size: int = _yaml.get("ocr", {}).get("batch_size", 20)
 
     marker_force_ocr: bool = _yaml.get("marker", {}).get("force_ocr", False)
+    marker_remote_url: str = _yaml.get("marker", {}).get("remote_url", "")
 
     chunk_target_max: int = _yaml.get("chunking", {}).get("target_max", 450)
     chunk_hard_cap: int = _yaml.get("chunking", {}).get("hard_cap", 500)
