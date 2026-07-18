@@ -12,6 +12,11 @@ from psycopg.types.json import Jsonb
 from lean.models.schemas import Chunk
 from lean.store.base import StoreConnection
 
+# Postgres caps prepared statements at 65535 parameters. The chunks INSERT has 16
+# columns per row, so a single executemany hits the ceiling at ~4096 rows. Batching
+# at 1000 keeps a 4× headroom and tolerates future column additions up to ~24.
+_INSERT_BATCH_SIZE = 1000
+
 
 @dataclass
 class ChunkRow:
@@ -60,37 +65,37 @@ class ChunkRepo:
                 (document_id,),
             )
             if chunks:
-                cur.executemany(
-                    """
+                rows = [
+                    (
+                        c.document_id,
+                        c.chunk_index,
+                        c.section_path,
+                        c.heading_text,
+                        c.page_start,
+                        c.page_end,
+                        c.token_count,
+                        c.content,
+                        c.embedding,
+                        c.chunk_type,
+                        Jsonb(c.image_meta) if c.image_meta else None,
+                        Jsonb(c.bbox) if c.bbox else None,
+                        c.image_hash,
+                        c.provenance_model,
+                        c.embedding_model,
+                        c.embedding_dim,
+                    )
+                    for c in chunks
+                ]
+                insert_sql = """
                     insert into public.chunks
                         (document_id, chunk_index, section_path, heading_text,
                          page_start, page_end, token_count, content, embedding,
                          chunk_type, image_meta, bbox, image_hash,
                          provenance_model, embedding_model, embedding_dim)
                     values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """,
-                    [
-                        (
-                            c.document_id,
-                            c.chunk_index,
-                            c.section_path,
-                            c.heading_text,
-                            c.page_start,
-                            c.page_end,
-                            c.token_count,
-                            c.content,
-                            c.embedding,
-                            c.chunk_type,
-                            Jsonb(c.image_meta) if c.image_meta else None,
-                            Jsonb(c.bbox) if c.bbox else None,
-                            c.image_hash,
-                            c.provenance_model,
-                            c.embedding_model,
-                            c.embedding_dim,
-                        )
-                        for c in chunks
-                    ],
-                )
+                """
+                for i in range(0, len(rows), _INSERT_BATCH_SIZE):
+                    cur.executemany(insert_sql, rows[i : i + _INSERT_BATCH_SIZE])
         if commit:
             self._conn.conn.commit()
 

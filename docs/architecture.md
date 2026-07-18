@@ -12,19 +12,23 @@ layout**. For configuration, see [`configuration.md`](configuration.md).
 
 ```
 PDF
- └─► corpus_root check (PermissionError if outside)
-     └─► max_pdf_mb check (ValueError if too large)
-         └─► SHA-256 + read bytes
-             └─► extraction.pipeline.run()
-                 ├─► unlimited_ocr (remote) — if OCR_BASE_URL set
-                 └─► markitdown (local) — fallback, always available
-             └─► chunker.markdown_ast + recursive.split
-                 └─► embedder.embed_documents (local CPU or remote Ollama)
-                     └─► store.chunks.upsert + store.documents.upsert
-                         └─► IngestResult
+  └─► corpus_root check (PermissionError if outside)
+      └─► max_pdf_mb check (ValueError if too large)
+          └─► SHA-256 (streamed, 1 MiB blocks)
+              └─► extraction.pipeline.extract_pdf_markdown()
+                  ├─► marker_converter (primary)
+                  │     ├─► _extract_remote — POST to marker.remote_url (GPU server)
+                  │     └─► _extract_local — in-process PdfConverter (CPU)
+                  ├─► unlimited_ocr (secondary) — if OCR_BASE_URL set
+                  └─► markitdown_fallback (tertiary) — pure Python, always available
+              └─► (optional) VLM enrichment — describe each chart/image (anyio.Semaphore-bounded)
+                  └─► chunker.markdown_ast + recursive.split
+                      └─► embedder.embed_documents (local CPU or remote Ollama)
+                          └─► atomic single-txn: documents.upsert (commit=False) + chunks.replace (commit=False) + conn.commit()
+                              └─► IngestResult
 ```
 
-All heavy operations (extraction, embedding, DB) run via
+All heavy operations (extraction, embedding, VLM, DB) run via
 `anyio.to_thread.run_sync` so the MCP event loop stays responsive.
 
 ### Search
@@ -62,12 +66,13 @@ src/lean/
 ├── models/
 │   └── schemas.py           # shared Pydantic types (Chunk, Document, SearchHit…)
 ├── extraction/              # PDF → markdown
-│   ├── unlimited_ocr.py     # remote OCR client (OpenAI-compatible)
+│   ├── pipeline.py          # marker → OCR → markitdown orchestrator
+│   ├── marker_converter.py  # PRIMARY: datalab-to/marker (surya + texify), local + remote GPU
+│   ├── unlimited_ocr.py     # SECONDARY: baidu/Unlimited-OCR via remote transformers
+│   ├── markitdown_fallback.py  # TERTIARY: pure-Python fallback
 │   ├── ocr_postprocess.py   # annotation stripper + empty-paragraph filter
-│   ├── markitdown_fallback.py
 │   ├── metadata.py          # title / authors / year / publisher
-│   ├── contextual.py        # optional Contextual Retrieval (LLM)
-│   └── pipeline.py          # OCR → markitdown orchestrator
+│   └── contextual.py        # optional Contextual Retrieval (LLM)
 ├── chunker/
 │   ├── markdown_ast.py      # mistune section parser
 │   └── recursive.py         # tiktoken recursive splitter
@@ -154,15 +159,20 @@ re-creation (used in tests; never in production paths).
 
 ```
 documents ───┬── source_sha256 (unique) — dedup key
-              ├── extraction_method (unlimited_ocr | markitdown)
+              ├── extraction_method (marker | unlimited_ocr | markitdown)
               └── metadata (jsonb)
 
 chunks ──────┴── document_id (FK cascade)
               ├── chunk_index >= 0, token_count > 0 (CHECK)
-              ├── section_path, heading_text, page_start, page_end
-              │   (page_start/end currently always NULL — see limitations.md)
+              ├── chunk_type IN ('text','image') (CHECK — migration 012)
+              ├── section_path, heading_text
+              ├── page_start, page_end  (currently always NULL — see limitations.md)
               ├── content (text)
-              └── embedding (vector(1024)) — ivfflat index, lists=100
+              ├── embedding vector(N) — ivfflat index, lists=100
+              ├── image_meta (jsonb, image chunks only)
+              ├── bbox (jsonb, always NULL — wiring pending)
+              ├── image_hash (text, written but not yet used in WHERE)
+              └── provenance: provenance_model, embedding_model, embedding_dim
 
 query_logs   ─── query_text, k > 0, filters, hit_chunk_ids, latency_ms >= 0
 

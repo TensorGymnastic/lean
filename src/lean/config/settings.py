@@ -129,7 +129,6 @@ class Settings(BaseSettings):
 
     # --- VLM (optional vision-language model for chart/image description) ---
     vlm_enabled: bool = (_yaml.get("vlm") or {}).get("enabled", False)
-    vlm_provider: str = (_yaml.get("vlm") or {}).get("provider", "ollama")
     vlm_base_url: str = (_yaml.get("vlm") or {}).get("base_url", "")
     vlm_model: str = (_yaml.get("vlm") or {}).get("model", "")
     vlm_api_key: str = Field(default="", description="VLM API key")

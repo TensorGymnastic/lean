@@ -92,6 +92,79 @@ def test_replace_chunks_commit_false_skips_commit(monkeypatch):
     conn.conn.commit.assert_not_called()  # but no commit
 
 
+def _make_chunk_rows(doc_id: uuid.UUID, n: int) -> list:
+    """Build n minimal ChunkRow instances for batch-insert tests."""
+    from lean.store.chunks import ChunkRow
+
+    return [
+        ChunkRow(
+            document_id=doc_id,
+            chunk_index=i,
+            section_path="Ch 1",
+            heading_text="H",
+            page_start=None,
+            page_end=None,
+            token_count=10,
+            content=f"content {i}",
+            embedding=[0.1] * 1024,
+        )
+        for i in range(n)
+    ]
+
+
+def test_replace_chunks_batches_large_inserts(monkeypatch):
+    """Large inserts (>1000 chunks) must be batched to avoid the 65535-param Postgres limit.
+
+    With 16 columns per row, a single executemany of 5000 chunks would push 80000 params
+    past the 65535 ceiling. The repo must split into batches of <= _INSERT_BATCH_SIZE.
+    """
+    monkeypatch.setenv("LEAN_MCP_API_KEY", _VALID_KEY)
+    from lean.store.chunks import _INSERT_BATCH_SIZE, ChunkRepo
+
+    cursor = _mock_cursor()
+    conn = _mock_conn(cursor)
+    repo = ChunkRepo(conn)
+    doc_id = uuid.uuid4()
+
+    n_chunks = 5000
+    repo.replace_chunks(doc_id, _make_chunk_rows(doc_id, n_chunks))
+
+    assert cursor.execute.call_count == 1
+    expected_batches = (n_chunks + _INSERT_BATCH_SIZE - 1) // _INSERT_BATCH_SIZE
+    assert cursor.executemany.call_count == expected_batches
+
+    for call in cursor.executemany.call_args_list:
+        _sql, rows = call.args
+        assert len(rows) <= _INSERT_BATCH_SIZE
+
+
+def test_replace_chunks_batch_size_keeps_params_under_postgres_limit(monkeypatch):
+    """_INSERT_BATCH_SIZE × column count must stay well below 65535 params."""
+    monkeypatch.setenv("LEAN_MCP_API_KEY", _VALID_KEY)
+    from lean.store.chunks import _INSERT_BATCH_SIZE
+
+    column_count = 24
+    assert _INSERT_BATCH_SIZE * column_count <= 65535, (
+        f"_INSERT_BATCH_SIZE={_INSERT_BATCH_SIZE} × max_cols={column_count} "
+        f"= {_INSERT_BATCH_SIZE * column_count} exceeds Postgres 65535-param ceiling"
+    )
+
+
+def test_replace_chunks_small_list_single_batch(monkeypatch):
+    """Small lists fit in one batch — do not over-batch."""
+    monkeypatch.setenv("LEAN_MCP_API_KEY", _VALID_KEY)
+    from lean.store.chunks import ChunkRepo
+
+    cursor = _mock_cursor()
+    conn = _mock_conn(cursor)
+    repo = ChunkRepo(conn)
+    doc_id = uuid.uuid4()
+
+    repo.replace_chunks(doc_id, _make_chunk_rows(doc_id, 5))
+    cursor.execute.assert_called_once()
+    cursor.executemany.assert_called_once()
+
+
 def test_get_chunk_found(monkeypatch):
     monkeypatch.setenv("LEAN_MCP_API_KEY", _VALID_KEY)
     from lean.store.chunks import ChunkRepo

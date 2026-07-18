@@ -12,12 +12,13 @@ the inline code comments.
 
 The columns exist in the schema (`db/schemas/003_chunks.sql:10-11`) and
 the MCP resource `lean://documents/{id}/chunks` exposes them. **Ingestion
-hardcodes both to `None`** in `src/lean/services/ingestion.py:155-156`.
-The OCR client returns per-page markdown but we do not currently track
-which chunks came from which pages.
+hardcodes both to `None`** for text chunks at
+`src/lean/services/ingestion.py:231-232` and for image chunks at
+`src/lean/services/ingestion.py:251-252`. The chunker does not currently
+track which chunks came from which pages.
 
 If you need page-anchored citation, this needs implementation work
-(upstream OCR client would need to return page boundaries, and the
+(upstream marker/OCR would need to return page boundaries, and the
 chunker would need to preserve them).
 
 ### Contextual Retrieval is irreversible
@@ -63,12 +64,17 @@ postprocessors). It does not measure what `lean search` returns.
 
 See [`evaluation.md`](evaluation.md) for the full methodology.
 
-### Eval sampling is non-deterministic
+### Eval sampling is deterministic given a fixed seed
 
-`build_eval_dataset` uses `ORDER BY random()` in SQL, which is
-unseeded. The `seed=42` only shuffles the already-fetched rows. Two
-consecutive runs sample different chunks and produce different
-hit_rate / MRR / NDCG / Recall numbers, even on the same corpus.
+`build_eval_dataset` fetches eligible chunks via SQL, then samples in
+Python using `random.Random(seed).sample(rows, n)` (see
+`src/lean/eval/runner.py:71`). Python's Mersenne Twister is stable
+across versions and platforms, so the same `seed` always selects the
+same chunks. Two consecutive runs on the same corpus with the same seed
+produce identical hit_rate / MRR / NDCG / Recall numbers.
+
+(Previously used unseeded SQL `ORDER BY random()`; replaced by Python
+sampling.) See [`evaluation.md`](evaluation.md#sampling-determinism-resolved).
 
 ---
 
@@ -132,17 +138,20 @@ as a CLI flag.
 
 ## Resource limits
 
-### Ingest loads the entire PDF into memory
+### Ingest streams the PDF for SHA-256
 
-`pdf_path.read_bytes()` is called once for SHA-256 hashing and then
-again for extraction. A `max_pdf_mb=200` PDF occupies ~400 MB during
-ingest. Concurrent ingests multiply this linearly.
+`_sha256_streaming` (`src/lean/services/ingestion.py:39-45`) reads the
+PDF in 1 MiB blocks. Memory footprint during hashing is bounded by the
+block size, not the file size. The earlier "loads full PDF twice"
+behavior was replaced by streaming; `max_pdf_mb` is now a size guard
+checked via `pdf_path.stat().st_size` before any read.
 
 ### `executemany` for chunk inserts can hit the 65535-param limit
 
-Postgres caps prepared statements at 65535 parameters. With 9 columns
-per chunk, this is hit at ~7281 chunks per insert batch. For very large
-books (rare in Lean Six Sigma corpora) this errors mid-ingest.
+Postgres caps prepared statements at 65535 parameters. With 16 columns
+per chunk (see `store/chunks.py:63-93`), this is hit at ~4096 chunks
+per insert batch. For very large books (rare in Lean Six Sigma corpora)
+this errors mid-ingest.
 
 ---
 
@@ -150,8 +159,13 @@ books (rare in Lean Six Sigma corpora) this errors mid-ingest.
 
 These have been observed in the codebase and may resurface:
 
-- `reranker.py` module docstring claims rerank is "disabled by default",
-  but `config.yaml:38` enables it. Trust the config, not the docstring.
 - README previously described `make smoke` and `make health` as
   different — they are identical (`smoke: health` in the Makefile).
 - README previously marketed the REST API as a "mirror" — it is partial.
+
+Historical drift that has been resolved:
+- `reranker.py` module docstring previously claimed rerank was
+  "disabled by default" while `config.yaml` enabled it — the docstring
+  now correctly references `retrieval.rerank.enabled: true`.
+- Eval sampling previously used unseeded SQL `ORDER BY random()` —
+  replaced by seeded Python `random.Random(seed).sample(...)`.

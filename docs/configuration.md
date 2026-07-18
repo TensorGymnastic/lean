@@ -173,13 +173,12 @@ described by a VLM at ingest time. Descriptions are embedded and stored as
 | Field | Default | Notes |
 |---|---|---|
 | `enabled` | `false` | Master switch. When false, images are captured but not described. |
-| `provider` | `ollama` | Provider label (informational — all use OpenAI-compat protocol) |
 | `base_url` | `""` | Required when enabled. e.g. `http://gpu:11434/v1` (Ollama), `https://api.minimax.io/v1` |
 | `model` | `""` | Required when enabled. e.g. `gemma3:27b`, `qwen2.5-vl:7b`, `MiniMax-M3` |
 | `api_key` | `""` | From `.env` (`LEAN_VLM_API_KEY`). Empty for local Ollama/vLLM. |
 | `detail` | `default` | Image resolution tier: `low`, `default`, or `high`. Higher = better quality, more tokens. |
 | `timeout_s` | `120.0` | VLM HTTP timeout (first model load can be slow) |
-| `max_concurrency` | `4` | Reserved for future parallel image description |
+| `max_concurrency` | `4` | Concurrency cap for parallel VLM image description (enforced via `anyio.Semaphore` in `services/ingestion.py:155`). Validated `>= 1`. |
 | `max_tokens` | `1000` | Max response tokens per image description |
 | `disable_thinking` | `true` | MiniMax-M3: skip `<think>` reasoning for faster structured JSON output. Set `false` for complex charts that benefit from reasoning. |
 

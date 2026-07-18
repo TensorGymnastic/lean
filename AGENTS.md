@@ -39,9 +39,10 @@ No business logic in transports. Each store repo is CRUD-narrow.
 - `src/lean/auth/bearer.py` — ASGI middleware, `hmac.compare_digest` token check
 - `src/lean/cli.py` — Typer CLI (full parity with MCP tools)
 - `src/lean/eval/` — retrieval evaluation harness (hit_rate@k, MRR@k, NDCG@k, Recall@k)
-- `db/schemas/` — SQL migrations (001-011). Key migrations:
+- `db/schemas/` — SQL migrations (001-012). Key migrations:
   - `010_add_chunk_types.sql` — `chunk_type` (`text`/`image`) + `image_meta` JSONB
   - `011_add_provenance_metadata.sql` — `bbox`, `image_hash`, `provenance_model`, `embedding_model`, `embedding_dim`
+  - `012_add_chunk_type_check.sql` — CHECK constraint enforcing `chunk_type IN ('text','image')`
 - `scripts/` — `canonical-queries.json` (eval fixture), `docs_lint.py` (drift detector)
 - `docs/` — reference docs (configuration, operations, architecture, evaluation, limitations, decisions)
 
@@ -53,7 +54,7 @@ No business logic in transports. Each store repo is CRUD-narrow.
 - Coverage gate: `fail_under = 80` enforced in pyproject.toml
 - `from __future__ import annotations` in all modules
 - Each module has one responsibility and is independently testable
-- **File-size ceiling ~500 LOC, function-size ceiling ~50 LOC** — split when approaching (currently `cli.py` at 429 and `ingest_pdf` at 222 LOC are the debt)
+- **File-size ceiling ~500 LOC, function-size ceiling ~50 LOC** — split when approaching (currently `cli.py` at 435 is the only remaining oversized file; `ingest_pdf` and `search` were split to 130/99 LOC)
 - Heavy operations (DB, extraction, embedding, VLM) run via `anyio.to_thread.run_sync`
   so the MCP event loop stays responsive
 - All singletons use `@lru_cache` (`get_settings`, `get_embedder`, `get_llm`,
@@ -84,7 +85,7 @@ No business logic in transports. Each store repo is CRUD-narrow.
 - `make verify-all` — all tests
 - `uv run python scripts/docs_lint.py` — detects drift between
   `config.yaml` / CLI commands / MCP tools and `docs/` + `README.md`
-- 240 unit tests + integration tests + e2e tests (coverage 82.97%)
+- 253 unit tests + integration tests + e2e tests (coverage 84.01%)
 - Integration tests need `SUPABASE_DB_URL` env var set
 - E2E tests need full stack running (Supabase + GPU servers)
 - CI: 3 jobs (verify matrix Python 3.12+3.13, security pip-audit+trivy+CodeQL,
@@ -121,15 +122,22 @@ tool, update the corresponding doc page in the same commit. Run
 
 ## Known Structural Debt (review-derived)
 
-Documented honestly so future agents don't re-derive. Items here are **accepted**, not blocking.
+Documented honestly so future agents don't re-derive. Items here are **accepted**, not blocking. Last verified 2026-07-18 against source.
 
-1. **`ingest_pdf` is a 222-LOC god function** (`services/ingestion.py:33`) doing extract+chunk+contextualize+VLM+embed+store. Split along natural seams when touching it.
-2. **`search` is 184 LOC** mixing orchestration + business logic (`services/search.py:25`). Extract pure transforms (RRF, rerank) from orchestration.
-3. **Transaction boundary split** — `documents.upsert_document` (commit at `documents.py:75`) and `chunks.replace_chunks` (commit at `chunks.py:83`) are two separate transactions. Crash between them = doc row with zero chunks. Fix: share one transaction.
-4. **`vlm_max_concurrency` configured but unused** — VLM calls are sequential. Wiring `anyio.Semaphore` gives ~4× ingest speedup.
-5. **Postgres binds `0.0.0.0:54322`** in `docker-compose.yml` with default `postgres:postgres`. Bind to `127.0.0.1:54322:5432` for any non-localhost deployment.
-6. **`chunk_type` has no CHECK constraint** — typos return silent empty results. Add `Literal["text","image"]` validation + SQL CHECK.
-7. **`_extract_remote` has 0% test coverage** (`marker_converter.py:47-75`) — network I/O path untested. Add `httpx.MockTransport` test.
-8. **`marker_server.py` lives in `/tmp/`** on the GPU host — vendor into `scripts/marker_server.py` + add `docs/marker-server-deployment.md`.
+1. **`page_start` / `page_end` are hardcoded `None`** at `services/ingestion.py:231-232` (text chunks) and `:251-252` (image chunks). Chunker doesn't preserve page boundaries; cleanup needs upstream marker/OCR changes.
+2. **`bbox` column is wired through but always NULL** — defined in `models/schemas.py:50`, `store/chunks.py:31`, written at `chunks.py:85`, read at `store/search.py:97,140`; never populated with non-NULL because `ChunkRow.bbox` defaults to `None` and no caller sets it. Awaits marker block-level polygon wiring.
+3. **`image_hash` is written but never used in a WHERE clause** — set at `services/ingestion.py:178,258`, read into the `Chunk` model at `models/schemas.py:73`, but no dedup query exists. Future: SELECT … WHERE image_hash = … to skip duplicate figures.
 
-See `docs/limitations.md` for runtime caveats (page_start NULL, dedup orphans, eval pseudo-queries, partial REST mirror).
+**Previously listed and since FIXED (do not re-litigate):**
+- `ingest_pdf` was a 244-LOC god function → split into `_describe_images` (74 LOC) + `_build_chunk_rows` (52 LOC) + `_persist_ingest` (48 LOC); `ingest_pdf` is now 130 LOC orchestration.
+- `search` was a 188-LOC function mixing orchestration + business logic → split into `_validate_search_inputs` + `_expand_queries` + `_compute_fetch_k` + `_fetch_one_query` + `_rerank_hits` + `_postprocess_hits` + `SearchRequest` dataclass; `search` is now 99 LOC orchestration.
+- Transaction boundary split → fixed by single-transaction pattern at `services/ingestion.py:204-271` (`commit=False` + final `conn.conn.commit()`).
+- `vlm_max_concurrency` unused → wired via `anyio.Semaphore(settings.vlm_max_concurrency)` at `services/ingestion.py:155`.
+- Postgres bound to `0.0.0.0:54322` → bound to `127.0.0.1:54322:5432` at `docker-compose.yml:5`.
+- `chunk_type` had no CHECK constraint → added in `db/schemas/012_add_chunk_type_check.sql`; app-side validation at `services/search.py:24` (`VALID_CHUNK_TYPES`).
+- `marker_server.py` lived in `/tmp/` → vendored at `scripts/marker_server.py`; deployment guide at `docs/marker-server-deployment.md`.
+- `_extract_local` / `_get_converter` 0% coverage → covered by mock-module injection tests in `tests/test_marker_converter.py` (`test_get_converter_constructs_pdf_converter_when_installed`, `test_get_converter_force_ocr_true_uses_separate_cache_entry`). Coverage of `marker_converter.py`: 88% → 98%.
+- `executemany` for chunk inserts could hit the 65535-param Postgres limit → batched at `_INSERT_BATCH_SIZE = 1000` in `store/chunks.py`; invariant enforced by `test_replace_chunks_batch_size_keeps_params_under_postgres_limit`.
+- `vlm_provider` field was dead config → removed from `settings.py`, `config.yaml` examples, and `docs/configuration.md` table. All VLM providers use the same OpenAI-compatible transport.
+
+See `docs/limitations.md` for runtime caveats (eval pseudo-queries, dedup orphans, partial REST mirror).

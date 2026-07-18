@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -144,6 +145,143 @@ def test_get_converter_caches_singleton() -> None:
         result2 = _get_converter(force_ocr=False)
 
     assert result1 is result2
+
+
+def test_get_converter_constructs_pdf_converter_when_installed() -> None:
+    """When marker deps are importable, _get_converter builds a real PdfConverter.
+
+    Covers the construction body (config + ConfigParser + PdfConverter wiring) that
+    the dispatch-level tests skip by mocking _get_converter itself.
+    """
+    import sys
+    import types
+
+    from lean.extraction.marker_converter import _get_converter
+
+    fake_modules: dict[str, Any] = {}
+    saved: dict[str, Any] = {}
+
+    def _install_fake_marker() -> None:
+        parser_mod = types.ModuleType("marker.config.parser")
+        converter_mod = types.ModuleType("marker.converters.pdf")
+        models_mod = types.ModuleType("marker.models")
+        output_mod = types.ModuleType("marker.output")
+
+        fake_config_parser = MagicMock()
+        fake_config_parser.return_value = fake_config_parser
+        fake_config_parser.generate_config_dict.return_value = {"parsed": True}
+        fake_config_parser.get_processors.return_value = ["proc_a"]
+        fake_config_parser.get_renderer.return_value = "renderer_cls"
+        parser_mod.ConfigParser = fake_config_parser
+
+        fake_pdf_converter = MagicMock(name="PdfConverter_instance")
+        fake_pdf_converter_class = MagicMock(name="PdfConverter", return_value=fake_pdf_converter)
+        converter_mod.PdfConverter = fake_pdf_converter_class
+
+        models_mod.create_model_dict = MagicMock(return_value={"model": "weights"})
+
+        output_mod.text_from_rendered = MagicMock(return_value=("text", "md", {}))
+
+        for name, mod in [
+            ("marker", types.ModuleType("marker")),
+            ("marker.config", types.ModuleType("marker.config")),
+            ("marker.config.parser", parser_mod),
+            ("marker.converters", types.ModuleType("marker.converters")),
+            ("marker.converters.pdf", converter_mod),
+            ("marker.models", models_mod),
+            ("marker.output", output_mod),
+        ]:
+            saved[name] = sys.modules.get(name)
+            sys.modules[name] = mod
+            fake_modules[name] = mod
+
+    _install_fake_marker()
+    try:
+        _get_converter.cache_clear()
+        result = _get_converter(force_ocr=False)
+    finally:
+        _get_converter.cache_clear()
+        for name, orig in saved.items():
+            if orig is None:
+                sys.modules.pop(name, None)
+            else:
+                sys.modules[name] = orig
+
+    assert result is not None
+    parser_mod = fake_modules["marker.config.parser"]
+    converter_mod = fake_modules["marker.converters.pdf"]
+    models_mod = fake_modules["marker.models"]
+
+    parser_mod.ConfigParser.assert_called_once_with(
+        {"output_format": "markdown", "force_ocr": False}
+    )
+    fake_config_parser_instance = parser_mod.ConfigParser.return_value
+    converter_mod.PdfConverter.assert_called_once_with(
+        config=fake_config_parser_instance.generate_config_dict.return_value,
+        artifact_dict=models_mod.create_model_dict.return_value,
+        processor_list=fake_config_parser_instance.get_processors.return_value,
+        renderer=fake_config_parser_instance.get_renderer.return_value,
+    )
+    assert result is converter_mod.PdfConverter.return_value
+
+
+def test_get_converter_force_ocr_true_uses_separate_cache_entry() -> None:
+    """force_ocr=True and force_ocr=False produce separate converter instances.
+
+    Covers the @lru_cache(maxsize=4) separate-cache-per-force_ocr contract.
+    """
+    import sys
+    import types
+
+    from lean.extraction.marker_converter import _get_converter
+
+    saved: dict[str, Any] = {}
+    fake_modules: dict[str, Any] = {}
+
+    def _install_fake_marker() -> None:
+        for name in [
+            "marker",
+            "marker.config",
+            "marker.config.parser",
+            "marker.converters",
+            "marker.converters.pdf",
+            "marker.models",
+            "marker.output",
+        ]:
+            mod = types.ModuleType(name)
+            saved[name] = sys.modules.get(name)
+            sys.modules[name] = mod
+            fake_modules[name] = mod
+
+        parser_mod = fake_modules["marker.config.parser"]
+        parser_mod.ConfigParser = MagicMock(
+            return_value=MagicMock(
+                generate_config_dict=MagicMock(return_value={}),
+                get_processors=MagicMock(return_value=[]),
+                get_renderer=MagicMock(return_value="r"),
+            )
+        )
+        converter_mod = fake_modules["marker.converters.pdf"]
+        converter_mod.PdfConverter = MagicMock(side_effect=lambda **kw: object())
+        fake_models = fake_modules["marker.models"]
+        fake_models.create_model_dict = MagicMock(return_value={})
+
+    _install_fake_marker()
+    try:
+        _get_converter.cache_clear()
+        result_false_1 = _get_converter(force_ocr=False)
+        result_false_2 = _get_converter(force_ocr=False)
+        result_true = _get_converter(force_ocr=True)
+    finally:
+        _get_converter.cache_clear()
+        for name, orig in saved.items():
+            if orig is None:
+                sys.modules.pop(name, None)
+            else:
+                sys.modules[name] = orig
+
+    assert result_false_1 is result_false_2
+    assert result_false_1 is not result_true
 
 
 # --- _extract_remote tests (network-mocked via respx) ---

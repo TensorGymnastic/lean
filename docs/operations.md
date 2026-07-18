@@ -128,14 +128,14 @@ To detect it:
 
 | Operation | Memory | Notes |
 |---|---|---|
-| Ingest | `max_pdf_mb` (default 200 MB) | `pdf_path.read_bytes()` loads the full PDF for SHA-256 |
-| Concurrent ingest | `n_concurrent × max_pdf_mb` | Each ingest holds the bytes in memory until the hash is computed |
+| Ingest | `~1 MiB` (SHA-256 block) + extraction working set | `_sha256_streaming` (`services/ingestion.py:39-45`) reads in 1 MiB blocks — memory bounded by block size, not file size. `max_pdf_mb` is checked via `stat().st_size` before any read. |
+| Concurrent ingest | `n_concurrent × (extraction working set)` | Streaming hash keeps the SHA-256 phase cheap; the dominant cost is extraction (marker/OCR sends the PDF body over HTTP once). |
 | Embedding (CPU) | ~500 MB | sentence-transformers + torch |
 | Embedding (GPU) | model + batch | Ollama-side; not in this process |
 | DB connections | pool size = `psycopg` default | Each MCP tool call opens + closes a `StoreConnection` |
 
-For a 200 MB PDF with concurrent ingests, plan for `n × 200 MB` of
-spare RAM.
+Extraction (not hashing) is now the memory driver. For very large PDFs,
+the marker/OCR HTTP client buffers the response body in memory.
 
 ---
 

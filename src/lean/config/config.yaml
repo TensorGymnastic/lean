@@ -85,7 +85,6 @@ vlm:
   #
   # === MiniMax M3 via API (fast, clean JSON, ~$0.004/image) — uncomment to enable ===
   # enabled: true
-  # provider: minimax
   # base_url: "https://api.minimax.io/v1"
   # model: "MiniMax-M3"
   # api_key: ""                            # from .env (VLM_API_KEY)
@@ -99,7 +98,6 @@ vlm:
   # Uncomment to switch. Qwen3.5 is natively multimodal (vision+text).
   # Note: thinks internally (~3K tokens), so needs higher max_tokens + longer timeout.
   #
-  # provider: ollama
   # base_url: "http://192.168.2.37:11434/v1"
   # model: "qwen3.5-128k:9b"             # 128K context, Q4_K_M, 9.9 GB on RTX 3080 Ti
   # api_key: ""
