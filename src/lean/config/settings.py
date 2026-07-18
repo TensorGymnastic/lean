@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -9,6 +10,8 @@ from typing import Any
 import yaml
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
 
 
 def _load_yaml() -> dict[str, Any]:
@@ -125,16 +128,16 @@ class Settings(BaseSettings):
     llm_multi_query_count: int = _yaml.get("llm", {}).get("multi_query_count", 4)
 
     # --- VLM (optional vision-language model for chart/image description) ---
-    vlm_enabled: bool = _yaml.get("vlm", {}).get("enabled", False)
-    vlm_provider: str = _yaml.get("vlm", {}).get("provider", "ollama")
-    vlm_base_url: str = _yaml.get("vlm", {}).get("base_url", "")
-    vlm_model: str = _yaml.get("vlm", {}).get("model", "")
+    vlm_enabled: bool = (_yaml.get("vlm") or {}).get("enabled", False)
+    vlm_provider: str = (_yaml.get("vlm") or {}).get("provider", "ollama")
+    vlm_base_url: str = (_yaml.get("vlm") or {}).get("base_url", "")
+    vlm_model: str = (_yaml.get("vlm") or {}).get("model", "")
     vlm_api_key: str = Field(default="", description="VLM API key")
-    vlm_detail: str = _yaml.get("vlm", {}).get("detail", "default")
-    vlm_timeout_s: float = _yaml.get("vlm", {}).get("timeout_s", 120.0)
-    vlm_max_concurrency: int = _yaml.get("vlm", {}).get("max_concurrency", 4)
-    vlm_max_tokens: int = _yaml.get("vlm", {}).get("max_tokens", 1000)
-    vlm_disable_thinking: bool = _yaml.get("vlm", {}).get("disable_thinking", True)
+    vlm_detail: str = (_yaml.get("vlm") or {}).get("detail", "default")
+    vlm_timeout_s: float = (_yaml.get("vlm") or {}).get("timeout_s", 120.0)
+    vlm_max_concurrency: int = (_yaml.get("vlm") or {}).get("max_concurrency", 4)
+    vlm_max_tokens: int = (_yaml.get("vlm") or {}).get("max_tokens", 1000)
+    vlm_disable_thinking: bool = (_yaml.get("vlm") or {}).get("disable_thinking", True)
 
     @field_validator("lean_mcp_api_key")
     @classmethod
@@ -175,6 +178,12 @@ class Settings(BaseSettings):
             raise ValueError(f"max_pdf_mb must be >= 1, got {self.max_pdf_mb}")
         if self.vlm_enabled and (not self.vlm_base_url or not self.vlm_model):
             raise ValueError("vlm_enabled=true requires vlm_base_url and vlm_model to be set")
+        if self.vlm_enabled:
+            logger.warning(
+                "VLM enabled — chart images will be sent to %s. "
+                "Disable vlm.enabled for corpora with PII/trade-secret concerns.",
+                self.vlm_base_url,
+            )
         if self.vlm_detail not in ("low", "default", "high"):
             raise ValueError(
                 f"vlm_detail must be 'low', 'default', or 'high', got '{self.vlm_detail}'"
