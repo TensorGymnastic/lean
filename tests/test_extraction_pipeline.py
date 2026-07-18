@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from lean.extraction.marker_converter import MarkerNotInstalled
 
@@ -20,14 +20,14 @@ def _write_minimal_pdf(path: Path) -> None:
 
 
 def test_pipeline_uses_marker_when_available(tmp_path: Path) -> None:
-    """When marker is installed, pipeline uses it (highest priority)."""
     pdf_path = tmp_path / "test.pdf"
     _write_minimal_pdf(pdf_path)
+    fake_images = {"img_0": MagicMock()}
 
     with (
         patch(
             "lean.extraction.marker_converter.extract_markdown",
-            return_value=("# marker markdown\n", 3),
+            return_value=("# marker markdown\n", 3, fake_images),
         ),
         patch(
             "lean.extraction.pipeline.extract_ocr",
@@ -36,7 +36,7 @@ def test_pipeline_uses_marker_when_available(tmp_path: Path) -> None:
     ):
         from lean.extraction.pipeline import ExtractionMethod, extract_pdf_markdown
 
-        markdown, page_count, method = extract_pdf_markdown(
+        markdown, page_count, method, images = extract_pdf_markdown(
             pdf_path,
             ocr_base_url="http://fake:8000",
             hf_token="x",
@@ -50,11 +50,11 @@ def test_pipeline_uses_marker_when_available(tmp_path: Path) -> None:
     assert method == ExtractionMethod.MARKER
     assert "marker" in markdown
     assert page_count == 3
+    assert images is fake_images
     ocr_mock.assert_not_called()
 
 
 def test_pipeline_uses_ocr_when_marker_unavailable(tmp_path: Path) -> None:
-    """When marker is not installed, pipeline uses Unlimited-OCR."""
     pdf_path = tmp_path / "test.pdf"
     _write_minimal_pdf(pdf_path)
 
@@ -74,7 +74,7 @@ def test_pipeline_uses_ocr_when_marker_unavailable(tmp_path: Path) -> None:
     ):
         from lean.extraction.pipeline import ExtractionMethod, extract_pdf_markdown
 
-        markdown, page_count, method = extract_pdf_markdown(
+        markdown, page_count, method, images = extract_pdf_markdown(
             pdf_path,
             ocr_base_url="http://fake:8000",
             hf_token="x",
@@ -87,10 +87,10 @@ def test_pipeline_uses_ocr_when_marker_unavailable(tmp_path: Path) -> None:
 
     assert method == ExtractionMethod.UNLIMITED_OCR
     assert "OCR" in markdown
+    assert images == {}
 
 
 def test_pipeline_falls_back_to_markitdown_when_both_fail(tmp_path: Path) -> None:
-    """When marker not installed and OCR server down, pipeline uses markitdown."""
     from lean.extraction.unlimited_ocr import OCRBackendUnavailable
 
     pdf_path = tmp_path / "test.pdf"
@@ -112,7 +112,7 @@ def test_pipeline_falls_back_to_markitdown_when_both_fail(tmp_path: Path) -> Non
     ):
         from lean.extraction.pipeline import ExtractionMethod, extract_pdf_markdown
 
-        markdown, page_count, method = extract_pdf_markdown(
+        markdown, page_count, method, images = extract_pdf_markdown(
             pdf_path,
             ocr_base_url="http://fake:8000",
             hf_token="x",
@@ -125,11 +125,11 @@ def test_pipeline_falls_back_to_markitdown_when_both_fail(tmp_path: Path) -> Non
 
     assert method == ExtractionMethod.MARKITDOWN
     assert "markitdown" in markdown
+    assert images == {}
     md_mock.assert_called_once_with(pdf_path)
 
 
 def test_pipeline_uses_markitdown_when_no_ocr_configured(tmp_path: Path) -> None:
-    """When marker not installed and no OCR URL, pipeline goes straight to markitdown."""
     pdf_path = tmp_path / "test.pdf"
     _write_minimal_pdf(pdf_path)
 
@@ -145,7 +145,7 @@ def test_pipeline_uses_markitdown_when_no_ocr_configured(tmp_path: Path) -> None
     ):
         from lean.extraction.pipeline import ExtractionMethod, extract_pdf_markdown
 
-        markdown, page_count, method = extract_pdf_markdown(
+        markdown, page_count, method, images = extract_pdf_markdown(
             pdf_path,
             ocr_base_url="",
             hf_token=None,
@@ -157,10 +157,10 @@ def test_pipeline_uses_markitdown_when_no_ocr_configured(tmp_path: Path) -> None
         )
 
     assert method == ExtractionMethod.MARKITDOWN
+    assert images == {}
 
 
 def test_pipeline_falls_through_when_marker_errors(tmp_path: Path) -> None:
-    """When marker raises a non-MarkerNotInstalled error, pipeline tries OCR next."""
     pdf_path = tmp_path / "test.pdf"
     _write_minimal_pdf(pdf_path)
 
@@ -176,7 +176,7 @@ def test_pipeline_falls_through_when_marker_errors(tmp_path: Path) -> None:
     ):
         from lean.extraction.pipeline import ExtractionMethod, extract_pdf_markdown
 
-        markdown, page_count, method = extract_pdf_markdown(
+        markdown, page_count, method, images = extract_pdf_markdown(
             pdf_path,
             ocr_base_url="http://fake:8000",
             hf_token="x",
@@ -188,3 +188,4 @@ def test_pipeline_falls_through_when_marker_errors(tmp_path: Path) -> None:
         )
 
     assert method == ExtractionMethod.UNLIMITED_OCR
+    assert images == {}

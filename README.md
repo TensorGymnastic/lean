@@ -7,6 +7,7 @@ GPU-accelerated embeddings, and hybrid BM25 + vector search via pgvector.
 ## Features
 
 - **Vision-based PDF extraction** — `datalab-to/marker` (surya OCR + texify) as primary backend with proper table/equation/heading formatting, with `markitdown` fallback when marker is not installed
+- **VLM chart/image enrichment** — optional vision-language model (Gemma 3, Qwen-VL, MiniMax-M3) describes charts and figures at ingest time, making visual content searchable alongside text
 - **Section-aware chunking** — mistune AST parser splits markdown by headings, then a recursive tiktoken-based splitter bounds chunks to a target token window
 - **GPU-accelerated embeddings** — LiquidAI/LFM2.5-Embedding-350M (1024-dim) served via Ollama on the GPU server, with automatic local CPU fallback
 - **Hybrid search** — BM25 full-text (PostgreSQL tsvector) fused with pgvector cosine similarity via Reciprocal Rank Fusion (RRF, k=60)

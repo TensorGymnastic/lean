@@ -20,13 +20,14 @@ Supabase pgvector, and exposes the corpus via fastmcp tools/resources/prompts.
 - `src/lean/store/` — focused repos: `base`, `documents`, `chunks`, `search`, `analytics`
 - `src/lean/retrieval/` — cross-encoder reranker + postprocessors
 - `src/lean/llm/` — OpenAI-compatible LLM client (MiniMax/Ollama), optional sidecar
+- `src/lean/vlm/` — Vision-Language Model client for chart/image description (Ollama/vLLM/MiniMax/DashScope)
 - `src/lean/services/` — business logic: `ingestion`, `search`, `corpus`
 - `src/lean/mcp_server/` — 8 tools, 4 resources, 3 prompts, stdio/http entrypoint
 - `src/lean/api/routes.py` — FastAPI mirror (bearer-authed REST)
 - `src/lean/auth/bearer.py` — ASGI middleware for bearer token auth
 - `src/lean/cli.py` — Typer CLI (full parity with MCP tools)
 - `src/lean/eval/` — retrieval evaluation harness (hit_rate@k, MRR@k)
-- `db/schemas/` — SQL migrations (001-009)
+- `db/schemas/` — SQL migrations (001-010)
 - `scripts/` — canonical-queries.json (eval fixture) + `docs_lint.py` (drift detector)
 - `docs/` — reference docs (configuration, operations, architecture, evaluation, limitations, decisions)
 

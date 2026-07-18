@@ -21,7 +21,6 @@ def _clear_converter_cache():
 
 
 def test_extract_markdown_returns_text_and_page_count(tmp_path: Path) -> None:
-    """extract_markdown returns (markdown, page_count) from the rendered output."""
     mock_rendered = MagicMock()
     mock_rendered.metadata = {"page_stats": [{"page_id": 0}, {"page_id": 1}, {"page_id": 2}]}
 
@@ -29,19 +28,37 @@ def test_extract_markdown_returns_text_and_page_count(tmp_path: Path) -> None:
 
     with (
         patch("lean.extraction.marker_converter._get_converter", return_value=mock_converter),
-        patch("marker.output.text_from_rendered", return_value=("# Test\n\nContent", None, None)),
+        patch("marker.output.text_from_rendered", return_value=("# Test\n\nContent", "md", {})),
     ):
         from lean.extraction.marker_converter import extract_markdown
 
-        text, page_count = extract_markdown(tmp_path / "fake.pdf")
+        text, page_count, images = extract_markdown(tmp_path / "fake.pdf")
 
     assert text == "# Test\n\nContent"
     assert page_count == 3
+    assert images == {}
     mock_converter.assert_called_once()
 
 
+def test_extract_markdown_returns_images(tmp_path: Path) -> None:
+    mock_rendered = MagicMock()
+    mock_rendered.metadata = {}
+
+    mock_converter = MagicMock(return_value=mock_rendered)
+    fake_images = {"img_0_0": MagicMock(), "img_1_2": MagicMock()}
+
+    with (
+        patch("lean.extraction.marker_converter._get_converter", return_value=mock_converter),
+        patch("marker.output.text_from_rendered", return_value=("text", "md", fake_images)),
+    ):
+        from lean.extraction.marker_converter import extract_markdown
+
+        _, _, images = extract_markdown(tmp_path / "fake.pdf")
+
+    assert images is fake_images
+
+
 def test_extract_markdown_passes_force_ocr_config(tmp_path: Path) -> None:
-    """force_ocr=True is passed to _get_converter for converter construction."""
     mock_rendered = MagicMock()
     mock_rendered.metadata = {}
 
@@ -52,7 +69,7 @@ def test_extract_markdown_passes_force_ocr_config(tmp_path: Path) -> None:
             "lean.extraction.marker_converter._get_converter",
             return_value=mock_converter,
         ) as get_conv_mock,
-        patch("marker.output.text_from_rendered", return_value=("text", None, None)),
+        patch("marker.output.text_from_rendered", return_value=("text", "md", {})),
     ):
         from lean.extraction.marker_converter import extract_markdown
 
@@ -62,7 +79,6 @@ def test_extract_markdown_passes_force_ocr_config(tmp_path: Path) -> None:
 
 
 def test_extract_markdown_handles_missing_page_stats(tmp_path: Path) -> None:
-    """When metadata lacks page_stats, page_count defaults to 1."""
     mock_rendered = MagicMock()
     mock_rendered.metadata = {}
 
@@ -70,17 +86,16 @@ def test_extract_markdown_handles_missing_page_stats(tmp_path: Path) -> None:
 
     with (
         patch("lean.extraction.marker_converter._get_converter", return_value=mock_converter),
-        patch("marker.output.text_from_rendered", return_value=("text", None, None)),
+        patch("marker.output.text_from_rendered", return_value=("text", "md", {})),
     ):
         from lean.extraction.marker_converter import extract_markdown
 
-        _, page_count = extract_markdown(tmp_path / "fake.pdf")
+        _, page_count, _ = extract_markdown(tmp_path / "fake.pdf")
 
     assert page_count == 1
 
 
 def test_extract_markdown_handles_none_metadata(tmp_path: Path) -> None:
-    """When rendered.metadata is None, page_count defaults to 1."""
     mock_rendered = MagicMock()
     mock_rendered.metadata = None
 
@@ -88,11 +103,11 @@ def test_extract_markdown_handles_none_metadata(tmp_path: Path) -> None:
 
     with (
         patch("lean.extraction.marker_converter._get_converter", return_value=mock_converter),
-        patch("marker.output.text_from_rendered", return_value=("text", None, None)),
+        patch("marker.output.text_from_rendered", return_value=("text", "md", {})),
     ):
         from lean.extraction.marker_converter import extract_markdown
 
-        _, page_count = extract_markdown(tmp_path / "fake.pdf")
+        _, page_count, _ = extract_markdown(tmp_path / "fake.pdf")
 
     assert page_count == 1
 

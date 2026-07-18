@@ -75,3 +75,14 @@ llm:
   multi_query: false           # set true to generate N paraphrased queries at search time
   hyde: false                  # set true to use HyDE (hypothetical document embeddings)
   multi_query_count: 4
+
+vlm:
+  enabled: false              # master switch — when false, images are captured but not VLM-described
+  provider: ollama            # ollama | vllm | minimax | dashscope | openai-compatible
+  base_url: ""                # e.g. http://gpu-host:11434/v1 (Ollama), https://api.minimax.io/v1 (MiniMax)
+  model: ""                   # e.g. gemma3:27b, qwen2.5-vl:7b, MiniMax-M3, qwen3-vl-plus
+  api_key: ""                 # from .env (LEAN_VLM_API_KEY) — empty for local Ollama/vLLM
+  detail: default             # low | default | high — image resolution tier (cost + token tradeoff)
+  timeout_s: 120.0            # VLM calls can be slow on first model load
+  max_concurrency: 4          # parallel image descriptions per PDF
+  max_tokens: 1000            # max response tokens per image description

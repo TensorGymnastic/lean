@@ -116,7 +116,7 @@ def test_ingest_pipeline_success(monkeypatch_settings, fake_pdf):
     with (
         patch(
             "lean.services.ingestion.extract_pdf_markdown",
-            return_value=("# DMAIC", 1, ExtractionMethod.MARKITDOWN),
+            return_value=("# DMAIC", 1, ExtractionMethod.MARKITDOWN, {}),
         ),
         patch("lean.services.ingestion.build_sections", return_value=fake_sections),
         patch("lean.services.ingestion.chunk_sections", return_value=fake_chunks),
@@ -141,3 +141,141 @@ def test_ingest_pipeline_success(monkeypatch_settings, fake_pdf):
     assert call_kwargs["metadata"]["keywords"] == []
     assert call_kwargs["metadata"]["subject"] is None
     assert call_kwargs["metadata"]["toc"] == []
+
+
+def test_ingest_vlm_enrichment_creates_image_chunks(monkeypatch_settings, fake_pdf):
+    """When VLM is enabled and marker returns images, image chunks are created."""
+    import asyncio
+
+    from lean.chunker.markdown_ast import Section
+    from lean.chunker.recursive import ChunkResult
+    from lean.models.schemas import ExtractionMethod
+    from lean.services.ingestion import ingest_pdf
+
+    monkeypatch_settings.vlm_enabled = True
+    monkeypatch_settings.vlm_base_url = "http://gpu:11434/v1"
+    monkeypatch_settings.vlm_model = "gemma3:27b"
+
+    fake_sections = [Section(path="Ch 1", level=1, heading="Ch 1", content="DMAIC content")]
+    fake_chunks = [
+        ChunkResult(
+            section_path="Ch 1",
+            heading_text="Ch 1",
+            chunk_index=0,
+            token_count=10,
+            content="DMAIC content",
+        )
+    ]
+
+    fake_pil_image = MagicMock()
+    fake_images = {"img_0_0": fake_pil_image}
+
+    mock_embedder = MagicMock()
+    mock_embedder.embed_documents.return_value = [[0.1] * 1024, [0.2] * 1024]
+
+    mock_conn = MagicMock()
+    mock_doc_repo = MagicMock()
+    mock_doc_repo.upsert_document.return_value = __import__("uuid").uuid4()
+    mock_chunk_repo = MagicMock()
+
+    from lean.extraction.metadata import PdfMetadata
+
+    fake_meta = PdfMetadata(title="Test Book", authors=["Author"], year=2024)
+
+    mock_vlm = MagicMock()
+    mock_vlm.describe_image.return_value = (
+        '{"chart_type": "bar", "title": "Revenue by Quarter", '
+        '"description": "Bar chart showing Q1-Q4 revenue.", '
+        '"key_data_points": ["Q1: $1M", "Q4: $4M"]}'
+    )
+
+    with (
+        patch(
+            "lean.services.ingestion.extract_pdf_markdown",
+            return_value=("# DMAIC", 1, ExtractionMethod.MARKER, fake_images),
+        ),
+        patch("lean.services.ingestion.build_sections", return_value=fake_sections),
+        patch("lean.services.ingestion.chunk_sections", return_value=fake_chunks),
+        patch("lean.services.ingestion.get_embedder", return_value=mock_embedder),
+        patch("lean.services.ingestion.extract_metadata", return_value=fake_meta),
+        patch("lean.services.ingestion.StoreConnection") as mock_store_cls,
+        patch("lean.services.ingestion.DocumentRepo", return_value=mock_doc_repo),
+        patch("lean.services.ingestion.ChunkRepo", return_value=mock_chunk_repo),
+        patch("lean.vlm.client.VLMClient", return_value=mock_vlm),
+    ):
+        mock_store_cls.from_env.return_value = mock_conn
+        result = asyncio.run(ingest_pdf(str(fake_pdf)))
+
+    assert result.chunk_count == 2
+    assert result.extraction_method == ExtractionMethod.MARKER
+    mock_vlm.describe_image.assert_called_once()
+    mock_vlm.close.assert_called_once()
+
+    call_args = mock_chunk_repo.replace_chunks.call_args
+    chunk_rows = call_args[0][1]
+    assert len(chunk_rows) == 2
+    assert chunk_rows[0].chunk_type == "text"
+    assert chunk_rows[1].chunk_type == "image"
+    assert chunk_rows[1].image_meta is not None
+    assert chunk_rows[1].image_meta["chart_type"] == "bar"
+
+    texts_embedded = mock_embedder.embed_documents.call_args[0][0]
+    assert len(texts_embedded) == 2
+
+
+def test_ingest_vlm_disabled_skips_enrichment(monkeypatch_settings, fake_pdf):
+    """When VLM is disabled but images exist, no VLM calls are made."""
+    import asyncio
+
+    from lean.chunker.markdown_ast import Section
+    from lean.chunker.recursive import ChunkResult
+    from lean.models.schemas import ExtractionMethod
+    from lean.services.ingestion import ingest_pdf
+
+    fake_sections = [Section(path="Ch 1", level=1, heading="Ch 1", content="Content")]
+    fake_chunks = [
+        ChunkResult(
+            section_path="Ch 1",
+            heading_text="Ch 1",
+            chunk_index=0,
+            token_count=5,
+            content="Content",
+        )
+    ]
+    fake_images = {"img_0": MagicMock()}
+
+    mock_embedder = MagicMock()
+    mock_embedder.embed_documents.return_value = [[0.1] * 1024]
+
+    with (
+        patch(
+            "lean.services.ingestion.extract_pdf_markdown",
+            return_value=("# Test", 1, ExtractionMethod.MARKER, fake_images),
+        ),
+        patch("lean.services.ingestion.build_sections", return_value=fake_sections),
+        patch("lean.services.ingestion.chunk_sections", return_value=fake_chunks),
+        patch("lean.services.ingestion.get_embedder", return_value=mock_embedder),
+        patch(
+            "lean.services.ingestion.extract_metadata",
+            return_value=__import__(
+                "lean.extraction.metadata", fromlist=["PdfMetadata"]
+            ).PdfMetadata(),
+        ),
+        patch("lean.services.ingestion.StoreConnection") as mock_store_cls,
+        patch(
+            "lean.services.ingestion.DocumentRepo",
+            return_value=MagicMock(
+                upsert_document=MagicMock(return_value=__import__("uuid").uuid4())
+            ),
+        ),
+        patch("lean.services.ingestion.ChunkRepo", return_value=MagicMock()),
+        patch("lean.vlm.client.VLMClient") as mock_vlm_cls,
+    ):
+        mock_store_cls.from_env.return_value = MagicMock()
+        result = asyncio.run(ingest_pdf(str(fake_pdf)))
+
+    assert result.chunk_count == 1
+    mock_vlm_cls.assert_not_called()
+    mock_embedder.embed_documents.assert_called_once()
+    embedded_texts = mock_embedder.embed_documents.call_args[0][0]
+    assert len(embedded_texts) == 1

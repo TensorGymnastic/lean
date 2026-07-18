@@ -12,6 +12,8 @@ create table if not exists public.chunks (
     token_count   int  not null check (token_count > 0),
     content       text not null,
     embedding     vector(1024) not null,
+    chunk_type    text not null default 'text',
+    image_meta    jsonb,
     unique (document_id, chunk_index)
 );
 

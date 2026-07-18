@@ -25,11 +25,12 @@ def extract_markdown(
     pdf_path: Path,
     *,
     force_ocr: bool = False,
-) -> tuple[str, int]:
+) -> tuple[str, int, dict[str, Any]]:
     """Extract markdown from a PDF via marker.
 
-    Returns ``(markdown, page_count)``. Raises ``MarkerNotInstalled`` if
-    marker-pdf is not available, so the pipeline orchestrator can fall back.
+    Returns ``(markdown, page_count, images)`` where ``images`` is a dict of
+    ``{image_name: PIL.Image}`` extracted from the PDF (charts, figures,
+    diagrams). Raises ``MarkerNotInstalled`` if marker-pdf is not available.
     """
     converter = _get_converter(force_ocr=force_ocr)
 
@@ -38,15 +39,15 @@ def extract_markdown(
 
     from marker.output import text_from_rendered
 
-    text, _, _ = text_from_rendered(rendered)
+    text, _, images = text_from_rendered(rendered)
 
     page_count = 1
     meta = rendered.metadata if hasattr(rendered, "metadata") else {}
     if isinstance(meta, dict) and "page_stats" in meta:
         page_count = len(meta["page_stats"])
 
-    logger.info("marker: %d pages → %d chars", page_count, len(text))
-    return text, page_count
+    logger.info("marker: %d pages → %d chars, %d images", page_count, len(text), len(images))
+    return text, page_count, images
 
 
 @lru_cache(maxsize=4)

@@ -45,6 +45,8 @@ class Chunk(BaseModel):
     page_end: int | None = None
     token_count: int
     content: str
+    chunk_type: str = "text"
+    image_meta: dict[str, Any] | None = None
     score: float | None = None
 
     @classmethod
@@ -60,6 +62,8 @@ class Chunk(BaseModel):
             page_end=r["page_end"],
             token_count=r["token_count"],
             content=r["content"],
+            chunk_type=r.get("chunk_type", "text"),
+            image_meta=r.get("image_meta"),
         )
 
 

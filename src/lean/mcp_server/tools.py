@@ -34,8 +34,13 @@ async def search(
     year_min: int | None = None,
     year_max: int | None = None,
     min_score: float | None = None,
+    chunk_type: str | None = None,
 ) -> list[Chunk]:
-    """Semantic + hybrid search over the Lean Six Sigma corpus."""
+    """Semantic + hybrid search over the Lean Six Sigma corpus.
+
+    Set chunk_type="image" to search only chart/figure descriptions,
+    or chunk_type="text" for text-only chunks.
+    """
     return await anyio.to_thread.run_sync(
         lambda: _search(
             query,
@@ -46,6 +51,7 @@ async def search(
             year_min=year_min,
             year_max=year_max,
             min_score=min_score,
+            chunk_type=chunk_type,
         )
     )
 

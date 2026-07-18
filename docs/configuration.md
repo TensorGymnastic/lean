@@ -164,6 +164,34 @@ success**. Watch `IngestResult.warnings` or `extraction_method` to detect this.
 regardless of `llm.ollama_url`. If you want local Ollama for LLM features,
 leave `MINIMAX_API_KEY` empty.
 
+### `vlm` (optional vision-language model for chart/image description)
+
+When enabled, extracted images from marker (charts, figures, diagrams) are
+described by a VLM at ingest time. Descriptions are embedded and stored as
+`chunk_type='image'` chunks, making charts searchable alongside text.
+
+| Field | Default | Notes |
+|---|---|---|
+| `enabled` | `false` | Master switch. When false, images are captured but not described. |
+| `provider` | `ollama` | Provider label (informational — all use OpenAI-compat protocol) |
+| `base_url` | `""` | Required when enabled. e.g. `http://gpu:11434/v1` (Ollama), `https://api.minimax.io/v1` |
+| `model` | `""` | Required when enabled. e.g. `gemma3:27b`, `qwen2.5-vl:7b`, `MiniMax-M3` |
+| `api_key` | `""` | From `.env` (`LEAN_VLM_API_KEY`). Empty for local Ollama/vLLM. |
+| `detail` | `default` | Image resolution tier: `low`, `default`, or `high`. Higher = better quality, more tokens. |
+| `timeout_s` | `120.0` | VLM HTTP timeout (first model load can be slow) |
+| `max_concurrency` | `4` | Reserved for future parallel image description |
+| `max_tokens` | `1000` | Max response tokens per image description |
+
+**Validation:** if `vlm.enabled=true`, then `vlm.base_url` and `vlm.model` must
+be non-empty. `detail` must be one of `low`/`default`/`high`.
+
+**VLM failure handling:** if a VLM call fails (timeout, network error, invalid
+response), a warning is appended to `IngestResult.warnings` and the image is
+skipped — ingest continues successfully.
+
+**Search:** use `chunk_type="image"` on the search tool to search only
+chart/figure descriptions, or `chunk_type="text"` for text-only chunks.
+
 ---
 
 ## Validation summary
@@ -180,3 +208,6 @@ All constraints below are enforced at startup via pydantic
 | `fetch_multiplier` | `>= 1` |
 | `eval_k` | `> 0` |
 | `search_max_k`, `search_max_query_len`, `search_fetch_k_cap`, `max_pdf_mb` | `>= 1` |
+| `vlm.enabled` | If true, `vlm.base_url` and `vlm.model` must be non-empty |
+| `vlm.detail` | One of `low`, `default`, `high` |
+| `vlm.max_concurrency` | `>= 1` |

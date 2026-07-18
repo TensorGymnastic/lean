@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
+from typing import Any
 from uuid import UUID  # noqa: TC003
 
 from psycopg.rows import dict_row
@@ -24,6 +26,8 @@ class ChunkRow:
     token_count: int
     content: str
     embedding: list[float]
+    chunk_type: str = "text"
+    image_meta: dict[str, Any] | None = None
 
 
 class ChunkRepo:
@@ -44,8 +48,9 @@ class ChunkRepo:
                     """
                     insert into public.chunks
                         (document_id, chunk_index, section_path, heading_text,
-                         page_start, page_end, token_count, content, embedding)
-                    values (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                         page_start, page_end, token_count, content, embedding,
+                         chunk_type, image_meta)
+                    values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """,
                     [
                         (
@@ -58,6 +63,8 @@ class ChunkRepo:
                             c.token_count,
                             c.content,
                             c.embedding,
+                            c.chunk_type,
+                            json.dumps(c.image_meta) if c.image_meta else None,
                         )
                         for c in chunks
                     ],
@@ -70,7 +77,7 @@ class ChunkRepo:
             cur.execute(
                 """
                 select id, document_id, chunk_index, section_path, heading_text,
-                       page_start, page_end, token_count, content
+                       page_start, page_end, token_count, content, chunk_type, image_meta
                 from public.chunks where id = %s
                 """,
                 (chunk_id,),
@@ -94,7 +101,7 @@ class ChunkRepo:
             cur.execute(
                 """
                 select id, document_id, chunk_index, section_path, heading_text,
-                       page_start, page_end, token_count, content
+                       page_start, page_end, token_count, content, chunk_type, image_meta
                 from public.chunks
                 where document_id = %s
                 order by chunk_index

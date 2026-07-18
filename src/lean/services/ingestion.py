@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import time
+from functools import partial
 from pathlib import Path
 from uuid import UUID
 
@@ -68,7 +69,7 @@ async def ingest_pdf(path: str) -> IngestResult:
 
     source_sha256 = hashlib.sha256(pdf_path.read_bytes()).hexdigest()
 
-    markdown, page_count, method = await anyio.to_thread.run_sync(
+    markdown, page_count, method, images = await anyio.to_thread.run_sync(
         lambda: extract_pdf_markdown(
             pdf_path,
             ocr_base_url=settings.ocr_base_url,
@@ -118,7 +119,48 @@ async def ingest_pdf(path: str) -> IngestResult:
             warnings.append("contextual_retrieval enabled but no LLM configured")
 
     embedder = get_embedder()
+
+    image_descriptions: list[tuple[str, dict[str, object]]] = []
+    if settings.vlm_enabled and images:
+        from lean.vlm.client import VLMClient, VLMError
+        from lean.vlm.prompts import CHART_EXTRACTION_PROMPT, parse_description
+
+        vlm = VLMClient(
+            base_url=settings.vlm_base_url,
+            model=settings.vlm_model,
+            api_key=settings.vlm_api_key,
+            timeout=settings.vlm_timeout_s,
+            detail=settings.vlm_detail,
+        )
+        try:
+            for img_name, pil_img in images.items():
+                try:
+                    raw = await anyio.to_thread.run_sync(
+                        partial(
+                            vlm.describe_image,
+                            pil_img,
+                            prompt=CHART_EXTRACTION_PROMPT,
+                            max_tokens=settings.vlm_max_tokens,
+                        )
+                    )
+                    parsed = parse_description(raw)
+                    embed_text = str(parsed.get("description", raw.strip()))
+                    if parsed.get("title"):
+                        embed_text = f"{parsed['title']}\n\n{embed_text}"
+                    if parsed.get("key_data_points"):
+                        points = parsed["key_data_points"]
+                        if isinstance(points, list):
+                            embed_text += "\n\nKey data: " + "; ".join(str(p) for p in points)
+                    image_descriptions.append((embed_text, parsed))
+                except VLMError as e:
+                    warnings.append(f"VLM failed for image {img_name}: {e}")
+        finally:
+            vlm.close()
+    elif images and not settings.vlm_enabled:
+        logger.info("VLM disabled, skipping description of %d images", len(images))
+
     chunk_texts = [c.content for c in chunk_results]
+    chunk_texts.extend(desc for desc, _ in image_descriptions)
     embeddings = await anyio.to_thread.run_sync(lambda: embedder.embed_documents(chunk_texts))
 
     pdf_meta = await anyio.to_thread.run_sync(lambda: extract_metadata(pdf_path))
@@ -154,8 +196,27 @@ async def ingest_pdf(path: str) -> IngestResult:
                 content=c.content,
                 embedding=emb,
             )
-            for global_idx, (c, emb) in enumerate(zip(chunk_results, embeddings, strict=True))
+            for global_idx, (c, emb) in enumerate(
+                zip(chunk_results, embeddings[: len(chunk_results)], strict=True)
+            )
         ]
+        image_offset = len(chunk_results)
+        for i, (desc, meta) in enumerate(image_descriptions):
+            chunk_rows.append(
+                ChunkRow(
+                    document_id=doc_id,
+                    chunk_index=image_offset + i,
+                    section_path="Images",
+                    heading_text=str(meta.get("title") or f"Image {i + 1}"),
+                    page_start=None,
+                    page_end=None,
+                    token_count=max(len(desc.split()), 1),
+                    content=desc,
+                    embedding=embeddings[image_offset + i],
+                    chunk_type="image",
+                    image_meta=meta,
+                )
+            )
         chunks_repo.replace_chunks(doc_id, chunk_rows)
     finally:
         conn.close()

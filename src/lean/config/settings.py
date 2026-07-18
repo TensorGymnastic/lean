@@ -123,6 +123,17 @@ class Settings(BaseSettings):
     llm_hyde: bool = _yaml.get("llm", {}).get("hyde", False)
     llm_multi_query_count: int = _yaml.get("llm", {}).get("multi_query_count", 4)
 
+    # --- VLM (optional vision-language model for chart/image description) ---
+    vlm_enabled: bool = _yaml.get("vlm", {}).get("enabled", False)
+    vlm_provider: str = _yaml.get("vlm", {}).get("provider", "ollama")
+    vlm_base_url: str = _yaml.get("vlm", {}).get("base_url", "")
+    vlm_model: str = _yaml.get("vlm", {}).get("model", "")
+    vlm_api_key: str = Field(default="", description="VLM API key")
+    vlm_detail: str = _yaml.get("vlm", {}).get("detail", "default")
+    vlm_timeout_s: float = _yaml.get("vlm", {}).get("timeout_s", 120.0)
+    vlm_max_concurrency: int = _yaml.get("vlm", {}).get("max_concurrency", 4)
+    vlm_max_tokens: int = _yaml.get("vlm", {}).get("max_tokens", 1000)
+
     @field_validator("lean_mcp_api_key")
     @classmethod
     def _validate_api_key(cls, v: str) -> str:
@@ -160,6 +171,14 @@ class Settings(BaseSettings):
             raise ValueError(f"search_fetch_k_cap must be >= 1, got {self.search_fetch_k_cap}")
         if self.max_pdf_mb < 1:
             raise ValueError(f"max_pdf_mb must be >= 1, got {self.max_pdf_mb}")
+        if self.vlm_enabled and (not self.vlm_base_url or not self.vlm_model):
+            raise ValueError("vlm_enabled=true requires vlm_base_url and vlm_model to be set")
+        if self.vlm_detail not in ("low", "default", "high"):
+            raise ValueError(
+                f"vlm_detail must be 'low', 'default', or 'high', got '{self.vlm_detail}'"
+            )
+        if self.vlm_max_concurrency < 1:
+            raise ValueError(f"vlm_max_concurrency must be >= 1, got {self.vlm_max_concurrency}")
         return self
 
 

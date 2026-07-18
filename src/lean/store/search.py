@@ -34,6 +34,7 @@ class SearchEngine:
         author: str | None,
         year_min: int | None,
         year_max: int | None,
+        chunk_type: str | None = None,
     ) -> tuple[str, list[str], list[object]]:
         """Return (join_clause, conditions, params) for shared metadata filters."""
         needs_join = author is not None or year_min is not None or year_max is not None
@@ -56,6 +57,9 @@ class SearchEngine:
         if year_max is not None:
             conditions.append("d.year <= %s")
             params.append(year_max)
+        if chunk_type is not None:
+            conditions.append("c.chunk_type = %s")
+            params.append(chunk_type)
 
         return join_clause, conditions, params
 
@@ -70,6 +74,7 @@ class SearchEngine:
         year_min: int | None = None,
         year_max: int | None = None,
         min_score: float | None = None,
+        chunk_type: str | None = None,
     ) -> list[SearchHit]:
         """Cosine similarity search over chunks with metadata filters."""
         join_clause, conditions, params = self._build_metadata_filters(
@@ -78,6 +83,7 @@ class SearchEngine:
             author=author,
             year_min=year_min,
             year_max=year_max,
+            chunk_type=chunk_type,
         )
         if min_score is not None:
             conditions.append("1 - (c.embedding <=> %s::vector) >= %s")
@@ -87,7 +93,7 @@ class SearchEngine:
         query = f"""
             select c.id, c.document_id, c.chunk_index, c.section_path,
                    c.heading_text, c.page_start, c.page_end, c.token_count,
-                   c.content,
+                   c.content, c.chunk_type, c.image_meta,
                    1 - (c.embedding <=> %s::vector) as score
             from public.chunks c{join_clause}
             where {where_clause}
@@ -110,6 +116,7 @@ class SearchEngine:
         author: str | None = None,
         year_min: int | None = None,
         year_max: int | None = None,
+        chunk_type: str | None = None,
     ) -> list[SearchHit]:
         """Full-text search via tsvector + ts_rank (BM25-style ranking)."""
         join_clause, conditions, params = self._build_metadata_filters(
@@ -118,6 +125,7 @@ class SearchEngine:
             author=author,
             year_min=year_min,
             year_max=year_max,
+            chunk_type=chunk_type,
         )
         conditions.insert(0, "c.tsv @@ plainto_tsquery('english', %s)")
         params.insert(0, query_text)
@@ -126,7 +134,7 @@ class SearchEngine:
         sql = f"""
             select c.id, c.document_id, c.chunk_index, c.section_path,
                    c.heading_text, c.page_start, c.page_end, c.token_count,
-                   c.content,
+                   c.content, c.chunk_type, c.image_meta,
                    ts_rank(c.tsv, plainto_tsquery('english', %s)) as score
             from public.chunks c{join_clause}
             where {where_clause}

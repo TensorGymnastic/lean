@@ -32,6 +32,7 @@ def search(
     year_min: int | None = None,
     year_max: int | None = None,
     min_score: float | None = None,
+    chunk_type: str | None = None,
 ) -> list[Chunk]:
     """Embed query → search (hybrid if enabled) → rerank → postprocess.
 
@@ -108,6 +109,7 @@ def search(
                     year_min=year_min,
                     year_max=year_max,
                     min_score=min_score,
+                    chunk_type=chunk_type,
                 )
                 bm25_hits = engine.bm25_search(
                     query_text=q,
@@ -117,6 +119,7 @@ def search(
                     author=author,
                     year_min=year_min,
                     year_max=year_max,
+                    chunk_type=chunk_type,
                 )
                 fused_lists.append(
                     engine.reciprocal_rank_fusion(
@@ -134,6 +137,7 @@ def search(
                         year_min=year_min,
                         year_max=year_max,
                         min_score=min_score,
+                        chunk_type=chunk_type,
                     )
                 )
 
