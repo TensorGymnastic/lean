@@ -26,6 +26,9 @@ chunking:
 
 retrieval:
   top_k: 5
+  max_k: 100              # hard ceiling on user-supplied k (DoS prevention)
+  max_query_len: 2000     # reject queries longer than this (DoS prevention)
+  fetch_k_cap: 500        # hard ceiling on fetch_k regardless of multiplier
   min_similarity: 0.0
   hybrid_search: true
   fetch_multiplier: 8       # fetch_k = max(k * fetch_multiplier, fetch_k_floor) — wider candidate set for reranking
@@ -51,6 +54,7 @@ storage:
   source_prefix: "sources/"    # storage path prefix for source PDFs
   markdown_prefix: "markdown/" # storage path prefix for extracted markdown
   corpus_root: "data"          # root directory for ingestible PDFs; paths outside are rejected (security)
+  max_pdf_mb: 200              # reject PDFs larger than this (resource exhaustion prevention)
 
 health:
   http_timeout: 10          # timeout for OCR/Ollama health check requests (seconds)

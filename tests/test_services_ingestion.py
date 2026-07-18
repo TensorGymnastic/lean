@@ -50,6 +50,38 @@ def test_ingest_rejects_nonexistent_file(monkeypatch_settings, tmp_path):
         asyncio.run(ingest_pdf(str(tmp_path / "nonexistent.pdf")))
 
 
+def test_ingest_rejects_oversized_pdf(monkeypatch_settings, tmp_path):
+    """PDFs larger than settings.max_pdf_mb are rejected before read_bytes (DoS prevention)."""
+    import asyncio
+
+    from lean.services.ingestion import ingest_pdf
+
+    monkeypatch_settings.max_pdf_mb = 1  # 1 MB cap
+    big_pdf = tmp_path / "huge.pdf"
+    big_pdf.write_bytes(b"%PDF-1.4\n" + b"x" * (2 * 1024 * 1024))  # 2 MB
+
+    with pytest.raises(ValueError, match="PDF too large"):
+        asyncio.run(ingest_pdf(str(big_pdf)))
+
+
+def test_ingest_permission_error_does_not_leak_corpus_root_path(monkeypatch_settings, tmp_path):
+    """PermissionError message must not disclose the resolved corpus_root absolute path."""
+    import asyncio
+
+    from lean.services.ingestion import ingest_pdf
+
+    outside = tmp_path.parent / "outside.pdf"
+    outside.write_bytes(b"%PDF-1.4 fake")
+
+    with pytest.raises(PermissionError) as exc_info:
+        asyncio.run(ingest_pdf(str(outside)))
+
+    msg = str(exc_info.value)
+    assert "outside corpus root" in msg
+    # corpus_root absolute path must NOT appear in the error message
+    assert str(tmp_path) not in msg
+
+
 def test_ingest_pipeline_success(monkeypatch_settings, fake_pdf):
     import asyncio
 

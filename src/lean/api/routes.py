@@ -12,7 +12,8 @@ from importlib.metadata import version as _pkg_version
 from typing import Annotated, Any
 
 import anyio
-from fastapi import Depends, FastAPI, HTTPException, Security, status
+from fastapi import Depends, FastAPI, HTTPException, Request, Security, status
+from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from lean.config.settings import get_settings
@@ -29,6 +30,24 @@ app = FastAPI(
 _security = HTTPBearer(auto_error=False)
 
 TokenCreds = Annotated[HTTPAuthorizationCredentials | None, Security(_security)]
+
+
+@app.exception_handler(ValueError)
+async def _value_error_handler(_request: Request, exc: ValueError) -> JSONResponse:
+    """Map domain validation errors (empty query, PDF too large, bad UUID) to HTTP 400."""
+    return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={"detail": str(exc)})
+
+
+@app.exception_handler(PermissionError)
+async def _permission_error_handler(_request: Request, exc: PermissionError) -> JSONResponse:
+    """Map path-traversal / corpus-root violations to HTTP 403."""
+    return JSONResponse(status_code=status.HTTP_403_FORBIDDEN, content={"detail": str(exc)})
+
+
+@app.exception_handler(FileNotFoundError)
+async def _not_found_handler(_request: Request, exc: FileNotFoundError) -> JSONResponse:
+    """Map missing file errors to HTTP 404."""
+    return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content={"detail": str(exc)})
 
 
 async def _verify_token(creds: TokenCreds) -> None:

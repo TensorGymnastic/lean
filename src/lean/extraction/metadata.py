@@ -102,7 +102,7 @@ def _parse_year(date_str: str | None) -> int | None:
     return int(match.group()) if match else None
 
 
-_PUBLISHER_KEYWORDS = ("Wiley", "Springer", "Wiley ", "Springer ", "Press", "Publishing")
+_PUBLISHER_KEYWORDS = ("Wiley", "Springer", "Press", "Publishing")
 
 
 def _guess_publisher(title: str | None, authors: list[str]) -> str | None:

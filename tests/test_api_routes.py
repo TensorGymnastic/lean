@@ -131,3 +131,21 @@ def test_ingest_with_valid_token(client, auth_headers):
         )
     assert response.status_code == 200
     assert response.json()["document_id"] == "00000000-0000-0000-0000-000000000001"
+
+
+def test_search_empty_query_returns_400(client, auth_headers):
+    """Domain ValueError (e.g. empty query) maps to HTTP 400, not 500."""
+    with patch("lean.api.routes._search", side_effect=ValueError("query must not be empty")):
+        response = client.get("/search", params={"query": "x"}, headers=auth_headers)
+    assert response.status_code == 400
+    assert "query must not be empty" in response.json()["detail"]
+
+
+def test_ingest_path_outside_corpus_returns_403(client, auth_headers):
+    """Path-traversal PermissionError maps to HTTP 403, not 500."""
+    with patch(
+        "lean.api.routes._ingest", side_effect=PermissionError("path outside corpus root: x")
+    ):
+        response = client.post("/ingest", params={"path": "x"}, headers=auth_headers)
+    assert response.status_code == 403
+    assert "outside corpus root" in response.json()["detail"]

@@ -45,8 +45,13 @@ def search(
         6. Truncate to k.
     """
     settings = get_settings()
+    if not query or not query.strip():
+        raise ValueError("query must not be empty")
+    if len(query) > settings.search_max_query_len:
+        raise ValueError(f"query exceeds max length ({settings.search_max_query_len} chars)")
     if k is None:
         k = settings.search_top_k
+    k = max(1, min(k, settings.search_max_k))
     embedder = get_embedder()
 
     start = time.monotonic()
@@ -72,10 +77,11 @@ def search(
         engine = SearchEngine(conn)
         analytics = AnalyticsRepo(conn)
 
-        fetch_k = (
+        fetch_k = min(
             max(k * settings.fetch_multiplier, settings.fetch_k_floor)
             if settings.hybrid_search_enabled
-            else k
+            else k,
+            settings.search_fetch_k_cap,
         )
 
         fused_lists: list[list[SearchHit]] = []

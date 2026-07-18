@@ -65,6 +65,9 @@ class Settings(BaseSettings):
     token_counter_encoding: str = _yaml.get("chunking", {}).get("token_encoding", "cl100k_base")
 
     search_top_k: int = _yaml.get("retrieval", {}).get("top_k", 5)
+    search_max_k: int = _yaml.get("retrieval", {}).get("max_k", 100)
+    search_max_query_len: int = _yaml.get("retrieval", {}).get("max_query_len", 2000)
+    search_fetch_k_cap: int = _yaml.get("retrieval", {}).get("fetch_k_cap", 500)
     min_similarity: float = _yaml.get("retrieval", {}).get("min_similarity", 0.0)
     hybrid_search_enabled: bool = _yaml.get("retrieval", {}).get("hybrid_search", True)
     fetch_multiplier: int = _yaml.get("retrieval", {}).get("fetch_multiplier", 8)
@@ -91,6 +94,7 @@ class Settings(BaseSettings):
     storage_source_prefix: str = _yaml.get("storage", {}).get("source_prefix", "sources/")
     storage_markdown_prefix: str = _yaml.get("storage", {}).get("markdown_prefix", "markdown/")
     corpus_root: str = _yaml.get("storage", {}).get("corpus_root", "data")
+    max_pdf_mb: int = _yaml.get("storage", {}).get("max_pdf_mb", 200)
 
     # --- Health checks ---
     health_http_timeout: float = _yaml.get("health", {}).get("http_timeout", 10.0)
@@ -148,6 +152,14 @@ class Settings(BaseSettings):
             raise ValueError(f"fetch_multiplier must be >= 1, got {self.fetch_multiplier}")
         if self.eval_k <= 0:
             raise ValueError(f"eval_k must be > 0, got {self.eval_k}")
+        if self.search_max_k < 1:
+            raise ValueError(f"search_max_k must be >= 1, got {self.search_max_k}")
+        if self.search_max_query_len < 1:
+            raise ValueError(f"search_max_query_len must be >= 1, got {self.search_max_query_len}")
+        if self.search_fetch_k_cap < 1:
+            raise ValueError(f"search_fetch_k_cap must be >= 1, got {self.search_fetch_k_cap}")
+        if self.max_pdf_mb < 1:
+            raise ValueError(f"max_pdf_mb must be >= 1, got {self.max_pdf_mb}")
         return self
 
 

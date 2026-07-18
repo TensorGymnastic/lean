@@ -55,7 +55,16 @@ async def ingest_pdf(path: str) -> IngestResult:
     corpus_root = Path(settings.corpus_root).resolve()
     resolved = pdf_path.resolve()
     if not resolved.is_relative_to(corpus_root):
-        raise PermissionError(f"path outside corpus root ({settings.corpus_root}): {path}")
+        raise PermissionError(f"path outside corpus root: {path}")
+
+    # Resource exhaustion guard: reject oversized PDFs before reading into memory
+    max_bytes = settings.max_pdf_mb * 1024 * 1024
+    file_size = pdf_path.stat().st_size
+    if file_size > max_bytes:
+        raise ValueError(
+            f"PDF too large: {file_size / (1024 * 1024):.1f} MB "
+            f"(max {settings.max_pdf_mb} MB): {path}"
+        )
 
     source_sha256 = hashlib.sha256(pdf_path.read_bytes()).hexdigest()
 

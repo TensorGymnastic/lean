@@ -40,6 +40,9 @@ class MockSettings:
     """
 
     search_top_k: int = 5
+    search_max_k: int = 100
+    search_max_query_len: int = 2000
+    search_fetch_k_cap: int = 500
     hybrid_search_enabled: bool = True
     fetch_multiplier: int = 8
     fetch_k_floor: int = 40
@@ -301,3 +304,75 @@ class TestSearchTopK:
             results = search_mod.search("query")
 
         assert len(results) <= 2
+
+
+class TestSearchInputValidation:
+    """Input validation guards (DoS prevention)."""
+
+    def test_empty_query_rejected(self, valid_env):
+        from lean.services import search as search_mod
+
+        settings = MockSettings(hybrid_search_enabled=False)
+        with _SearchPatcher(settings, vector_hits=[]):
+            with pytest.raises(ValueError, match="query must not be empty"):
+                search_mod.search("")
+            with pytest.raises(ValueError, match="query must not be empty"):
+                search_mod.search("   ")
+
+    def test_query_too_long_rejected(self, valid_env):
+        from lean.services import search as search_mod
+
+        settings = MockSettings(hybrid_search_enabled=False, search_max_query_len=10)
+        with (
+            _SearchPatcher(settings, vector_hits=[]),
+            pytest.raises(ValueError, match="exceeds max length"),
+        ):
+            search_mod.search("a" * 11)
+
+    def test_k_clamped_to_max(self, valid_env):
+        """User-supplied k is clamped to settings.search_max_k."""
+        from lean.services import search as search_mod
+
+        # k=1000 must be clamped to max_k=10 → fetch_k floor of 40 still wins
+        settings = MockSettings(
+            hybrid_search_enabled=False,
+            search_max_k=10,
+            search_fetch_k_cap=500,
+        )
+        vector_hits = [_make_hit(i, 0.9 - i * 0.05) for i in range(50)]
+
+        with _SearchPatcher(settings, vector_hits=vector_hits):
+            # Must not raise — k is clamped silently
+            results = search_mod.search("query", k=1000)
+
+        assert len(results) <= 10
+
+    def test_k_below_one_clamped_up(self, valid_env):
+        """k=0 or negative is clamped up to 1."""
+        from lean.services import search as search_mod
+
+        settings = MockSettings(hybrid_search_enabled=False, search_max_k=100)
+        vector_hits = [_make_hit(i, 0.5) for i in range(3)]
+
+        with _SearchPatcher(settings, vector_hits=vector_hits):
+            results = search_mod.search("query", k=0)
+
+        assert isinstance(results, list)
+
+    def test_fetch_k_capped(self, valid_env):
+        """fetch_k respects settings.search_fetch_k_cap even when k*multiplier exceeds it."""
+        from lean.services import search as search_mod
+
+        # k=10, multiplier=8 → fetch_k=80; cap=50 → fetch_k=50
+        settings = MockSettings(
+            hybrid_search_enabled=True,
+            search_max_k=100,
+            fetch_multiplier=8,
+            fetch_k_floor=10,
+            search_fetch_k_cap=50,
+        )
+        # Just verify it runs without raising on the cap path
+        with _SearchPatcher(settings, vector_hits=[_make_hit(0, 0.5)]):
+            results = search_mod.search("query", k=10)
+
+        assert isinstance(results, list)

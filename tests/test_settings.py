@@ -105,3 +105,24 @@ def test_rejects_default_api_key(monkeypatch) -> None:
 
     with pytest.raises(ValidationError, match="change-me"):
         Settings()
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("search_max_k", 0),
+        ("search_max_query_len", 0),
+        ("search_fetch_k_cap", 0),
+        ("max_pdf_mb", 0),
+    ],
+)
+def test_rejects_non_positive_resource_limits(monkeypatch, field, value) -> None:
+    """Resource-limit fields must be >= 1 (DoS prevention)."""
+    monkeypatch.setenv("SUPABASE_DB_URL", "postgresql://localhost/postgres")
+    monkeypatch.setenv("HF_TOKEN", "token")
+    monkeypatch.setenv("LEAN_MCP_API_KEY", "x" * 32)
+
+    from lean.config.settings import Settings
+
+    with pytest.raises(ValidationError, match=field):
+        Settings(**{field: value})
