@@ -84,6 +84,11 @@ def search(
     year_min: int = typer.Option(None, help="Filter by min publication year"),
     year_max: int = typer.Option(None, help="Filter by max publication year"),
     min_score: float = typer.Option(None, help="Minimum cosine similarity"),
+    chunk_type: str = typer.Option(
+        None,
+        help="Filter by chunk type: 'text' or 'image'. "
+        "Omit for both (default). Typo returns ValueError.",
+    ),
     json_output: bool = typer.Option(False, "--json"),
 ) -> None:
     """Semantic + hybrid search over the corpus."""
@@ -98,6 +103,7 @@ def search(
         year_min=year_min,
         year_max=year_max,
         min_score=min_score,
+        chunk_type=chunk_type,
     )
     if json_output:
         _output(chunks, True)
