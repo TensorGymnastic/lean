@@ -120,9 +120,6 @@ async def ingest_pdf(path: str) -> IngestResult:
     chunk_texts = [c.content for c in chunk_results]
     embeddings = await anyio.to_thread.run_sync(lambda: embedder.embed_documents(chunk_texts))
 
-    source_storage_path = f"{settings.storage_source_prefix}{source_sha256}.pdf"
-    markdown_storage_path = f"{settings.storage_markdown_prefix}{source_sha256}.md"
-
     pdf_meta = await anyio.to_thread.run_sync(lambda: extract_metadata(pdf_path))
 
     conn = StoreConnection.from_env()
@@ -134,8 +131,6 @@ async def ingest_pdf(path: str) -> IngestResult:
             source_sha256=source_sha256,
             title=pdf_meta.title or pdf_path.stem,
             extraction_method=method.value,
-            source_storage_path=source_storage_path,
-            markdown_storage_path=markdown_storage_path,
             authors=pdf_meta.authors,
             publisher=pdf_meta.publisher,
             year=pdf_meta.year,

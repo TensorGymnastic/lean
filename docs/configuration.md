@@ -113,8 +113,6 @@ success**. Watch `IngestResult.warnings` or `extraction_method` to detect this.
 
 | Field | Default | Notes |
 |---|---|---|
-| `source_prefix` | `sources/` | Path prefix stored in `documents.source_storage_path`. **Not uploaded anywhere** — Supabase Storage is configured but not wired. |
-| `markdown_prefix` | `markdown/` | Path prefix for extracted markdown. **Same — not uploaded.** |
 | `corpus_root` | `data` | Ingest paths must resolve inside this directory. Outside → `PermissionError` (→ HTTP 403 on REST). |
 | `max_pdf_mb` | `200` | Reject PDFs larger than this before `read_bytes`. Validated `>= 1`. |
 

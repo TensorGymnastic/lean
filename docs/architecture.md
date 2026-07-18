@@ -154,7 +154,6 @@ re-creation (used in tests; never in production paths).
 
 ```
 documents ───┬── source_sha256 (unique) — dedup key
-              ├── source_storage_path, markdown_storage_path (strings, no upload)
               ├── extraction_method (unlimited_ocr | markitdown)
               └── metadata (jsonb)
 
@@ -166,7 +165,6 @@ chunks ──────┴── document_id (FK cascade)
               └── embedding (vector(1024)) — ivfflat index, lists=100
 
 query_logs   ─── query_text, k > 0, filters, hit_chunk_ids, latency_ms >= 0
-                 (agent_id column exists but never populated — see limitations.md)
 
 eval_runs    ─── mrr, ndcg, recall, mean_latency_ms >= 0, sample_count > 0, k > 0
 ```

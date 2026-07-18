@@ -91,8 +91,6 @@ class Settings(BaseSettings):
     api_port: int = _yaml.get("transport", {}).get("api_port", 8766)
 
     # --- Storage paths ---
-    storage_source_prefix: str = _yaml.get("storage", {}).get("source_prefix", "sources/")
-    storage_markdown_prefix: str = _yaml.get("storage", {}).get("markdown_prefix", "markdown/")
     corpus_root: str = _yaml.get("storage", {}).get("corpus_root", "data")
     max_pdf_mb: int = _yaml.get("storage", {}).get("max_pdf_mb", 200)
 

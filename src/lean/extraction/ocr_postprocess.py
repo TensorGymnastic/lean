@@ -16,6 +16,9 @@ import re
 
 _DET_RE = re.compile(r"<\|det\|>[^<]*<\|/det\|>")
 _REF_RE = re.compile(r"<\|ref\|>[^<]*<\|/ref\|>")
+# <PAGE> markers carry per-page boundaries from the OCR model. Stripped here
+# because the chunker is section-based (see docs/limitations.md). Recoverable
+# upstream if page-anchored chunking is ever needed.
 _PAGE_RE = re.compile(r"</?PAGE>")
 _GROUNDING_RE = re.compile(r"<\|grounding\|>")
 _IMAGE_TOKEN_RE = re.compile(r"<image>")

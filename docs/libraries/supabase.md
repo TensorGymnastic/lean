@@ -10,8 +10,8 @@ pgvector is pre-installed.
 - **`SUPABASE_DB_URL`** — direct Postgres DSN (not pooler)
 
 Lean does **not** use Supabase Auth, Storage, Realtime, or Edge Functions.
-The vestigial `supabase/config.toml [storage]` block and `storage.*`
-path-prefix columns are not wired up — see [`limitations.md`](../limitations.md#dedup-is-by-sha-256-not-by-path).
+PDFs stay on local disk; markdown is reconstructed from chunks (not stored
+as a file).
 
 ## Local stack (Docker Compose)
 

@@ -98,7 +98,7 @@ Ingest dedups by SHA-256 of the source PDF bytes. The behavior:
 | Same path, same bytes | No-op (returns existing `document_id`) |
 | Same path, **different bytes** | New `document_id` created; **old document row and chunks remain orphaned** |
 | New path, any bytes | New document |
-| `lean reingest <doc_id>` | Re-reads `source_storage_path` from the existing row; if bytes have changed, new `document_id`, old doc becomes orphan |
+| `lean reingest <doc_id>` | Re-reads `source_path` from the existing row; if bytes have changed, new `document_id`, old doc becomes orphan |
 
 **To delete an orphan:** `lean delete <old_doc_id>`. Use
 `lean corpus-stats` to find orphans after a content edit.

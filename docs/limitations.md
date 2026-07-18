@@ -47,15 +47,6 @@ changes the SHA, so a `lean reingest` after the edit creates a **new
 - To clean up: `lean delete <old_doc_id>`, then optionally `REINDEX`
   (see [`operations.md`](operations.md))
 
-### `agent_id` analytics is dormant
-
-`public.query_logs.agent_id` exists, `services/search.search(agent_id=...)`
-accepts it, and `AnalyticsRepo.log_query` writes it. **No caller (CLI,
-MCP, REST) populates it.** Every analytics row has `agent_id = NULL`.
-
-To wire it: each transport needs to accept an `agent_id` arg (from CLI
-flag, MCP client ID, or REST header) and pass it through. Not implemented.
-
 ---
 
 ## Search & evaluation

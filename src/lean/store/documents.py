@@ -29,8 +29,6 @@ class DocumentRepo:
         source_sha256: str,
         title: str | None,
         extraction_method: str,
-        source_storage_path: str,
-        markdown_storage_path: str,
         authors: list[str] | None = None,
         publisher: str | None = None,
         year: int | None = None,
@@ -47,9 +45,8 @@ class DocumentRepo:
                 """
                 insert into public.documents
                     (source_path, source_sha256, title, authors, publisher, year,
-                     page_count, extraction_method, source_storage_path,
-                     markdown_storage_path, metadata)
-                values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     page_count, extraction_method, metadata)
+                values (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 on conflict (source_sha256) do update set
                     source_path = excluded.source_path,
                     title = excluded.title,
@@ -71,8 +68,6 @@ class DocumentRepo:
                     year,
                     page_count,
                     extraction_method,
-                    source_storage_path,
-                    markdown_storage_path,
                     Jsonb(metadata or {}),
                 ),
             )

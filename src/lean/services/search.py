@@ -32,7 +32,6 @@ def search(
     year_min: int | None = None,
     year_max: int | None = None,
     min_score: float | None = None,
-    agent_id: str | None = None,
 ) -> list[Chunk]:
     """Embed query → search (hybrid if enabled) → rerank → postprocess.
 
@@ -186,7 +185,6 @@ def search(
                 hit_chunk_ids=[UUID(h.chunk.id) for h in hits],
                 hit_scores=[h.score for h in hits],
                 latency_ms=latency_ms,
-                agent_id=agent_id,
             )
         except Exception:
             logger.warning("failed to log query", exc_info=True)

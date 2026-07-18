@@ -309,6 +309,9 @@ def health(
             label = "[OK]" if status == "ok" else "[--]" if status == "not_configured" else "[FAIL]"
             typer.echo(f"{label} {name}: {status}")
 
+    if any(r["status"] == "error" for r in checks.values()):
+        raise typer.Exit(1)
+
 
 @app.command(name="mcp-serve")
 def mcp_serve(

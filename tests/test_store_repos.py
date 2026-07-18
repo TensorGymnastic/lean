@@ -149,8 +149,6 @@ def test_upsert_document(monkeypatch):
         source_sha256="abc123",
         title="Test",
         extraction_method="markitdown",
-        source_storage_path="sources/abc.pdf",
-        markdown_storage_path="markdown/abc.md",
         authors=["Author"],
         publisher=None,
         year=2024,

@@ -30,15 +30,14 @@ class AnalyticsRepo:
         hit_chunk_ids: list[UUID],
         hit_scores: list[float],
         latency_ms: int,
-        agent_id: str | None = None,
     ) -> None:
         """Persist a search query log entry for analytics and evaluation."""
         with self._conn.conn.cursor() as cur:
             cur.execute(
                 """
                 insert into public.query_logs
-                    (query_text, k, filters, hit_chunk_ids, hit_scores, latency_ms, agent_id)
-                values (%s, %s, %s::jsonb, %s::uuid[], %s, %s, %s)
+                    (query_text, k, filters, hit_chunk_ids, hit_scores, latency_ms)
+                values (%s, %s, %s::jsonb, %s::uuid[], %s, %s)
                 """,
                 (
                     query_text,
@@ -47,7 +46,6 @@ class AnalyticsRepo:
                     hit_chunk_ids,
                     hit_scores,
                     latency_ms,
-                    agent_id,
                 ),
             )
             self._conn.conn.commit()
