@@ -21,9 +21,31 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
+MAX_IMAGES_PER_DOC = 200
+MAX_IMAGE_B64_BYTES = 20 * 1024 * 1024  # 20 MiB per decoded image
+_MAX_PIL_PIXELS = 50_000_000  # ~50 MP — decompression bomb guard
+
 
 class MarkerNotInstalled(RuntimeError):
     """Raised when marker-pdf is not installed but marker extraction is requested."""
+
+
+class MarkerRemoteError(RuntimeError):
+    """Raised when the remote marker server returns an error or malformed response.
+
+    Distinct from ``MarkerNotInstalled`` (which means marker is absent and the
+    pipeline should fall through to OCR/markitdown). A remote error means the
+    server is present but the request failed — logged, then pipeline falls through.
+    """
+
+
+def _pil() -> Any:
+    """Lazy-import PIL.Image and set the decompression-bomb guard on first call."""
+    from PIL import Image
+
+    if Image.MAX_IMAGE_PIXELS != _MAX_PIL_PIXELS:
+        Image.MAX_IMAGE_PIXELS = _MAX_PIL_PIXELS
+    return Image
 
 
 def extract_markdown(
@@ -37,7 +59,7 @@ def extract_markdown(
     Returns ``(markdown, page_count, images)`` where ``images`` is a dict of
     ``{image_name: PIL.Image}`` extracted from the PDF (charts, figures,
     diagrams). Raises ``MarkerNotInstalled`` if marker-pdf is not available
-    and no remote_url is set.
+    and no remote_url is set. Raises ``MarkerRemoteError`` on remote failures.
     """
     if remote_url:
         return _extract_remote(pdf_path, remote_url, force_ocr=force_ocr)
@@ -48,27 +70,50 @@ def _extract_remote(
     pdf_path: Path, remote_url: str, *, force_ocr: bool = False
 ) -> tuple[str, int, dict[str, Any]]:
     """Send PDF to remote GPU marker server, get results back."""
-    from PIL import Image
-
+    Image = _pil()
     url = remote_url.rstrip("/") + "/extract"
     pdf_bytes = pdf_path.read_bytes()
 
     logger.info("marker-remote: sending %s (%d bytes) to %s", pdf_path.name, len(pdf_bytes), url)
-    resp = httpx.Client(timeout=600).post(
-        url, content=pdf_bytes, headers={"Content-Type": "application/pdf"}
-    )
-    resp.raise_for_status()
-    data = resp.json()
+    transport = httpx.HTTPTransport(retries=2)
+    with httpx.Client(timeout=600, transport=transport) as client:
+        resp = client.post(url, content=pdf_bytes, headers={"Content-Type": "application/pdf"})
+
+    if resp.status_code >= 500:
+        raise MarkerRemoteError(f"remote marker server error: HTTP {resp.status_code}")
+    if resp.status_code >= 400:
+        raise MarkerRemoteError(
+            f"remote marker client error: HTTP {resp.status_code} {resp.text[:200]}"
+        )
+
+    try:
+        data = resp.json()
+    except ValueError as e:
+        raise MarkerRemoteError(f"remote marker returned non-JSON response: {e}") from e
 
     if "error" in data:
-        raise MarkerNotInstalled(f"remote marker error: {data['error']}")
+        raise MarkerRemoteError(f"remote marker error: {data['error']}")
 
-    text: str = data["markdown"]
-    page_count: int = data["page_count"]
+    try:
+        text: str = data["markdown"]
+        page_count: int = data["page_count"]
+    except KeyError as e:
+        raise MarkerRemoteError(f"remote marker response missing key {e}") from e
+
+    raw_images = data.get("images", {})
+    if len(raw_images) > MAX_IMAGES_PER_DOC:
+        raise MarkerRemoteError(
+            f"remote marker returned {len(raw_images)} images (max {MAX_IMAGES_PER_DOC})"
+        )
 
     images: dict[str, Any] = {}
-    for name, b64 in data.get("images", {}).items():
-        img_bytes = base64.b64decode(b64)
+    for name, b64 in raw_images.items():
+        if len(b64) > MAX_IMAGE_B64_BYTES:
+            raise MarkerRemoteError(
+                f"remote marker image '{name}' too large: {len(b64)} bytes "
+                f"(max {MAX_IMAGE_B64_BYTES})"
+            )
+        img_bytes = base64.b64decode(b64, validate=True)
         images[name] = Image.open(io.BytesIO(img_bytes))
 
     logger.info("marker-remote: %d pages → %d chars, %d images", page_count, len(text), len(images))

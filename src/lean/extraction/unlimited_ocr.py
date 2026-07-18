@@ -16,6 +16,8 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
+MAX_PAGE_PIXELS = 50_000_000  # 50 MP — blocks page-bomb PDFs (100"×100" @ 300 DPI = 900 MP)
+
 
 class OCRBackendUnavailable(RuntimeError):
     """Raised when the remote OCR backend is unreachable or returns an error."""
@@ -116,6 +118,15 @@ def _pdf_to_base64_images(pdf_path: Path, *, dpi: int) -> list[str]:
     images: list[str] = []
     try:
         for page in doc:
+            rect = page.rect
+            rasterized_pixels = rect.width * (dpi / 72) * rect.height * (dpi / 72)
+            if rasterized_pixels > MAX_PAGE_PIXELS:
+                max_mp = MAX_PAGE_PIXELS / 1e6
+                actual_mp = rasterized_pixels / 1e6
+                raise ValueError(
+                    f"PDF page too large: {rect.width:.0f}x{rect.height:.0f} pt "
+                    f"at {dpi} DPI = {actual_mp:.0f} MP (max {max_mp:.0f} MP)"
+                )
             pixmap = page.get_pixmap(matrix=mat)
             png_bytes = pixmap.tobytes("png")
             images.append(base64.b64encode(png_bytes).decode("ascii"))

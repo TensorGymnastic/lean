@@ -33,6 +33,17 @@ from lean.store.documents import DocumentRepo
 
 logger = logging.getLogger(__name__)
 
+_SHA256_CHUNK_SIZE = 1 << 20  # 1 MiB
+
+
+def _sha256_streaming(path: Path) -> str:
+    """Stream SHA-256 in 1 MiB blocks — avoids loading whole PDF into memory."""
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for block in iter(lambda: f.read(_SHA256_CHUNK_SIZE), b""):
+            h.update(block)
+    return h.hexdigest()
+
 
 async def ingest_pdf(path: str) -> IngestResult:
     """Full pipeline: PDF → extract → metadata → chunk → embed → store.
@@ -72,7 +83,7 @@ async def ingest_pdf(path: str) -> IngestResult:
             f"(max {settings.max_pdf_mb} MB): {path}"
         )
 
-    source_sha256 = hashlib.sha256(pdf_path.read_bytes()).hexdigest()
+    source_sha256 = _sha256_streaming(pdf_path)
 
     markdown, page_count, method, images = await anyio.to_thread.run_sync(
         lambda: extract_pdf_markdown(
