@@ -27,7 +27,7 @@ def test_pipeline_uses_marker_when_available(tmp_path: Path) -> None:
     with (
         patch(
             "lean.extraction.marker_converter.extract_markdown",
-            return_value=("# marker markdown\n", 3, fake_images),
+            return_value=("# marker markdown\n", 3, fake_images, []),
         ),
         patch(
             "lean.extraction.pipeline.extract_ocr",
@@ -36,7 +36,7 @@ def test_pipeline_uses_marker_when_available(tmp_path: Path) -> None:
     ):
         from lean.extraction.pipeline import ExtractionMethod, extract_pdf_markdown
 
-        markdown, page_count, method, images = extract_pdf_markdown(
+        markdown, page_count, method, images, _block_metas = extract_pdf_markdown(
             pdf_path,
             ocr_base_url="http://fake:8000",
             hf_token="x",
@@ -74,7 +74,7 @@ def test_pipeline_uses_ocr_when_marker_unavailable(tmp_path: Path) -> None:
     ):
         from lean.extraction.pipeline import ExtractionMethod, extract_pdf_markdown
 
-        markdown, page_count, method, images = extract_pdf_markdown(
+        markdown, page_count, method, images, _block_metas = extract_pdf_markdown(
             pdf_path,
             ocr_base_url="http://fake:8000",
             hf_token="x",
@@ -112,7 +112,7 @@ def test_pipeline_falls_back_to_markitdown_when_both_fail(tmp_path: Path) -> Non
     ):
         from lean.extraction.pipeline import ExtractionMethod, extract_pdf_markdown
 
-        markdown, page_count, method, images = extract_pdf_markdown(
+        markdown, page_count, method, images, _block_metas = extract_pdf_markdown(
             pdf_path,
             ocr_base_url="http://fake:8000",
             hf_token="x",
@@ -145,7 +145,7 @@ def test_pipeline_uses_markitdown_when_no_ocr_configured(tmp_path: Path) -> None
     ):
         from lean.extraction.pipeline import ExtractionMethod, extract_pdf_markdown
 
-        markdown, page_count, method, images = extract_pdf_markdown(
+        markdown, page_count, method, images, _block_metas = extract_pdf_markdown(
             pdf_path,
             ocr_base_url="",
             hf_token=None,
@@ -176,7 +176,7 @@ def test_pipeline_falls_through_when_marker_errors(tmp_path: Path) -> None:
     ):
         from lean.extraction.pipeline import ExtractionMethod, extract_pdf_markdown
 
-        markdown, page_count, method, images = extract_pdf_markdown(
+        markdown, page_count, method, images, _block_metas = extract_pdf_markdown(
             pdf_path,
             ocr_base_url="http://fake:8000",
             hf_token="x",

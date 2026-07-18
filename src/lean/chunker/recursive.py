@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from typing import Any
 
 import tiktoken
 
@@ -32,6 +33,9 @@ class ChunkResult:
     chunk_index: int  # 0-based within the section
     content: str
     token_count: int
+    bbox: dict[str, Any] | None = None
+    page_start: int | None = None
+    page_end: int | None = None
 
 
 def chunk_sections(

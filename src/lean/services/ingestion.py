@@ -25,6 +25,7 @@ if TYPE_CHECKING:
 from lean.chunker.markdown_ast import build_sections
 from lean.chunker.recursive import ChunkResult, chunk_sections
 from lean.config.settings import Settings, get_settings
+from lean.extraction.marker_converter import BlockMeta
 from lean.extraction.metadata import PdfMetadata, extract_metadata
 from lean.extraction.pipeline import extract_pdf_markdown
 from lean.infrastructure.embedder import get_embedder
@@ -138,6 +139,60 @@ async def _describe_images(
     return descriptions, warnings
 
 
+def _enrich_chunks_with_block_meta(
+    chunks: list[ChunkResult],
+    block_metas: list[BlockMeta],
+) -> None:
+    """Populate bbox + page_start/page_end on chunks by matching content to blocks."""
+    if not block_metas:
+        return
+    for chunk in chunks:
+        page, bbox = _find_best_block_match(chunk.content, block_metas)
+        chunk.page_start = page
+        chunk.page_end = page
+        chunk.bbox = bbox
+
+
+def _find_best_block_match(
+    content: str,
+    blocks: list[BlockMeta],
+) -> tuple[int | None, dict[str, float] | None]:
+    """Find the block whose text overlaps most with the chunk content.
+
+    Uses Jaccard-like word overlap. Returns (page, bbox_dict) or (None, None)
+    if no block meets the 0.15 minimum overlap threshold.
+    """
+    content_words = set(content.lower().split())
+    if not content_words:
+        return None, None
+
+    best_score = 0.0
+    best_page: int | None = None
+    best_bbox: list[float] | None = None
+
+    for block in blocks:
+        block_words = set(block.text.lower().split())
+        if not block_words:
+            continue
+        overlap = len(content_words & block_words)
+        score = overlap / min(len(content_words), len(block_words))
+        if score > best_score:
+            best_score = score
+            best_page = block.page
+            best_bbox = block.bbox
+
+    if best_score < 0.15:
+        return None, None
+    if best_bbox and len(best_bbox) == 4:
+        return best_page, {
+            "x0": best_bbox[0],
+            "y0": best_bbox[1],
+            "x1": best_bbox[2],
+            "y1": best_bbox[3],
+        }
+    return best_page, None
+
+
 def _build_chunk_rows(
     chunk_results: list[ChunkResult],
     embeddings: list[list[float]],
@@ -156,8 +211,9 @@ def _build_chunk_rows(
             chunk_index=global_idx,
             section_path=c.section_path,
             heading_text=c.heading_text,
-            page_start=None,
-            page_end=None,
+            page_start=c.page_start,
+            page_end=c.page_end,
+            bbox=c.bbox,
             token_count=c.token_count,
             content=c.content,
             embedding=emb,
@@ -281,7 +337,7 @@ async def ingest_pdf(path: str) -> IngestResult:
 
     source_sha256 = _sha256_streaming(pdf_path)
 
-    markdown, page_count, method, images = await anyio.to_thread.run_sync(
+    markdown, page_count, method, images, block_metas = await anyio.to_thread.run_sync(
         lambda: extract_pdf_markdown(
             pdf_path,
             ocr_base_url=settings.ocr_base_url,
@@ -312,6 +368,8 @@ async def ingest_pdf(path: str) -> IngestResult:
             encoding=settings.token_counter_encoding,
         )
     )
+
+    _enrich_chunks_with_block_meta(chunk_results, block_metas)
 
     if settings.llm_contextual_retrieval:
         from lean.extraction.contextual import add_context_to_chunks

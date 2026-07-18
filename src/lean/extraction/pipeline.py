@@ -16,7 +16,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from lean.extraction.marker_converter import MarkerNotInstalled
+from lean.extraction.marker_converter import BlockMeta, MarkerNotInstalled
 from lean.extraction.markitdown_fallback import (
     extract_markdown as extract_markitdown,
 )
@@ -42,19 +42,20 @@ def extract_pdf_markdown(
     ocr_batch_size: int,
     marker_force_ocr: bool = False,
     marker_remote_url: str = "",
-) -> tuple[str, int, ExtractionMethod, dict[str, Any]]:
+) -> tuple[str, int, ExtractionMethod, dict[str, Any], list[BlockMeta]]:
     """Extract markdown from a PDF, preferring marker then OCR then markitdown.
 
-    Returns ``(markdown, page_count, method, images)`` where ``images`` is
-    ``{image_name: PIL.Image}`` from marker (empty for OCR/markitdown paths).
+    Returns ``(markdown, page_count, method, images, block_metas)`` where ``images`` is
+    ``{image_name: PIL.Image}`` from marker (empty for OCR/markitdown paths) and
+    ``block_metas`` is per-block page/bbox metadata (local marker only; empty otherwise).
     """
     try:
         from lean.extraction.marker_converter import extract_markdown as extract_marker
 
-        markdown, page_count, images = extract_marker(
+        markdown, page_count, images, block_metas = extract_marker(
             pdf_path, force_ocr=marker_force_ocr, remote_url=marker_remote_url
         )
-        return markdown, page_count, ExtractionMethod.MARKER, images
+        return markdown, page_count, ExtractionMethod.MARKER, images, block_metas
     except MarkerNotInstalled:
         pass
     except Exception as exc:
@@ -73,9 +74,9 @@ def extract_pdf_markdown(
                 batch_size=ocr_batch_size,
             )
             markdown = clean_ocr_output(raw_markdown)
-            return markdown, page_count, ExtractionMethod.UNLIMITED_OCR, {}
+            return markdown, page_count, ExtractionMethod.UNLIMITED_OCR, {}, []
         except OCRBackendUnavailable as exc:
             logger.warning("OCR server unavailable (%s); falling back to markitdown", exc)
 
     markdown, page_count = extract_markitdown(pdf_path)
-    return markdown, page_count, ExtractionMethod.MARKITDOWN, {}
+    return markdown, page_count, ExtractionMethod.MARKITDOWN, {}, []

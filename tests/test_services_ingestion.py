@@ -116,7 +116,7 @@ def test_ingest_pipeline_success(monkeypatch_settings, fake_pdf):
     with (
         patch(
             "lean.services.ingestion.extract_pdf_markdown",
-            return_value=("# DMAIC", 1, ExtractionMethod.MARKITDOWN, {}),
+            return_value=("# DMAIC", 1, ExtractionMethod.MARKITDOWN, {}, []),
         ),
         patch("lean.services.ingestion.build_sections", return_value=fake_sections),
         patch("lean.services.ingestion.chunk_sections", return_value=fake_chunks),
@@ -192,7 +192,7 @@ def test_ingest_vlm_enrichment_creates_image_chunks(monkeypatch_settings, fake_p
     with (
         patch(
             "lean.services.ingestion.extract_pdf_markdown",
-            return_value=("# DMAIC", 1, ExtractionMethod.MARKER, fake_images),
+            return_value=("# DMAIC", 1, ExtractionMethod.MARKER, fake_images, []),
         ),
         patch("lean.services.ingestion.build_sections", return_value=fake_sections),
         patch("lean.services.ingestion.chunk_sections", return_value=fake_chunks),
@@ -260,7 +260,7 @@ def test_ingest_vlm_disabled_skips_enrichment(monkeypatch_settings, fake_pdf):
     with (
         patch(
             "lean.services.ingestion.extract_pdf_markdown",
-            return_value=("# Test", 1, ExtractionMethod.MARKER, fake_images),
+            return_value=("# Test", 1, ExtractionMethod.MARKER, fake_images, []),
         ),
         patch("lean.services.ingestion.build_sections", return_value=fake_sections),
         patch("lean.services.ingestion.chunk_sections", return_value=fake_chunks),

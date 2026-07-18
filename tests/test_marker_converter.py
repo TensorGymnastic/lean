@@ -22,11 +22,19 @@ def _clear_converter_cache():
     _get_converter.cache_clear()
 
 
+def _make_mock_converter(mock_rendered: MagicMock, page_count: int = 1) -> MagicMock:
+    """Build a mock PdfConverter wired for the _extract_local dual-render flow."""
+    mock_document = MagicMock()
+    mock_document.pages = [MagicMock()] * page_count
+    mock_converter = MagicMock()
+    mock_converter.build_document.return_value = mock_document
+    mock_converter.resolve_dependencies.return_value = MagicMock(return_value=mock_rendered)
+    return mock_converter
+
+
 def test_extract_markdown_returns_text_and_page_count(tmp_path: Path) -> None:
     mock_rendered = MagicMock()
-    mock_rendered.metadata = {"page_stats": [{"page_id": 0}, {"page_id": 1}, {"page_id": 2}]}
-
-    mock_converter = MagicMock(return_value=mock_rendered)
+    mock_converter = _make_mock_converter(mock_rendered, page_count=3)
 
     with (
         patch("lean.extraction.marker_converter._get_converter", return_value=mock_converter),
@@ -34,19 +42,16 @@ def test_extract_markdown_returns_text_and_page_count(tmp_path: Path) -> None:
     ):
         from lean.extraction.marker_converter import extract_markdown
 
-        text, page_count, images = extract_markdown(tmp_path / "fake.pdf")
+        text, page_count, images, _block_metas = extract_markdown(tmp_path / "fake.pdf")
 
     assert text == "# Test\n\nContent"
     assert page_count == 3
     assert images == {}
-    mock_converter.assert_called_once()
 
 
 def test_extract_markdown_returns_images(tmp_path: Path) -> None:
     mock_rendered = MagicMock()
-    mock_rendered.metadata = {}
-
-    mock_converter = MagicMock(return_value=mock_rendered)
+    mock_converter = _make_mock_converter(mock_rendered, page_count=1)
     fake_images = {"img_0_0": MagicMock(), "img_1_2": MagicMock()}
 
     with (
@@ -55,7 +60,7 @@ def test_extract_markdown_returns_images(tmp_path: Path) -> None:
     ):
         from lean.extraction.marker_converter import extract_markdown
 
-        _, _, images = extract_markdown(tmp_path / "fake.pdf")
+        _, _, images, _ = extract_markdown(tmp_path / "fake.pdf")
 
     assert images is fake_images
 
@@ -82,9 +87,7 @@ def test_extract_markdown_passes_force_ocr_config(tmp_path: Path) -> None:
 
 def test_extract_markdown_handles_missing_page_stats(tmp_path: Path) -> None:
     mock_rendered = MagicMock()
-    mock_rendered.metadata = {}
-
-    mock_converter = MagicMock(return_value=mock_rendered)
+    mock_converter = _make_mock_converter(mock_rendered, page_count=1)
 
     with (
         patch("lean.extraction.marker_converter._get_converter", return_value=mock_converter),
@@ -92,16 +95,14 @@ def test_extract_markdown_handles_missing_page_stats(tmp_path: Path) -> None:
     ):
         from lean.extraction.marker_converter import extract_markdown
 
-        _, page_count, _ = extract_markdown(tmp_path / "fake.pdf")
+        _, page_count, _, _ = extract_markdown(tmp_path / "fake.pdf")
 
     assert page_count == 1
 
 
 def test_extract_markdown_handles_none_metadata(tmp_path: Path) -> None:
     mock_rendered = MagicMock()
-    mock_rendered.metadata = None
-
-    mock_converter = MagicMock(return_value=mock_rendered)
+    mock_converter = _make_mock_converter(mock_rendered, page_count=1)
 
     with (
         patch("lean.extraction.marker_converter._get_converter", return_value=mock_converter),
@@ -109,7 +110,7 @@ def test_extract_markdown_handles_none_metadata(tmp_path: Path) -> None:
     ):
         from lean.extraction.marker_converter import extract_markdown
 
-        _, page_count, _ = extract_markdown(tmp_path / "fake.pdf")
+        _, page_count, _, _ = extract_markdown(tmp_path / "fake.pdf")
 
     assert page_count == 1
 
@@ -306,7 +307,7 @@ def test_extract_remote_success(tmp_path: Path) -> None:
         )
         from lean.extraction.marker_converter import _extract_remote
 
-        text, pages, images = _extract_remote(pdf, "http://gpu-test:8000")
+        text, pages, images, _block_metas = _extract_remote(pdf, "http://gpu-test:8000")
 
     assert text == "# Hello"
     assert pages == 3

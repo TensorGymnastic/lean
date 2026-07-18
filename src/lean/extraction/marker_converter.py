@@ -13,6 +13,8 @@ from __future__ import annotations
 import base64
 import io
 import logging
+import re
+from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -24,6 +26,38 @@ logger = logging.getLogger(__name__)
 MAX_IMAGES_PER_DOC = 200
 MAX_IMAGE_B64_BYTES = 20 * 1024 * 1024  # 20 MiB per decoded image
 _MAX_PIL_PIXELS = 50_000_000  # ~50 MP — decompression bomb guard
+
+_HTML_TAG_RE = re.compile(r"<[^>]+>")
+
+
+@dataclass
+class BlockMeta:
+    """Per-block metadata from marker extraction — page number + bbox + text for matching."""
+
+    page: int
+    bbox: list[float] | None
+    text: str
+
+
+def _extract_block_metas_from_chunks(chunk_output: Any) -> list[BlockMeta]:
+    """Extract BlockMeta list from a ChunkRenderer ChunkOutput.
+
+    Strips HTML tags from each block's html field to produce clean text
+    suitable for matching against chunked content.
+    """
+    metas: list[BlockMeta] = []
+    for block in chunk_output.blocks:
+        clean_text = _HTML_TAG_RE.sub("", block.html).strip()
+        if not clean_text:
+            continue
+        metas.append(
+            BlockMeta(
+                page=block.page,
+                bbox=list(block.bbox) if block.bbox else None,
+                text=clean_text[:500],
+            )
+        )
+    return metas
 
 
 class MarkerNotInstalled(RuntimeError):
@@ -53,12 +87,13 @@ def extract_markdown(
     *,
     force_ocr: bool = False,
     remote_url: str = "",
-) -> tuple[str, int, dict[str, Any]]:
+) -> tuple[str, int, dict[str, Any], list[BlockMeta]]:
     """Extract markdown from a PDF via marker.
 
-    Returns ``(markdown, page_count, images)`` where ``images`` is a dict of
+    Returns ``(markdown, page_count, images, block_metas)`` where ``images`` is a dict of
     ``{image_name: PIL.Image}`` extracted from the PDF (charts, figures,
-    diagrams). Raises ``MarkerNotInstalled`` if marker-pdf is not available
+    diagrams) and ``block_metas`` is per-block page/bbox metadata (local path only;
+    empty for remote). Raises ``MarkerNotInstalled`` if marker-pdf is not available
     and no remote_url is set. Raises ``MarkerRemoteError`` on remote failures.
     """
     if remote_url:
@@ -68,7 +103,7 @@ def extract_markdown(
 
 def _extract_remote(
     pdf_path: Path, remote_url: str, *, force_ocr: bool = False
-) -> tuple[str, int, dict[str, Any]]:
+) -> tuple[str, int, dict[str, Any], list[BlockMeta]]:
     """Send PDF to remote GPU marker server, get results back."""
     Image = _pil()
     url = remote_url.rstrip("/") + "/extract"
@@ -117,27 +152,49 @@ def _extract_remote(
         images[name] = Image.open(io.BytesIO(img_bytes))
 
     logger.info("marker-remote: %d pages → %d chars, %d images", page_count, len(text), len(images))
-    return text, page_count, images
+    return text, page_count, images, []
 
 
-def _extract_local(pdf_path: Path, *, force_ocr: bool = False) -> tuple[str, int, dict[str, Any]]:
-    """Run marker locally (in-process). Requires ``uv sync --extra marker``."""
+def _extract_local(
+    pdf_path: Path, *, force_ocr: bool = False
+) -> tuple[str, int, dict[str, Any], list[BlockMeta]]:
+    """Run marker locally (in-process). Requires ``uv sync --extra marker``.
+
+    Builds the Document once, then renders both markdown (for the chunker) and
+    chunk-structured output (for bbox/page metadata). Falls back gracefully if
+    ChunkRenderer fails — block_metas will be empty, same as the remote path.
+    """
     converter = _get_converter(force_ocr=force_ocr)
 
     logger.info("marker: converting %s (force_ocr=%s)", pdf_path, force_ocr)
-    rendered = converter(str(pdf_path))
+    document = converter.build_document(str(pdf_path))
+    page_count = len(document.pages)
+
+    md_renderer = converter.resolve_dependencies(converter.renderer)
+    rendered = md_renderer(document)
 
     from marker.output import text_from_rendered
 
     text, _, images = text_from_rendered(rendered)
 
-    page_count = 1
-    meta = rendered.metadata if hasattr(rendered, "metadata") else {}
-    if isinstance(meta, dict) and "page_stats" in meta:
-        page_count = len(meta["page_stats"])
+    block_metas: list[BlockMeta] = []
+    try:
+        from marker.renderers.chunk import ChunkRenderer
 
-    logger.info("marker: %d pages → %d chars, %d images", page_count, len(text), len(images))
-    return text, page_count, images
+        chunk_renderer = converter.resolve_dependencies(ChunkRenderer)
+        chunk_output = chunk_renderer(document)
+        block_metas = _extract_block_metas_from_chunks(chunk_output)
+    except Exception as exc:
+        logger.warning("marker: ChunkRenderer metadata extraction failed: %s", exc)
+
+    logger.info(
+        "marker: %d pages → %d chars, %d images, %d block metas",
+        page_count,
+        len(text),
+        len(images),
+        len(block_metas),
+    )
+    return text, page_count, images, block_metas
 
 
 @lru_cache(maxsize=4)
