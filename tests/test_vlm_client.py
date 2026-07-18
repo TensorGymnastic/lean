@@ -93,6 +93,24 @@ class TestDescribeImage:
         body = mock_post.call_args.kwargs["json"]
         assert body["max_tokens"] == 500
 
+    def test_disable_thinking_adds_field(self):
+        client = VLMClient(
+            base_url="http://gpu:11434/v1", model="MiniMax-M3", disable_thinking=True
+        )
+        mock_resp = _mock_response("desc")
+        with patch.object(client._client, "post", return_value=mock_resp) as mock_post:
+            client.describe_image(_make_image(), prompt="x")
+        body = mock_post.call_args.kwargs["json"]
+        assert body["thinking"] == {"type": "disabled"}
+
+    def test_thinking_not_in_body_by_default(self):
+        client = VLMClient(base_url="http://gpu:11434/v1", model="m")
+        mock_resp = _mock_response("desc")
+        with patch.object(client._client, "post", return_value=mock_resp) as mock_post:
+            client.describe_image(_make_image(), prompt="x")
+        body = mock_post.call_args.kwargs["json"]
+        assert "thinking" not in body
+
     def test_raises_on_http_error(self):
         client = VLMClient(base_url="http://gpu:11434/v1", model="m")
         with (

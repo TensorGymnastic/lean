@@ -232,6 +232,8 @@ def test_ingest_vlm_disabled_skips_enrichment(monkeypatch_settings, fake_pdf):
     from lean.models.schemas import ExtractionMethod
     from lean.services.ingestion import ingest_pdf
 
+    monkeypatch_settings.vlm_enabled = False
+
     fake_sections = [Section(path="Ch 1", level=1, heading="Ch 1", content="Content")]
     fake_chunks = [
         ChunkResult(

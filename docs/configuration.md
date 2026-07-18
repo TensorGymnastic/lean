@@ -181,6 +181,7 @@ described by a VLM at ingest time. Descriptions are embedded and stored as
 | `timeout_s` | `120.0` | VLM HTTP timeout (first model load can be slow) |
 | `max_concurrency` | `4` | Reserved for future parallel image description |
 | `max_tokens` | `1000` | Max response tokens per image description |
+| `disable_thinking` | `true` | MiniMax-M3: skip `<think>` reasoning for faster structured JSON output. Set `false` for complex charts that benefit from reasoning. |
 
 **Validation:** if `vlm.enabled=true`, then `vlm.base_url` and `vlm.model` must
 be non-empty. `detail` must be one of `low`/`default`/`high`.

@@ -45,10 +45,12 @@ class VLMClient:
         api_key: str = "",
         timeout: float = 120.0,
         detail: str = "default",
+        disable_thinking: bool = False,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._model = model
         self._detail = detail
+        self._disable_thinking = disable_thinking
         self._client = httpx.Client(timeout=timeout)
         self._headers: dict[str, str] = {"Content-Type": "application/json"}
         if api_key:
@@ -76,31 +78,35 @@ class VLMClient:
         """
         data_uri = self._image_to_data_uri(image)
 
+        request_body: dict[str, Any] = {
+            "model": self._model,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": data_uri,
+                                "detail": self._detail,
+                            },
+                        },
+                    ],
+                }
+            ],
+            "max_tokens": max_tokens,
+            "temperature": 0.0,
+            "stream": False,
+        }
+        if self._disable_thinking:
+            request_body["thinking"] = {"type": "disabled"}
+
         try:
             resp = self._client.post(
                 f"{self._base_url}/chat/completions",
                 headers=self._headers,
-                json={
-                    "model": self._model,
-                    "messages": [
-                        {
-                            "role": "user",
-                            "content": [
-                                {"type": "text", "text": prompt},
-                                {
-                                    "type": "image_url",
-                                    "image_url": {
-                                        "url": data_uri,
-                                        "detail": self._detail,
-                                    },
-                                },
-                            ],
-                        }
-                    ],
-                    "max_tokens": max_tokens,
-                    "temperature": 0.0,
-                    "stream": False,
-                },
+                json=request_body,
             )
             resp.raise_for_status()
         except httpx.HTTPError as e:

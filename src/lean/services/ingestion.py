@@ -131,6 +131,7 @@ async def ingest_pdf(path: str) -> IngestResult:
             api_key=settings.vlm_api_key,
             timeout=settings.vlm_timeout_s,
             detail=settings.vlm_detail,
+            disable_thinking=settings.vlm_disable_thinking,
         )
         try:
             for img_name, pil_img in images.items():

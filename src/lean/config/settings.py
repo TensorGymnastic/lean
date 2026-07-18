@@ -133,6 +133,7 @@ class Settings(BaseSettings):
     vlm_timeout_s: float = _yaml.get("vlm", {}).get("timeout_s", 120.0)
     vlm_max_concurrency: int = _yaml.get("vlm", {}).get("max_concurrency", 4)
     vlm_max_tokens: int = _yaml.get("vlm", {}).get("max_tokens", 1000)
+    vlm_disable_thinking: bool = _yaml.get("vlm", {}).get("disable_thinking", True)
 
     @field_validator("lean_mcp_api_key")
     @classmethod
