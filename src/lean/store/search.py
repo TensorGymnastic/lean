@@ -94,6 +94,8 @@ class SearchEngine:
             select c.id, c.document_id, c.chunk_index, c.section_path,
                    c.heading_text, c.page_start, c.page_end, c.token_count,
                    c.content, c.chunk_type, c.image_meta,
+                   c.bbox, c.image_hash, c.provenance_model,
+                   c.embedding_model, c.embedding_dim,
                    1 - (c.embedding <=> %s::vector) as score
             from public.chunks c{join_clause}
             where {where_clause}
@@ -135,6 +137,8 @@ class SearchEngine:
             select c.id, c.document_id, c.chunk_index, c.section_path,
                    c.heading_text, c.page_start, c.page_end, c.token_count,
                    c.content, c.chunk_type, c.image_meta,
+                   c.bbox, c.image_hash, c.provenance_model,
+                   c.embedding_model, c.embedding_dim,
                    ts_rank(c.tsv, plainto_tsquery('english', %s)) as score
             from public.chunks c{join_clause}
             where {where_clause}

@@ -47,6 +47,11 @@ class Chunk(BaseModel):
     content: str
     chunk_type: str = "text"
     image_meta: dict[str, Any] | None = None
+    bbox: dict[str, Any] | None = None
+    image_hash: str | None = None
+    provenance_model: str | None = None
+    embedding_model: str | None = None
+    embedding_dim: int | None = None
     score: float | None = None
 
     @classmethod
@@ -64,6 +69,11 @@ class Chunk(BaseModel):
             content=r["content"],
             chunk_type=r.get("chunk_type", "text"),
             image_meta=r.get("image_meta"),
+            bbox=r.get("bbox"),
+            image_hash=r.get("image_hash"),
+            provenance_model=r.get("provenance_model"),
+            embedding_model=r.get("embedding_model"),
+            embedding_dim=r.get("embedding_dim"),
         )
 
 

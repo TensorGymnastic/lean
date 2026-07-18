@@ -215,9 +215,17 @@ def test_ingest_vlm_enrichment_creates_image_chunks(monkeypatch_settings, fake_p
     chunk_rows = call_args[0][1]
     assert len(chunk_rows) == 2
     assert chunk_rows[0].chunk_type == "text"
+    assert chunk_rows[0].embedding_model is not None
+    assert chunk_rows[0].embedding_dim == 1024
+
     assert chunk_rows[1].chunk_type == "image"
     assert chunk_rows[1].image_meta is not None
     assert chunk_rows[1].image_meta["chart_type"] == "bar"
+    assert chunk_rows[1].image_hash is not None
+    assert len(chunk_rows[1].image_hash) == 64
+    assert chunk_rows[1].provenance_model == "gemma3:27b"
+    assert chunk_rows[1].embedding_model is not None
+    assert chunk_rows[1].embedding_dim == 1024
 
     texts_embedded = mock_embedder.embed_documents.call_args[0][0]
     assert len(texts_embedded) == 2

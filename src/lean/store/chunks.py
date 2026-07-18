@@ -28,6 +28,11 @@ class ChunkRow:
     embedding: list[float]
     chunk_type: str = "text"
     image_meta: dict[str, Any] | None = None
+    bbox: dict[str, Any] | None = None
+    image_hash: str | None = None
+    provenance_model: str | None = None
+    embedding_model: str | None = None
+    embedding_dim: int | None = None
 
 
 class ChunkRepo:
@@ -49,8 +54,9 @@ class ChunkRepo:
                     insert into public.chunks
                         (document_id, chunk_index, section_path, heading_text,
                          page_start, page_end, token_count, content, embedding,
-                         chunk_type, image_meta)
-                    values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                         chunk_type, image_meta, bbox, image_hash,
+                         provenance_model, embedding_model, embedding_dim)
+                    values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """,
                     [
                         (
@@ -65,6 +71,11 @@ class ChunkRepo:
                             c.embedding,
                             c.chunk_type,
                             json.dumps(c.image_meta) if c.image_meta else None,
+                            json.dumps(c.bbox) if c.bbox else None,
+                            c.image_hash,
+                            c.provenance_model,
+                            c.embedding_model,
+                            c.embedding_dim,
                         )
                         for c in chunks
                     ],
@@ -77,7 +88,9 @@ class ChunkRepo:
             cur.execute(
                 """
                 select id, document_id, chunk_index, section_path, heading_text,
-                       page_start, page_end, token_count, content, chunk_type, image_meta
+                       page_start, page_end, token_count, content, chunk_type,
+                       image_meta, bbox, image_hash, provenance_model,
+                       embedding_model, embedding_dim
                 from public.chunks where id = %s
                 """,
                 (chunk_id,),
@@ -101,7 +114,9 @@ class ChunkRepo:
             cur.execute(
                 """
                 select id, document_id, chunk_index, section_path, heading_text,
-                       page_start, page_end, token_count, content, chunk_type, image_meta
+                       page_start, page_end, token_count, content, chunk_type,
+                       image_meta, bbox, image_hash, provenance_model,
+                       embedding_model, embedding_dim
                 from public.chunks
                 where document_id = %s
                 order by chunk_index

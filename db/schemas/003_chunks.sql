@@ -14,6 +14,11 @@ create table if not exists public.chunks (
     embedding     vector(1024) not null,
     chunk_type    text not null default 'text',
     image_meta    jsonb,
+    bbox          jsonb,
+    image_hash    text,
+    provenance_model text,
+    embedding_model text,
+    embedding_dim int,
     unique (document_id, chunk_index)
 );
 
