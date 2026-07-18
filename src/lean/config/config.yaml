@@ -77,13 +77,27 @@ llm:
   multi_query_count: 4
 
 vlm:
+  # === ACTIVE: MiniMax M3 via API (fast, clean JSON, ~$0.004/image) ===
   enabled: true
   provider: minimax
   base_url: "https://api.minimax.io/v1"
   model: "MiniMax-M3"
   api_key: ""                            # from .env (VLM_API_KEY)
-  detail: default
+  detail: high                           # high = best chart resolution
   timeout_s: 120.0
   max_concurrency: 4
-  max_tokens: 4096                       # M3 output budget — no thinking waste, all useful content
-  disable_thinking: true                 # M3 properly suppresses reasoning (unlike Ollama Qwen3.5)
+  max_tokens: 8192                       # generous output budget (M3 uses all for content, no thinking waste)
+  disable_thinking: true                 # M3 properly suppresses reasoning
+
+  # === LOCAL FALLBACK: Qwen3.5-9b on GPU server (free, self-hosted) ===
+  # Uncomment to switch. Qwen3.5 is natively multimodal (vision+text).
+  # Note: thinks internally (~3K tokens), so needs higher max_tokens + longer timeout.
+  #
+  # provider: ollama
+  # base_url: "http://192.168.2.37:11434/v1"
+  # model: "qwen3.5-128k:9b"             # 128K context, Q4_K_M, 9.9 GB on RTX 3080 Ti
+  # api_key: ""
+  # detail: default
+  # timeout_s: 300.0
+  # max_tokens: 8192
+  # disable_thinking: false              # Ollama ignores this; model thinks regardless
