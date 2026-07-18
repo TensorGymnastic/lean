@@ -58,6 +58,8 @@ class Settings(BaseSettings):
     ocr_max_tokens: int = _yaml.get("ocr", {}).get("max_tokens", 32768)
     ocr_batch_size: int = _yaml.get("ocr", {}).get("batch_size", 20)
 
+    marker_force_ocr: bool = _yaml.get("marker", {}).get("force_ocr", False)
+
     chunk_target_max: int = _yaml.get("chunking", {}).get("target_max", 450)
     chunk_hard_cap: int = _yaml.get("chunking", {}).get("hard_cap", 500)
     chunk_overlap: int = _yaml.get("chunking", {}).get("overlap", 50)

@@ -13,7 +13,7 @@ Supabase pgvector, and exposes the corpus via fastmcp tools/resources/prompts.
 
 - `src/lean/config/settings.py` — pydantic-settings: `.env` (secrets) + `config.yaml` (app config)
 - `src/lean/models/schemas.py` — Pydantic types shared across modules
-- `src/lean/extraction/` — PDF→markdown (Unlimited-OCR remote server, markitdown fallback, pipeline orchestrator)
+- `src/lean/extraction/` — PDF→markdown (marker primary, Unlimited-OCR secondary, markitdown fallback, pipeline orchestrator)
 - `src/lean/chunker/` — markdown AST section parser (mistune) + recursive token splitter (tiktoken)
 - `src/lean/embeddings/` — `liquid_lmf.py` (local CPU) + `remote_ollama.py` (remote GPU)
 - `src/lean/infrastructure/embedder.py` — singleton factory: remote Ollama when configured, else local CPU
@@ -26,7 +26,7 @@ Supabase pgvector, and exposes the corpus via fastmcp tools/resources/prompts.
 - `src/lean/auth/bearer.py` — ASGI middleware for bearer token auth
 - `src/lean/cli.py` — Typer CLI (full parity with MCP tools)
 - `src/lean/eval/` — retrieval evaluation harness (hit_rate@k, MRR@k)
-- `db/schemas/` — SQL migrations (001-008)
+- `db/schemas/` — SQL migrations (001-009)
 - `scripts/` — canonical-queries.json (eval fixture) + `docs_lint.py` (drift detector)
 - `docs/` — reference docs (configuration, operations, architecture, evaluation, limitations, decisions)
 
@@ -49,7 +49,8 @@ Supabase pgvector, and exposes the corpus via fastmcp tools/resources/prompts.
 - Ingest paths confined to `settings.corpus_root` (default: `data/`) — prevents
   path traversal via authenticated API/MCP clients
 - torch/transformers/sentence-transformers are optional deps
-  (`uv sync --extra local-models`); remote-only deployments skip them
+  (`uv sync --extra local-models`); remote-only deployments skip them.
+  marker-pdf is a separate optional dep (`uv sync --extra marker`).
 
 ## Validation
 

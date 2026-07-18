@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 class ExtractionMethod(StrEnum):
     """Which extraction path produced this document's markdown."""
 
+    MARKER = "marker"
     UNLIMITED_OCR = "unlimited_ocr"
     MARKITDOWN = "markitdown"
 

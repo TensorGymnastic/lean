@@ -50,7 +50,23 @@ and its gotchas.
 `normalize_embeddings=True`. Swapping the embedder without preserving this
 will silently destroy retrieval. See ADR-0001 (forthcoming).
 
+### `marker`
+
+Marker (datalab-to/marker) is the primary extraction backend when installed
+(`uv sync --extra marker`). Uses surya OCR + texify for high-quality tables,
+equations, and layout. Works on CPU natively; GPU auto-detected.
+
+| Field | Default | Notes |
+|---|---|---|
+| `force_ocr` | `false` | Force OCR on all pages (set `true` for scanned PDFs) |
+
+When marker is not installed, the pipeline falls through to Unlimited-OCR
+(if `ocr.base_url` is set) then markitdown.
+
 ### `ocr`
+
+Unlimited-OCR via a remote GPU server. Secondary backend (used when marker
+is not installed and `base_url` is set).
 
 | Field | Default | Notes |
 |---|---|---|

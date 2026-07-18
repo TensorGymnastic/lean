@@ -6,7 +6,7 @@ GPU-accelerated embeddings, and hybrid BM25 + vector search via pgvector.
 
 ## Features
 
-- **Vision-based PDF extraction** — `baidu/Unlimited-OCR` via a remote GPU server, with `markitdown` fallback when the OCR server is unavailable
+- **Vision-based PDF extraction** — `datalab-to/marker` (surya OCR + texify) as primary backend with proper table/equation/heading formatting, with `markitdown` fallback when marker is not installed
 - **Section-aware chunking** — mistune AST parser splits markdown by headings, then a recursive tiktoken-based splitter bounds chunks to a target token window
 - **GPU-accelerated embeddings** — LiquidAI/LFM2.5-Embedding-350M (1024-dim) served via Ollama on the GPU server, with automatic local CPU fallback
 - **Hybrid search** — BM25 full-text (PostgreSQL tsvector) fused with pgvector cosine similarity via Reciprocal Rank Fusion (RRF, k=60)
@@ -15,7 +15,7 @@ GPU-accelerated embeddings, and hybrid BM25 + vector search via pgvector.
 - **Retrieval evaluation** — `lean eval` command computing hit_rate@k, MRR@k, NDCG@k, Recall@k (see [`docs/evaluation.md`](docs/evaluation.md) for caveats)
 - **Optional LLM sidecar** — Contextual Retrieval, HyDE, multi-query generation — all opt-in, pipeline works without LLM
 - **Security hardening** — corpus-root path confinement, API key validation (min 16 chars, `change-me` rejected), HuggingFace model revisions pinned to SHA hashes, non-root Docker user, multi-stage build
-- **Optional ML deps** — torch/transformers/sentence-transformers only when local CPU embeddings are needed (`uv sync --extra local-models`)
+- **Optional ML deps** — torch/transformers/sentence-transformers only when local CPU embeddings are needed (`uv sync --extra local-models`); marker-pdf for high-quality extraction (`uv sync --extra marker`)
 
 ## Tech Stack
 

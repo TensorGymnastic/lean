@@ -17,6 +17,9 @@ ocr:
   max_tokens: 32768
   batch_size: 20
 
+marker:
+  force_ocr: false        # set true to force OCR on all pages (better for scanned PDFs)
+
 chunking:
   target_max: 450
   hard_cap: 500

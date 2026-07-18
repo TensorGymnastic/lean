@@ -11,7 +11,7 @@ create table if not exists public.documents (
     year                  int,
     page_count            int,
     extraction_method     text not null
-        check (extraction_method in ('unlimited_ocr', 'markitdown')),
+        check (extraction_method in ('marker', 'unlimited_ocr', 'markitdown')),
     ingested_at           timestamptz not null default now(),
     reingested_at         timestamptz,
     metadata              jsonb not null default '{}'::jsonb

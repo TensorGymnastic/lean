@@ -29,6 +29,9 @@ local-models = [
     "transformers>=4.57.1,<5",
     "torch>=2.3",
 ]
+marker = [
+    "marker-pdf",
+]
 
 [dependency-groups]
 dev = [
@@ -91,7 +94,7 @@ plugins = ["pydantic.mypy"]
 packages = ["src/lean"]
 
 [[tool.mypy.overrides]]
-module = ["fitz", "markitdown"]
+module = ["fitz", "markitdown", "marker.*"]
 ignore_missing_imports = true
 
 [tool.uv]
