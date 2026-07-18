@@ -1,11 +1,11 @@
 CREATE TABLE IF NOT EXISTS query_logs (
     id          uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
     query_text  text    NOT NULL,
-    k           integer NOT NULL,
+    k           integer NOT NULL CHECK (k > 0),
     filters     jsonb   NOT NULL DEFAULT '{}',
     hit_chunk_ids  uuid[]   NOT NULL DEFAULT '{}',
     hit_scores     float8[] NOT NULL DEFAULT '{}',
-    latency_ms  integer NOT NULL,
+    latency_ms  integer NOT NULL CHECK (latency_ms >= 0),
     agent_id    text,
     created_at  timestamptz NOT NULL DEFAULT now()
 );

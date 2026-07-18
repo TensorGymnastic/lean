@@ -5,9 +5,9 @@ CREATE TABLE IF NOT EXISTS eval_runs (
     mrr         float8  NOT NULL,
     ndcg        float8  NOT NULL DEFAULT 0,
     recall      float8  NOT NULL DEFAULT 0,
-    mean_latency_ms integer NOT NULL,
-    sample_count integer NOT NULL,
-    k           integer NOT NULL,
+    mean_latency_ms integer NOT NULL CHECK (mean_latency_ms >= 0),
+    sample_count integer NOT NULL CHECK (sample_count > 0),
+    k           integer NOT NULL CHECK (k > 0),
     created_at  timestamptz NOT NULL DEFAULT now()
 );
 
