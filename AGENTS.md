@@ -126,18 +126,19 @@ Documented honestly so future agents don't re-derive. Items here are **accepted*
 
 1. **`page_start` / `page_end` are hardcoded `None`** at `services/ingestion.py:231-232` (text chunks) and `:251-252` (image chunks). Chunker doesn't preserve page boundaries; cleanup needs upstream marker/OCR changes.
 2. **`bbox` column is wired through but always NULL** — defined in `models/schemas.py:50`, `store/chunks.py:31`, written at `chunks.py:85`, read at `store/search.py:97,140`; never populated with non-NULL because `ChunkRow.bbox` defaults to `None` and no caller sets it. Awaits marker block-level polygon wiring.
-3. **`image_hash` is written but never used in a WHERE clause** — set at `services/ingestion.py:178,258`, read into the `Chunk` model at `models/schemas.py:73`, but no dedup query exists. Future: SELECT … WHERE image_hash = … to skip duplicate figures.
 
 **Previously listed and since FIXED (do not re-litigate):**
-- `ingest_pdf` was a 244-LOC god function → split into `_describe_images` (74 LOC) + `_build_chunk_rows` (52 LOC) + `_persist_ingest` (48 LOC); `ingest_pdf` is now 130 LOC orchestration.
-- `search` was a 188-LOC function mixing orchestration + business logic → split into `_validate_search_inputs` + `_expand_queries` + `_compute_fetch_k` + `_fetch_one_query` + `_rerank_hits` + `_postprocess_hits` + `SearchRequest` dataclass; `search` is now 99 LOC orchestration.
+- `ingest_pdf` was a 244-LOC god function → split into `_describe_one_image` (40 LOC) + `_describe_images` (47 LOC) + `_build_chunk_rows` (52 LOC) + `_persist_ingest` (48 LOC); `ingest_pdf` is now 130 LOC orchestration.
+- `search` was a 188-LOC function mixing orchestration + business logic → split into `_validate_search_inputs` + `_expand_queries` + `_compute_fetch_k` + `_vector_fetch` + `_hybrid_fetch` + `_fetch_one_query` + `_rerank_hits` + `_postprocess_hits` + `SearchRequest` dataclass; `search` is now 99 LOC orchestration.
+- REST API was a partial mirror (5/8 endpoints) → now 7/8 parity; added `GET /chunks/{id}`, `GET /documents/{id}/markdown`, `DELETE /documents/{id}`. `reingest` intentionally CLI-only.
+- `image_hash` dedup query didn't exist → `ChunkRepo.find_duplicate_image_hashes()` diagnostic method added; surfaces duplicate images for future VLM-skip optimization.
 - Transaction boundary split → fixed by single-transaction pattern at `services/ingestion.py:204-271` (`commit=False` + final `conn.conn.commit()`).
 - `vlm_max_concurrency` unused → wired via `anyio.Semaphore(settings.vlm_max_concurrency)` at `services/ingestion.py:155`.
 - Postgres bound to `0.0.0.0:54322` → bound to `127.0.0.1:54322:5432` at `docker-compose.yml:5`.
 - `chunk_type` had no CHECK constraint → added in `db/schemas/012_add_chunk_type_check.sql`; app-side validation at `services/search.py:24` (`VALID_CHUNK_TYPES`).
 - `marker_server.py` lived in `/tmp/` → vendored at `scripts/marker_server.py`; deployment guide at `docs/marker-server-deployment.md`.
-- `_extract_local` / `_get_converter` 0% coverage → covered by mock-module injection tests in `tests/test_marker_converter.py` (`test_get_converter_constructs_pdf_converter_when_installed`, `test_get_converter_force_ocr_true_uses_separate_cache_entry`). Coverage of `marker_converter.py`: 88% → 98%.
-- `executemany` for chunk inserts could hit the 65535-param Postgres limit → batched at `_INSERT_BATCH_SIZE = 1000` in `store/chunks.py`; invariant enforced by `test_replace_chunks_batch_size_keeps_params_under_postgres_limit`.
-- `vlm_provider` field was dead config → removed from `settings.py`, `config.yaml` examples, and `docs/configuration.md` table. All VLM providers use the same OpenAI-compatible transport.
+- `_extract_local` / `_get_converter` 0% coverage → covered by mock-module injection tests in `tests/test_marker_converter.py`. Coverage of `marker_converter.py`: 88% → 98%.
+- `executemany` for chunk inserts could hit the 65535-param Postgres limit → batched at `_INSERT_BATCH_SIZE = 1000` in `store/chunks.py`.
+- `vlm_provider` field was dead config → removed from `settings.py`, `config.yaml` examples, and `docs/configuration.md` table.
 
-See `docs/limitations.md` for runtime caveats (eval pseudo-queries, dedup orphans, partial REST mirror).
+See `docs/limitations.md` for runtime caveats.
