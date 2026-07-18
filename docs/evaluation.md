@@ -62,6 +62,17 @@ It does **not** measure:
 | **The full search pipeline** | `evaluate()` calls `engine.vector_search` directly — **no BM25, no RRF fusion, no reranker, no postprocessors**. This is not what `lean search` returns. See "Pipeline gap" below. |
 | **Reranker contribution** | With `rerank.enabled: true`, real queries get reranked. Pseudo-queries (heading + content) are already so similar to the target that rerank barely moves them. Eval numbers don't reflect rerank benefit. |
 
+### Recall@k is identical to HitRate@k in this eval
+
+Each sample carries exactly **one** relevant item
+(`expected_chunk_id`). Binary Recall with a single relevant item reduces
+to "did the relevant item appear in top-k?" — which is also the
+definition of HitRate@k. As a result `result.recall == result.hit_rate`
+always, and only **3 of the 4 metrics are independent**
+(`hit_rate==recall`, `mrr`, `ndcg`). To get a meaningful Recall that
+differs from HitRate, build a curated dataset where each query has
+multiple graded-relevant chunks and upgrade `EvalSample` to carry them.
+
 ---
 
 ## Pipeline gap (HIGH)

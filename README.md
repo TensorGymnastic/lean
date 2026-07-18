@@ -16,7 +16,7 @@ storage, and hybrid BM25 + vector search via pgvector.
 - **GPU-accelerated embeddings** — LiquidAI/LFM2.5-Embedding-350M (1024-dim) served via Ollama on the GPU server, with automatic local CPU fallback
 - **Hybrid search** — BM25 full-text (PostgreSQL tsvector) fused with pgvector cosine similarity via Reciprocal Rank Fusion (RRF, k=60)
 - **Cross-encoder reranking** — fetch wide candidate set, rerank with `ms-marco-MiniLM-L-6-v2`, return top-k
-- **MCP server** — 8 tools, 4 resources, 3 prompts exposed over stdio or HTTP, plus a partial REST mirror (5 endpoints)
+- **MCP server** — 8 tools, 4 resources, 3 prompts exposed over stdio or HTTP, plus a REST mirror (7 endpoints)
 - **Retrieval evaluation** — `lean eval` command computing hit_rate@k, MRR@k, NDCG@k, Recall@k (see [`docs/evaluation.md`](docs/evaluation.md) for caveats)
 - **Optional LLM sidecar** — Contextual Retrieval, HyDE, multi-query generation — all opt-in, pipeline works without LLM
 - **Security hardening** — corpus-root path confinement, API key validation (min 16 chars, `change-me` rejected), HuggingFace model revisions pinned to SHA hashes, non-root Docker user, multi-stage build
@@ -140,7 +140,7 @@ All commands support `--json` for structured output. Use `-v` / `--verbose` for 
 
 **3 prompts:** `lean_qa`, `lean_glossary`, `lean_compare_concepts`
 
-### REST API (partial mirror)
+### REST API (near-full mirror)
 
 ```bash
 make api-serve   # http://localhost:8766
@@ -149,14 +149,17 @@ curl -H "Authorization: Bearer $LEAN_MCP_API_KEY" \
      "http://localhost:8766/search?query=What+is+DMAIC%3F&k=5"
 ```
 
-Endpoints (5/8 MCP tools — see [`docs/limitations.md`](docs/limitations.md#rest-api-is-a-partial-mirror-not-full-parity)):
+Endpoints (7/8 MCP tools — `reingest` is CLI-only; see [`docs/limitations.md`](docs/limitations.md#rest-api-now-mirrors-7-of-8-mcp-tools)):
 
 | Endpoint | MCP equivalent |
 |---|---|
 | `GET /health` | (no auth, always 200) |
-| `GET /search` | `search` |
+| `GET /search` | `search` (supports `chunk_type` filter) |
 | `GET /documents` | `list_documents` |
-| `GET /stats` | `corpus_stats` (subset) |
+| `GET /documents/{id}/markdown` | `get_document_markdown` |
+| `DELETE /documents/{id}` | `delete_document` |
+| `GET /chunks/{chunk_id}` | `get_chunk` |
+| `GET /stats` | `corpus_stats` |
 | `POST /ingest` | `ingest_pdf` |
 
 Domain errors map to HTTP codes: `ValueError` → 400, `PermissionError` → 403,
@@ -168,7 +171,7 @@ Domain errors map to HTTP codes: `ValueError` → 400, `PermissionError` → 403
 - **[`docs/configuration.md`](docs/configuration.md)** — every `Settings` field, defaults, validators, gotchas
 - **[`docs/operations.md`](docs/operations.md)** — Docker ports, healthcheck semantics, post-ingest reindex, reingest semantics
 - **[`docs/architecture.md`](docs/architecture.md)** — pipeline, directory layout, transport tier pattern
-- **[`docs/limitations.md`](docs/limitations.md)** — known caveats (page fields NULL, eval pseudo-queries, dedup orphans, REST partial mirror)
+- **[`docs/limitations.md`](docs/limitations.md)** — known caveats (page fields NULL, eval pseudo-queries, dedup orphans, REST near-full mirror)
 - **[`docs/decisions/`](docs/decisions/)** — Architecture Decision Records
 - **[`AGENTS.md`](AGENTS.md)** — operational rules for agents
 

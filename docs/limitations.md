@@ -86,12 +86,12 @@ sampling.) See [`evaluation.md`](evaluation.md#sampling-determinism-resolved).
 
 ## Operational
 
-### REST API now mirrors all MCP tools (full parity)
+### REST API now mirrors 7 of 8 MCP tools (near-full parity)
 
 | MCP tool | REST endpoint |
 |---|---|
 | `ingest_pdf` | `POST /ingest` |
-| `search` | `GET /search` |
+| `search` | `GET /search` (supports `chunk_type` filter) |
 | `list_documents` | `GET /documents` |
 | `get_chunk` | `GET /chunks/{chunk_id}` |
 | `get_document_markdown` | `GET /documents/{doc_id}/markdown` |
@@ -115,12 +115,16 @@ The healthcheck creates a TCP socket to port 8765 and closes it. It
 does not exercise the MCP protocol. A hung server (event-loop deadlock,
 exhausted DB pool) still passes the healthcheck.
 
-### `lean health` always exits 0
+### `lean health` exits 1 on component failure
 
 `make health` (alias `make smoke`) runs `lean health`, which checks
-OCR, DB, and Ollama. It prints `[FAIL]` per-component but **never
-raises `typer.Exit(1)`**. Do not use as a CI gate — wrap with grep or
-parse the output.
+OCR server, database, and Ollama. It prints `[OK]` / `[--]` / `[FAIL]`
+per component, and exits with code 1 if **any** component reports
+`status: "error"` (see `src/lean/cli.py`'s `health` command). Safe to
+use as a CI gate or Docker `HEALTHCHECK` precondition — but note that
+the per-component check only verifies connectivity/HTTP 200, not full
+pipeline correctness (e.g. a hung event loop with an open port still
+passes).
 
 ### `lean mcp-serve` lacks `--host` flag
 
@@ -151,12 +155,16 @@ block size, not the file size. The earlier "loads full PDF twice"
 behavior was replaced by streaming; `max_pdf_mb` is now a size guard
 checked via `pdf_path.stat().st_size` before any read.
 
-### `executemany` for chunk inserts can hit the 65535-param limit
+### `executemany` chunk inserts are batched at 1000 rows
 
 Postgres caps prepared statements at 65535 parameters. With 16 columns
-per chunk (see `store/chunks.py:63-93`), this is hit at ~4096 chunks
-per insert batch. For very large books (rare in Lean Six Sigma corpora)
-this errors mid-ingest.
+per chunk (see `store/chunks.py:63-93`), a single `executemany` call
+would hit the ceiling at ~4096 rows. This is mitigated by
+`_INSERT_BATCH_SIZE = 1000` (see `store/chunks.py:15-18`), which keeps
+a 4× headroom and tolerates future column additions up to ~24 columns.
+Very large books in a single document still batch correctly — no
+mid-ingest `prepared statement "..." has too many parameters` errors
+in practice.
 
 ---
 
@@ -166,9 +174,10 @@ These have been observed in the codebase and may resurface:
 
 - README previously described `make smoke` and `make health` as
   different — they are identical (`smoke: health` in the Makefile).
-- README previously marketed the REST API as a "mirror" — it is partial.
 
 Historical drift that has been resolved:
+- README previously marketed the REST API as a "mirror" of all MCP tools
+  without noting `reingest` is CLI-only; now correctly states 7/8.
 - `reranker.py` module docstring previously claimed rerank was
   "disabled by default" while `config.yaml` enabled it — the docstring
   now correctly references `retrieval.rerank.enabled: true`.
