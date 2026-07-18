@@ -86,6 +86,7 @@ ignore = ["TC001", "TC002", "TC003", "S603", "S607", "S105"]
 "tests/**/*.py" = ["S101", "S105", "S106"]
 "src/lean/store/search.py" = ["S608"]
 "src/lean/eval/runner.py" = ["S311"]  # eval sampling uses random.Random(seed) for reproducibility, not secrets
+"src/lean/cli.py" = ["B008"]  # typer.Option() in argument defaults is the documented Typer pattern
 
 [tool.mypy]
 python_version = "3.12"

@@ -264,3 +264,109 @@ def test_cli_search_json(runner):
     with patch("lean.services.search.search", return_value=fake_chunks):
         result = runner.invoke(app, ["search", "query", "--json"])
     assert result.exit_code == 0
+
+
+def test_cli_eval_with_dataset_flag_uses_curated_loader(runner, tmp_path, monkeypatch):
+    """--dataset <path> loads samples via load_curated_dataset, skipping build_eval_dataset."""
+    import json
+    from pathlib import Path
+
+    from lean.cli import app
+    from lean.eval.runner import EvalSample
+
+    dataset_path: Path = tmp_path / "curated.json"
+    dataset_path.write_text(
+        json.dumps(
+            [
+                {
+                    "query": "What is DMAIC?",
+                    "expected_chunk_id": "11111111-1111-1111-1111-111111111111",
+                },
+                {
+                    "query": "What is Pareto?",
+                    "expected_chunk_id": "22222222-2222-2222-2222-222222222222",
+                },
+            ]
+        )
+    )
+
+    fake_samples = [
+        EvalSample(
+            query="What is DMAIC?", expected_chunk_id="11111111-1111-1111-1111-111111111111"
+        ),
+        EvalSample(
+            query="What is Pareto?", expected_chunk_id="22222222-2222-2222-2222-222222222222"
+        ),
+    ]
+
+    with (
+        patch("lean.eval.runner.load_curated_dataset", return_value=fake_samples) as mock_load,
+        patch("lean.eval.runner.build_eval_dataset") as mock_build,  # must NOT be called
+        patch(
+            "lean.eval.runner.evaluate",
+            return_value=type(
+                "FakeResult",
+                (),
+                {
+                    "hit_rate": 0.5,
+                    "mrr": 0.5,
+                    "ndcg": 0.5,
+                    "recall": 0.5,
+                    "mean_latency_ms": 10.0,
+                    "sample_count": 2,
+                    "k": 5,
+                },
+            )(),
+        ),
+        patch("lean.store.base.StoreConnection") as mock_store_cls,
+        patch("lean.store.analytics.AnalyticsRepo.save_eval_run") as mock_save,
+    ):
+        mock_store_cls.return_value.close.return_value = None
+        result = runner.invoke(app, ["eval", "--dataset", str(dataset_path), "--k", "5"])
+
+    assert result.exit_code == 0, f"CLI failed: {result.output}"
+    assert "Loading curated dataset" in result.output
+    assert "Building eval dataset" not in result.output
+    mock_load.assert_called_once_with(dataset_path)
+    mock_build.assert_not_called()
+    mock_save.assert_called_once()
+    saved_config = mock_save.call_args.kwargs.get("config", {})
+    assert saved_config.get("dataset") == str(dataset_path)
+
+
+def test_cli_eval_without_dataset_flag_uses_builder(runner, monkeypatch):
+    """Without --dataset, build_eval_dataset is used (existing behavior preserved)."""
+    from lean.cli import app
+    from lean.eval.runner import EvalSample
+
+    with (
+        patch(
+            "lean.eval.runner.build_eval_dataset", return_value=[EvalSample("q", "id")]
+        ) as mock_build,
+        patch("lean.eval.runner.load_curated_dataset") as mock_load,  # must NOT be called
+        patch(
+            "lean.eval.runner.evaluate",
+            return_value=type(
+                "FakeResult",
+                (),
+                {
+                    "hit_rate": 0.0,
+                    "mrr": 0.0,
+                    "ndcg": 0.0,
+                    "recall": 0.0,
+                    "mean_latency_ms": 0.0,
+                    "sample_count": 1,
+                    "k": 5,
+                },
+            )(),
+        ),
+        patch("lean.store.base.StoreConnection") as mock_store_cls,
+        patch("lean.store.analytics.AnalyticsRepo.save_eval_run"),
+    ):
+        mock_store_cls.return_value.close.return_value = None
+        result = runner.invoke(app, ["eval", "--sample-size", "1", "--k", "5"])
+
+    assert result.exit_code == 0, f"CLI failed: {result.output}"
+    assert "Building eval dataset" in result.output
+    mock_build.assert_called_once()
+    mock_load.assert_not_called()

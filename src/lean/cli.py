@@ -389,23 +389,44 @@ def db_init() -> None:
 def eval(
     sample_size: int | None = typer.Option(None, help="Number of chunks to sample for eval"),
     k: int | None = typer.Option(None, help="Top-k for hit_rate/MRR"),
+    dataset: Path | None = typer.Option(
+        None,
+        "--dataset",
+        help="Path to a curated eval dataset JSON; overrides --sample-size.",
+    ),
 ) -> None:
-    """Run retrieval evaluation (hit_rate@k, MRR@k, NDCG@k, Recall@k)."""
+    """Run retrieval evaluation (hit_rate@k, MRR@k, NDCG@k, Recall@k).
+
+    By default, samples chunks from the corpus and uses their heading +
+    content preview as pseudo-queries (measures self-similarity, not real
+    queries). With ``--dataset <path>``, loads a curated JSON list of
+    ``{"query": str, "expected_chunk_id": str}`` entries instead. See
+    ``data/curated_eval_dataset.json`` and ``scripts/build_eval_dataset.py``.
+    """
     from lean.config.settings import get_settings
-    from lean.eval.runner import build_eval_dataset, evaluate
+    from lean.eval.runner import build_eval_dataset, evaluate, load_curated_dataset
     from lean.store.analytics import AnalyticsRepo
     from lean.store.base import StoreConnection
 
     settings = get_settings()
-    if sample_size is None:
-        sample_size = settings.eval_sample_size
     if k is None:
         k = settings.eval_k
 
     conn = StoreConnection(settings.supabase_db_url)
     try:
-        typer.echo(f"Building eval dataset ({sample_size} samples)...")
-        samples = build_eval_dataset(conn, sample_size=sample_size, seed=settings.eval_seed)
+        if dataset is not None:
+            typer.echo(f"Loading curated dataset from {dataset}...")
+            samples = load_curated_dataset(dataset)
+            typer.echo(f"Loaded {len(samples)} curated samples.")
+            config: dict[str, object] = {"k": k, "dataset": str(dataset)}
+            sample_size = len(samples)
+        else:
+            if sample_size is None:
+                sample_size = settings.eval_sample_size
+            typer.echo(f"Building eval dataset ({sample_size} samples)...")
+            samples = build_eval_dataset(conn, sample_size=sample_size, seed=settings.eval_seed)
+            config = {"sample_size": sample_size, "k": k}
+
         typer.echo(f"Running evaluation (k={k})...")
         result = evaluate(conn, samples, k=k)
 
@@ -417,7 +438,7 @@ def eval(
         typer.echo(f"  mean_latency: {result.mean_latency_ms:.0f}ms")
 
         AnalyticsRepo(conn).save_eval_run(
-            config={"sample_size": sample_size, "k": k},
+            config=config,
             hit_rate=result.hit_rate,
             mrr=result.mrr,
             ndcg=result.ndcg,

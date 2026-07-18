@@ -9,6 +9,10 @@ document describes what it actually measures — and the three things it
 
 ## What `lean eval` does
 
+There are two modes:
+
+**Default (pseudo-eval):**
+
 1. **Build an eval dataset** by sampling `eval.sample_size` chunks from
    `public.chunks` (filtered to `heading_text` longer than 5 chars).
 2. **Generate a pseudo-query** from each sampled chunk: the heading plus
@@ -19,6 +23,25 @@ document describes what it actually measures — and the three things it
    appears in the top-k.
 4. **Aggregate** hit_rate, MRR, NDCG, and Recall into `EvalResult`,
    persisted to `public.eval_runs`.
+
+**Curated (`--dataset <path>`):**
+
+```bash
+lean eval --dataset data/curated_eval_dataset.json --k 5
+```
+
+1. **Load** the JSON list of `{"query": str, "expected_chunk_id": str}`
+   entries via `runner.load_curated_dataset(path)`. Extra fields
+   (`heading`, `section`, `doc`) are silently dropped.
+2. **For each sample**: same as default — embed the query, vector_search,
+   check top-k, aggregate metrics.
+3. **Aggregate** identical to default.
+
+The curated mode uses real queries (paraphrased from chunk headings by
+`scripts/build_eval_dataset.py`) instead of self-similar pseudo-queries.
+It still calls `engine.vector_search` directly (not the full pipeline),
+but its numbers are **closer to real-world retrieval quality** because
+the query no longer matches the target chunk's own text.
 
 ---
 

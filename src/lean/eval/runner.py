@@ -3,17 +3,21 @@
 Pure Python implementations of standard IR metrics (LlamaIndex-compatible
 definitions). No LlamaIndex dependency.
 
-The eval dataset is built by sampling chunks from the corpus and using
-their heading text + content as pseudo-queries. For production eval,
-replace with a hand-curated set of (query, expected_chunk_id) pairs.
+The default eval dataset is built by sampling chunks from the corpus and using
+their heading text + content as pseudo-queries. For semi-curated eval, pass a
+JSON file of (query, expected_chunk_id) pairs to ``load_curated_dataset`` and
+run ``evaluate`` on the result — see ``data/curated_eval_dataset.json`` for the
+format and ``scripts/build_eval_dataset.py`` for the builder.
 """
 
 from __future__ import annotations
 
+import json
 import math
 import random
 import time
 from dataclasses import dataclass
+from pathlib import Path
 
 from psycopg.rows import dict_row
 
@@ -41,6 +45,63 @@ class EvalResult:
     mean_latency_ms: float
     sample_count: int
     k: int
+
+
+def load_curated_dataset(path: Path) -> list[EvalSample]:
+    """Load a curated eval dataset from a JSON file.
+
+    Each entry must be a JSON object with non-empty ``query`` (str) and
+    ``expected_chunk_id`` (str) fields. Extra fields (``heading``, ``section``,
+    ``doc``) are silently dropped — they are diagnostic context written by
+    ``scripts/build_eval_dataset.py`` and are not used by ``evaluate``.
+
+    Args:
+        path: Filesystem path to a JSON file whose root value is a list of
+            the entry shapes described above.
+
+    Returns:
+        List of ``EvalSample`` (in JSON order).
+
+    Raises:
+        FileNotFoundError: ``path`` does not exist.
+        ValueError: JSON is malformed, root is not a list, or any entry is
+            missing/has empty ``query`` or ``expected_chunk_id``, or any entry
+            is not a JSON object.
+    """
+    path = Path(path)
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        raise
+
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as e:
+        msg = f"invalid json in {path}: {e.msg} (line {e.lineno}, col {e.colno})"
+        raise ValueError(msg) from e
+
+    if not isinstance(data, list):
+        msg = (
+            f"curated dataset root must be a JSON list of objects, "
+            f"got {type(data).__name__} in {path}"
+        )
+        raise ValueError(msg)
+
+    samples: list[EvalSample] = []
+    for i, entry in enumerate(data):
+        if not isinstance(entry, dict):
+            msg = f"entry {i} in {path} must be a JSON object, got {type(entry).__name__}"
+            raise ValueError(msg)
+        query = entry.get("query")
+        if not isinstance(query, str) or not query.strip():
+            msg = f"entry {i} in {path} is missing non-empty 'query'"
+            raise ValueError(msg)
+        chunk_id = entry.get("expected_chunk_id")
+        if not isinstance(chunk_id, str) or not chunk_id.strip():
+            msg = f"entry {i} in {path} is missing non-empty 'expected_chunk_id'"
+            raise ValueError(msg)
+        samples.append(EvalSample(query=query.strip(), expected_chunk_id=chunk_id.strip()))
+    return samples
 
 
 def build_eval_dataset(

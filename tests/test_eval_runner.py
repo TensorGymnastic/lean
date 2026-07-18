@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -203,3 +205,157 @@ def test_build_eval_dataset_clamps_when_fewer_eligible_than_sample_size(monkeypa
     samples = build_eval_dataset(store, sample_size=50, seed=42)
 
     assert len(samples) == 3
+
+
+# --------------------------------------------------------------------------- #
+# load_curated_dataset
+# --------------------------------------------------------------------------- #
+
+
+def _write_json(path: Path, data: object) -> Path:
+    path.write_text(json.dumps(data), encoding="utf-8")
+    return path
+
+
+def test_load_curated_dataset_loads_valid_entries(monkeypatch_env, tmp_path):
+    """load_curated_dataset reads query+expected_chunk_id pairs from a JSON list."""
+    from lean.eval.runner import load_curated_dataset
+
+    data = [
+        {
+            "query": "What is DMAIC?",
+            "expected_chunk_id": "abc-123",
+            "heading": "DMAIC",
+            "section": "Intro > DMAIC",
+            "doc": "Lean Book",
+        },
+        {
+            "query": "What is Pareto?",
+            "expected_chunk_id": "def-456",
+        },
+    ]
+    path = _write_json(tmp_path / "dataset.json", data)
+
+    samples = load_curated_dataset(path)
+
+    assert len(samples) == 2
+    assert samples[0].query == "What is DMAIC?"
+    assert samples[0].expected_chunk_id == "abc-123"
+    assert samples[1].query == "What is Pareto?"
+    assert samples[1].expected_chunk_id == "def-456"
+
+
+def test_load_curated_dataset_ignores_extra_fields(monkeypatch_env, tmp_path):
+    """Extra fields (heading/section/doc) are silently dropped — only query+id are kept."""
+    from lean.eval.runner import EvalSample, load_curated_dataset
+
+    data = [
+        {
+            "query": "q1",
+            "expected_chunk_id": "id-1",
+            "heading": "h",
+            "section": "s",
+            "doc": "d",
+            "unexpected_field": "should_not_appear",
+        }
+    ]
+    path = _write_json(tmp_path / "dataset.json", data)
+
+    samples = load_curated_dataset(path)
+
+    assert samples == [EvalSample(query="q1", expected_chunk_id="id-1")]
+
+
+def test_load_curated_dataset_returns_empty_for_empty_list(monkeypatch_env, tmp_path):
+    """Empty JSON list yields empty sample list (no error)."""
+    from lean.eval.runner import load_curated_dataset
+
+    path = _write_json(tmp_path / "empty.json", [])
+
+    samples = load_curated_dataset(path)
+
+    assert samples == []
+
+
+def test_load_curated_dataset_raises_on_missing_file(monkeypatch_env, tmp_path):
+    """Missing path raises FileNotFoundError (not silently swallowed)."""
+    from lean.eval.runner import load_curated_dataset
+
+    with pytest.raises(FileNotFoundError):
+        load_curated_dataset(tmp_path / "nonexistent.json")
+
+
+def test_load_curated_dataset_raises_on_invalid_json(monkeypatch_env, tmp_path):
+    """Malformed JSON raises ValueError (wrapping the JSONDecodeError)."""
+    from lean.eval.runner import load_curated_dataset
+
+    path = tmp_path / "bad.json"
+    path.write_text("{not json", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="invalid json"):
+        load_curated_dataset(path)
+
+
+def test_load_curated_dataset_rejects_non_list_root(monkeypatch_env, tmp_path):
+    """Root JSON value must be a list — dicts or scalars are rejected."""
+    from lean.eval.runner import load_curated_dataset
+
+    path = _write_json(tmp_path / "dict.json", {"query": "x", "expected_chunk_id": "y"})
+
+    with pytest.raises(ValueError, match="must be a JSON list"):
+        load_curated_dataset(path)
+
+
+def test_load_curated_dataset_rejects_entry_missing_query(monkeypatch_env, tmp_path):
+    """Entry missing 'query' raises ValueError with location info."""
+    from lean.eval.runner import load_curated_dataset
+
+    data = [{"expected_chunk_id": "id-1"}]
+    path = _write_json(tmp_path / "dataset.json", data)
+
+    with pytest.raises(ValueError, match="query"):
+        load_curated_dataset(path)
+
+
+def test_load_curated_dataset_rejects_entry_missing_expected_chunk_id(monkeypatch_env, tmp_path):
+    """Entry missing 'expected_chunk_id' raises ValueError with location info."""
+    from lean.eval.runner import load_curated_dataset
+
+    data = [{"query": "q1"}]
+    path = _write_json(tmp_path / "dataset.json", data)
+
+    with pytest.raises(ValueError, match="expected_chunk_id"):
+        load_curated_dataset(path)
+
+
+def test_load_curated_dataset_rejects_entry_with_empty_query(monkeypatch_env, tmp_path):
+    """Empty/whitespace query is invalid (would embed garbage)."""
+    from lean.eval.runner import load_curated_dataset
+
+    data = [{"query": "  ", "expected_chunk_id": "id-1"}]
+    path = _write_json(tmp_path / "dataset.json", data)
+
+    with pytest.raises(ValueError, match="query"):
+        load_curated_dataset(path)
+
+
+def test_load_curated_dataset_rejects_entry_with_empty_expected_chunk_id(monkeypatch_env, tmp_path):
+    """Empty expected_chunk_id is invalid."""
+    from lean.eval.runner import load_curated_dataset
+
+    data = [{"query": "q1", "expected_chunk_id": ""}]
+    path = _write_json(tmp_path / "dataset.json", data)
+
+    with pytest.raises(ValueError, match="expected_chunk_id"):
+        load_curated_dataset(path)
+
+
+def test_load_curated_dataset_rejects_non_dict_entry(monkeypatch_env, tmp_path):
+    """A non-object entry (string, number) is rejected with a clear error."""
+    from lean.eval.runner import load_curated_dataset
+
+    data = ["not an object", 42]
+    path = _write_json(tmp_path / "dataset.json", data)
+
+    with pytest.raises(ValueError, match="entry.*must be"):
+        load_curated_dataset(path)

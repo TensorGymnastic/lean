@@ -51,11 +51,20 @@ changes the SHA, so a `lean reingest` after the edit creates a **new
 
 ### `lean eval` is pseudo-eval
 
-The eval dataset is built from heading + content preview, so the query
-is derived from the answer. It measures self-similarity, not real user
-queries. **Eval numbers are not comparable to external benchmarks.**
+By default, the eval dataset is built from heading + content preview, so
+the query is derived from the answer. It measures self-similarity, not
+real user queries. **Default eval numbers are not comparable to external
+benchmarks.**
 
-`lean eval` also bypasses the full search pipeline — it calls
+Pass `--dataset <path>` to a JSON list of `{"query": str,
+"expected_chunk_id": str}` pairs (see
+[`data/curated_eval_dataset.json`](../data/curated_eval_dataset.json) or
+`scripts/build_eval_dataset.py`) to run evaluation against real queries
+instead. Curated datasets still bypass the full search pipeline (see
+below) unless the eval is rerouted through `services.search.search()` —
+that is left as a project-specific caller concern.
+
+`lean eval` (in either mode) bypasses the full search pipeline — it calls
 `engine.vector_search` directly (no BM25, no RRF, no rerank, no
 postprocessors). It does not measure what `lean search` returns.
 
