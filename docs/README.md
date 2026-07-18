@@ -19,6 +19,17 @@ doesn't fit in a quick-start.
 - [`ocr-server-deployment.md`](ocr-server-deployment.md) — GPU host setup for
   `baidu/Unlimited-OCR` + Ollama embedding model (already exists)
 
+## Library cards
+
+Lean per-library reference (distilled from official docs, oriented toward
+how lean actually uses each library):
+
+- [`libraries/fastmcp.md`](libraries/fastmcp.md) — MCP server framework
+- [`libraries/pgvector.md`](libraries/pgvector.md) — vector similarity search
+- [`libraries/pydantic-settings.md`](libraries/pydantic-settings.md) — config from `.env` + YAML
+- [`libraries/fastapi.md`](libraries/fastapi.md) — REST transport + bearer auth
+- [`libraries/supabase.md`](libraries/supabase.md) — local Docker stack + migrations
+
 ## Decisions
 
 - [`decisions/`](decisions/) — Architecture Decision Records (ADRs) for
