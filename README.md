@@ -149,7 +149,7 @@ curl -H "Authorization: Bearer $LEAN_MCP_API_KEY" \
      "http://localhost:8766/search?query=What+is+DMAIC%3F&k=5"
 ```
 
-Endpoints (7/8 MCP tools — `reingest` is CLI-only; see [`docs/limitations.md`](docs/limitations.md#rest-api-now-mirrors-7-of-8-mcp-tools)):
+Endpoints (7/8 MCP tools — `reingest` is CLI-only; see [`docs/limitations.md`](docs/limitations.md#rest-api-now-mirrors-7-of-8-mcp-tools-near-full-parity)):
 
 | Endpoint | MCP equivalent |
 |---|---|
