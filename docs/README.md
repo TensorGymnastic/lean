@@ -14,10 +14,12 @@ doesn't fit in a quick-start.
   non-determinism caveat
 - [`architecture.md`](architecture.md) — retrieval pipeline, directory layout,
   transport tier pattern
-- [`limitations.md`](limitations.md) — known caveats (page fields NULL, eval
-  pseudo-queries, dedup orphans)
+- [`limitations.md`](limitations.md) — known caveats (page fields on remote
+  path, eval pseudo-queries, SHA-256 dedup orphans, REST near-full mirror)
+- [`marker-server-deployment.md`](marker-server-deployment.md) — GPU host
+  setup for the marker-pdf HTTP extraction server (primary extraction path)
 - [`ocr-server-deployment.md`](ocr-server-deployment.md) — GPU host setup for
-  `baidu/Unlimited-OCR` + Ollama embedding model (already exists)
+  `baidu/Unlimited-OCR` + Ollama embedding model
 
 ## Library cards
 

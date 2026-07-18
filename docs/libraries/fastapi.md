@@ -1,7 +1,8 @@
 # FastAPI
 
-Lean's REST transport — a thin mirror of the MCP tools (5 of 8 endpoints;
-see [`limitations.md`](../limitations.md#rest-api-is-a-partial-mirror-not-full-parity)).
+Lean's REST transport — a near-full mirror of the MCP tools (7 of 8
+endpoints; `reingest` is CLI-only — see
+[`limitations.md`](../limitations.md#rest-api-now-mirrors-7-of-8-mcp-tools-near-full-parity)).
 
 ## What lean uses
 
@@ -28,7 +29,11 @@ async def _verify_token(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid token")
 
 @app.get("/search", dependencies=[Depends(_verify_token)])
-async def search(query: str, k: int = 5) -> list[dict]:
+async def search(
+    query: str,
+    k: int = 5,
+    chunk_type: str | None = None,
+) -> list[dict]:
     ...
 ```
 
@@ -64,7 +69,10 @@ Without these, domain errors return 500. Lean maps: `ValueError` → 400,
 
 - **Path vs query params:** lean uses `query` and `k` as query params
   on `GET /search`. For ingestion, `POST /ingest` uses `path` as a
-  query param (not JSON body) — non-obvious, see
+  query param (not JSON body) — non-obvious. **Security note:** URLs
+  are logged by reverse proxies / ALBs / browser history, so `path`
+  may leak source PDF filenames (which can carry PII) into access logs.
+  A breaking change to a JSON body model is on the roadmap. See
   [`limitations.md`](../limitations.md).
 - **Sync services:** FastAPI runs sync route handlers in a thread pool,
   but lean wraps anyway with `anyio.to_thread.run_sync` for explicit

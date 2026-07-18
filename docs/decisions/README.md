@@ -18,7 +18,7 @@ relevant guide pages — use them as reference, not as authoritative decisions._
 | `ivfflat` post-bulk-ingest `REINDEX` | [`operations.md` §post-ingest-reindex](../operations.md#post-ingest-reindex) |
 | Contextual Retrieval irreversibility | [`limitations.md` §contextual-retrieval-is-irreversible](../limitations.md#contextual-retrieval-is-irreversible) |
 | Pseudo-eval methodology | [`evaluation.md`](../evaluation.md) |
-| REST API as partial mirror | [`limitations.md` §rest-api-is-a-partial-mirror](../limitations.md#rest-api-is-a-partial-mirror-not-full-parity) |
+| REST API as near-full mirror (7/8) | [`limitations.md` §rest-api-now-mirrors-7-of-8-mcp-tools](../limitations.md#rest-api-now-mirrors-7-of-8-mcp-tools-near-full-parity) |
 | Dedup by SHA-256 | [`operations.md` §reingest-semantics](../operations.md#reingest-semantics) + [`limitations.md` §dedup](../limitations.md#dedup-is-by-sha-256-not-by-path) |
 
 If a future decision is **expensive to reverse**, write it as an ADR below

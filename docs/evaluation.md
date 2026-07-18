@@ -2,8 +2,8 @@
 
 `lean eval` computes hit_rate@k, MRR@k, NDCG@k, and Recall@k against the
 ingested corpus. The implementation is in `src/lean/eval/runner.py`. This
-document describes what it actually measures — and the three things it
-**doesn't** measure that are easy to misread from the metrics.
+document describes what it actually measures — and what it **doesn't**
+measure that is easy to misread from the metrics.
 
 ---
 
@@ -155,7 +155,7 @@ pipeline.
 
 ## Persisted eval results
 
-Eval results are written to `public.eval_runs` (`mean_latency_ms`,
+Eval results are written to `public.eval_runs` (`hit_rate`, `mean_latency_ms`,
 `sample_count`, `k`, `mrr`, `ndcg`, `recall`, `created_at`). The CLI
 prints the latest run; trend analysis requires direct SQL:
 

@@ -60,13 +60,16 @@ deadlock, exhausted DB pool) still passes.
 ## `lean health`
 
 `make health` (alias: `make smoke`) runs `lean health`, which checks
-OCR server, database, and Ollama.
+OCR server, database, and Ollama. It prints `[OK]` / `[--]` / `[FAIL]`
+per component and **exits with code 1** if any component reports
+`status: "error"` (see `src/lean/cli.py` `health` command). Safe to use
+as a CI gate or Docker `HEALTHCHECK` precondition.
 
-**`lean health` always exits 0**, even when all three checks fail. It
-echoes `[FAIL]` per-component but never raises `typer.Exit(1)`. **Do not
-use `lean health` as a CI gate** — it will silently pass on a broken
-deployment. Wrap it with explicit grep or parse the output if you need
-a real exit code.
+Note: the per-component check only verifies connectivity/HTTP 200, not
+full pipeline correctness. A hung server (event-loop deadlock, exhausted
+DB pool) with an open port still passes. See
+[`limitations.md`](limitations.md#lean-health-exits-1-on-component-failure)
+for the full caveat.
 
 ---
 
@@ -100,8 +103,9 @@ Ingest dedups by SHA-256 of the source PDF bytes. The behavior:
 | New path, any bytes | New document |
 | `lean reingest <doc_id>` | Re-reads `source_path` from the existing row; if bytes have changed, new `document_id`, old doc becomes orphan |
 
-**To delete an orphan:** `lean delete <old_doc_id>`. Use
-`lean corpus-stats` to find orphans after a content edit.
+**To delete an orphan:** `lean delete <old_doc_id>`. To surface duplicate
+images across the corpus (a diagnostic for cleanup prioritization), use
+`lean corpus-stats` — the response includes `duplicate_image_hashes`.
 
 This is intentional (per `src/lean/store/documents.py:upsert_document`).
 Content-addressable dedup is the source of truth; the path is incidental.

@@ -95,7 +95,7 @@ All commands support `--json` for structured output. Use `-v` / `--verbose` for 
 | `lean delete <doc_id>` | Delete a document and all its chunks |
 | `lean reingest <doc_id>` | Re-extract a document with current settings |
 | `lean reingest-all` | Batch reingest all documents (`--force` to re-extract OCR'd docs) |
-| `lean eval` | Run retrieval evaluation (`--sample-size`, `--k`) |
+| `lean eval` | Run retrieval evaluation (`--sample-size`, `--k`, `--dataset <path>` for curated queries) |
 | `lean health` | Check marker server, OCR server, database, and Ollama connectivity |
 | `lean mcp-serve` | Start the MCP server (`--transport stdio\|http`, `--port`) |
 | `lean api-serve` | Start the FastAPI REST API server (`--reload` for dev) |
@@ -171,7 +171,7 @@ Domain errors map to HTTP codes: `ValueError` → 400, `PermissionError` → 403
 - **[`docs/configuration.md`](docs/configuration.md)** — every `Settings` field, defaults, validators, gotchas
 - **[`docs/operations.md`](docs/operations.md)** — Docker ports, healthcheck semantics, post-ingest reindex, reingest semantics
 - **[`docs/architecture.md`](docs/architecture.md)** — pipeline, directory layout, transport tier pattern
-- **[`docs/limitations.md`](docs/limitations.md)** — known caveats (page fields NULL, eval pseudo-queries, dedup orphans, REST near-full mirror)
+- **[`docs/limitations.md`](docs/limitations.md)** — known caveats (page fields on remote path, eval pseudo-queries, SHA-256 dedup orphans, REST near-full mirror)
 - **[`docs/decisions/`](docs/decisions/)** — Architecture Decision Records
 - **[`AGENTS.md`](AGENTS.md)** — operational rules for agents
 

@@ -98,7 +98,7 @@ src/lean/
 │   ├── search.py            # search (orchestrates the pipeline above)
 │   └── corpus.py            # list, get, delete, stats
 ├── mcp_server/              # MCP transport (8 tools, 4 resources, 3 prompts)
-├── api/routes.py            # FastAPI REST mirror (partial — see operations.md)
+├── api/routes.py            # FastAPI REST mirror (7/8 endpoints — see limitations.md)
 ├── auth/bearer.py           # ASGI bearer-token middleware
 ├── cli.py                   # Typer CLI (full parity with MCP tools)
 └── eval/runner.py           # retrieval evaluation (see evaluation.md)
@@ -166,12 +166,12 @@ chunks ──────┴── document_id (FK cascade)
               ├── chunk_index >= 0, token_count > 0 (CHECK)
               ├── chunk_type IN ('text','image') (CHECK — migration 012)
               ├── section_path, heading_text
-              ├── page_start, page_end  (currently always NULL — see limitations.md)
+              ├── page_start, page_end  (populated by _enrich_chunks_with_block_meta on local marker path; NULL on remote marker path — see limitations.md)
               ├── content (text)
               ├── embedding vector(N) — ivfflat index, lists=100
               ├── image_meta (jsonb, image chunks only)
-              ├── bbox (jsonb, always NULL — wiring pending)
-              ├── image_hash (text, written but not yet used in WHERE)
+              ├── bbox (jsonb, populated on local marker path; NULL on remote)
+              ├── image_hash (text, surfaced via corpus_stats find_duplicate_image_hashes)
               └── provenance: provenance_model, embedding_model, embedding_dim
 
 query_logs   ─── query_text, k > 0, filters, hit_chunk_ids, latency_ms >= 0

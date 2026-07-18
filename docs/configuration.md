@@ -104,7 +104,7 @@ success**. Watch `IngestResult.warnings` or `extraction_method` to detect this.
 | `fetch_multiplier` | `8` | `fetch_k = max(k * fetch_multiplier, fetch_k_floor)`, then clamped by `fetch_k_cap` |
 | `fetch_k_floor` | `40` | Minimum candidate set even when `k` is small |
 | `rrf_k` | `60` | Reciprocal Rank Fusion constant. Validated `> 0`. |
-| `rerank.enabled` | `true` (this repo's `config.yaml`) / `False` (Python default) | **Drift:** module docstring says "disabled by default"; actual config enables it |
+| `rerank.enabled` | `true` (this repo's `config.yaml`) / `False` (Python default) | Python-side default is off; this repo's `config.yaml` sets `true`. Module docstring documents both. |
 | `rerank.model` | `cross-encoder/ms-marco-MiniLM-L-6-v2` | Cross-encoder model |
 | `rerank.model_revision` | `c5ee24cb16019beea0893ab7796b1df96625c6b8` | Pinned SHA for reproducibility |
 | `rerank.top_n` | `5` | Top N after rerank. If `top_k > rerank.top_n`, rerank discards candidates the user asked for. |
@@ -115,7 +115,7 @@ success**. Watch `IngestResult.warnings` or `extraction_method` to detect this.
 |---|---|---|
 | `sample_size` | `50` | Chunks to sample. Validated `> 0`. |
 | `k` | `5` | Top-k for hit_rate / MRR / NDCG / Recall |
-| `seed` | `42` | **Only the post-fetch Python shuffle is seeded.** SQL `ORDER BY random()` is unseeded → each run samples different chunks. See [`evaluation.md`](evaluation.md). |
+| `seed` | `42` | Seeds the Python `random.Random(seed).sample(rows, n)` call that selects chunks — stable across Postgres versions and platforms. See [`evaluation.md`](evaluation.md#sampling-determinism-resolved). |
 
 ### `transport`
 
@@ -175,7 +175,7 @@ described by a VLM at ingest time. Descriptions are embedded and stored as
 | `enabled` | `false` | Master switch. When false, images are captured but not described. |
 | `base_url` | `""` | Required when enabled. e.g. `http://gpu:11434/v1` (Ollama), `https://api.minimax.io/v1` |
 | `model` | `""` | Required when enabled. e.g. `gemma3:27b`, `qwen2.5-vl:7b`, `MiniMax-M3` |
-| `api_key` | `""` | From `.env` (`LEAN_VLM_API_KEY`). Empty for local Ollama/vLLM. |
+| `api_key` | `""` | From `.env` (`VLM_API_KEY`). Empty for local Ollama/vLLM. |
 | `detail` | `default` | Image resolution tier: `low`, `default`, or `high`. Higher = better quality, more tokens. |
 | `timeout_s` | `120.0` | VLM HTTP timeout (first model load can be slow) |
 | `max_concurrency` | `4` | Concurrency cap for parallel VLM image description (enforced via `anyio.Semaphore` in `services/ingestion.py:155`). Validated `>= 1`. |

@@ -42,7 +42,7 @@ EOF
 Both run as systemd services on the GPU host:
 
 ```bash
-# OCR server (port 8000)
+# OCR server (port 8001)
 sudo systemctl status ocr-serve
 
 # Ollama (port 11434)

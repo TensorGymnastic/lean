@@ -60,12 +60,10 @@ Pass `--dataset <path>` to a JSON list of `{"query": str,
 "expected_chunk_id": str}` pairs (see
 [`data/curated_eval_dataset.json`](../data/curated_eval_dataset.json) or
 `scripts/build_eval_dataset.py`) to run evaluation against real queries
-instead. Curated datasets still bypass the full search pipeline (see
-below) unless the eval is rerouted through `services.search.search()` —
-that is left as a project-specific caller concern.
-
-`lean eval` (in either mode) bypasses the full search pipeline — it calls
-`engine.vector_search` directly (no BM25, no RRF, no rerank, no
+instead. Curated datasets are closer to real-world retrieval quality
+because the query no longer matches the target chunk's own text — but
+`lean eval` (in either mode) bypasses the full search pipeline,
+calling `engine.vector_search` directly (no BM25, no RRF, no rerank, no
 postprocessors). It does not measure what `lean search` returns.
 
 See [`evaluation.md`](evaluation.md) for the full methodology.
