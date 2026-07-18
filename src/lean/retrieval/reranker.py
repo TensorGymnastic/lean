@@ -4,7 +4,10 @@ Retrieves top-N candidates via vector/BM25 search, then re-sorts them
 using a cross-encoder that jointly attends to (query, document) pairs.
 This dramatically improves top-3 precision.
 
-Disabled by default. Enable via ``settings.rerank_enabled = True``.
+Default is OFF (Python-side). Enabled by this repo's ``config.yaml``
+(``retrieval.rerank.enabled: true``). To toggle, edit
+``src/lean/config/config.yaml`` or set ``LEAN_RERANK_ENABLED=true`` in
+``.env``.
 """
 
 from __future__ import annotations
