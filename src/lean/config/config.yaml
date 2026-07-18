@@ -85,5 +85,5 @@ vlm:
   detail: default
   timeout_s: 120.0
   max_concurrency: 4
-  max_tokens: 1000                       # M3 disable_thinking → ~400 tokens clean JSON, no waste
+  max_tokens: 4096                       # M3 output budget — no thinking waste, all useful content
   disable_thinking: true                 # M3 properly suppresses reasoning (unlike Ollama Qwen3.5)
