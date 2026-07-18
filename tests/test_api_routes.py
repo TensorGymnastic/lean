@@ -72,6 +72,34 @@ def test_search_with_valid_token_returns_results(client, auth_headers):
     assert "DMAIC" in data[0]["content"]
 
 
+def test_search_forwards_chunk_type_filter(client, auth_headers):
+    """REST /search must forward chunk_type to the service layer (parity with MCP/CLI)."""
+    from lean.models.schemas import Chunk
+
+    fake_chunks = [
+        Chunk(
+            id="00000000-0000-0000-0000-000000000001",
+            document_id="00000000-0000-0000-0000-000000000002",
+            chunk_index=0,
+            section_path="Images",
+            heading_text="Pareto chart",
+            token_count=50,
+            content="A Pareto chart of defects.",
+            score=0.9,
+        )
+    ]
+    with patch("lean.api.routes._search", return_value=fake_chunks) as mock_search:
+        response = client.get(
+            "/search",
+            params={"query": "Pareto", "chunk_type": "image"},
+            headers=auth_headers,
+        )
+    assert response.status_code == 200
+    assert mock_search.call_count == 1
+    _, kwargs = mock_search.call_args
+    assert kwargs.get("chunk_type") == "image"
+
+
 def test_documents_with_valid_token(client, auth_headers):
     from datetime import datetime
 

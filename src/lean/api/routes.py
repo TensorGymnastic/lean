@@ -84,6 +84,7 @@ async def search(
     year_min: int | None = None,
     year_max: int | None = None,
     min_score: float | None = None,
+    chunk_type: str | None = None,
 ) -> list[dict[str, Any]]:
     chunks = await anyio.to_thread.run_sync(
         lambda: _search(
@@ -95,6 +96,7 @@ async def search(
             year_min=year_min,
             year_max=year_max,
             min_score=min_score,
+            chunk_type=chunk_type,
         )
     )
     return [c.model_dump(mode="json") for c in chunks]
