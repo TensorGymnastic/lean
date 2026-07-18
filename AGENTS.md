@@ -124,20 +124,21 @@ tool, update the corresponding doc page in the same commit. Run
 
 Documented honestly so future agents don't re-derive. Items here are **accepted**, not blocking. Last verified 2026-07-18 against source.
 
-1. **`page_start` / `page_end` are hardcoded `None`** at `services/ingestion.py:231-232` (text chunks) and `:251-252` (image chunks). **Research complete** — marker's `ChunkRenderer` produces `FlatBlockOutput` with `page: int` per block. Implementation path documented in `docs/marker-integration-research.md`. Estimated 1-1.5 days to wire through chunker.
-2. **`bbox` column is wired through but always NULL**. **Research complete** — marker's `FlatBlockOutput.bbox: List[float]` provides `[x0, y0, x1, y1]` per block. Same implementation path as item 1. `ChunkRenderer` confirmed available in installed marker version.
+All previously-listed structural debt items have been resolved. The Known Structural Debt list is currently **empty** — see the FIXED section below for the full history of what was addressed.
 
 **Previously listed and since FIXED (do not re-litigate):**
+- `page_start` / `page_end` were always NULL → wired via `_enrich_chunks_with_block_meta` in `services/ingestion.py`; marker's `ChunkRenderer` provides per-block page numbers, enrichment matches chunks to blocks by word overlap. Local path only (remote returns empty block_metas until server is updated).
+- `bbox` column was always NULL → same enrichment path as page_start/page_end; marker's `FlatBlockOutput.bbox` provides `[x0, y0, x1, y1]` per block, stored as JSONB dict.
 - `ingest_pdf` was a 244-LOC god function → split into `_describe_one_image` (40 LOC) + `_describe_images` (47 LOC) + `_build_chunk_rows` (52 LOC) + `_persist_ingest` (48 LOC); `ingest_pdf` is now 130 LOC orchestration.
 - `search` was a 188-LOC function mixing orchestration + business logic → split into `_validate_search_inputs` + `_expand_queries` + `_compute_fetch_k` + `_vector_fetch` + `_hybrid_fetch` + `_fetch_one_query` + `_rerank_hits` + `_postprocess_hits` + `SearchRequest` dataclass; `search` is now 99 LOC orchestration.
 - REST API was a partial mirror (5/8 endpoints) → now 7/8 parity; added `GET /chunks/{id}`, `GET /documents/{id}/markdown`, `DELETE /documents/{id}`. `reingest` intentionally CLI-only.
-- `image_hash` dedup query didn't exist → `ChunkRepo.find_duplicate_image_hashes()` diagnostic method added; surfaces duplicate images for future VLM-skip optimization.
-- Transaction boundary split → fixed by single-transaction pattern at `services/ingestion.py:204-271` (`commit=False` + final `conn.conn.commit()`).
-- `vlm_max_concurrency` unused → wired via `anyio.Semaphore(settings.vlm_max_concurrency)` at `services/ingestion.py:155`.
+- `image_hash` dedup query didn't exist → `ChunkRepo.find_duplicate_image_hashes()` diagnostic method added.
+- Transaction boundary split → fixed by single-transaction pattern at `services/ingestion.py:204-271`.
+- `vlm_max_concurrency` unused → wired via `anyio.Semaphore(settings.vlm_max_concurrency)`.
 - Postgres bound to `0.0.0.0:54322` → bound to `127.0.0.1:54322:5432` at `docker-compose.yml:5`.
-- `chunk_type` had no CHECK constraint → added in `db/schemas/012_add_chunk_type_check.sql`; app-side validation at `services/search.py:24` (`VALID_CHUNK_TYPES`).
-- `marker_server.py` lived in `/tmp/` → vendored at `scripts/marker_server.py`; deployment guide at `docs/marker-server-deployment.md`.
-- `_extract_local` / `_get_converter` 0% coverage → covered by mock-module injection tests in `tests/test_marker_converter.py`. Coverage of `marker_converter.py`: 88% → 98%.
+- `chunk_type` had no CHECK constraint → added in `db/schemas/012_add_chunk_type_check.sql`.
+- `marker_server.py` lived in `/tmp/` → vendored at `scripts/marker_server.py`.
+- `_extract_local` / `_get_converter` 0% coverage → covered by mock-module injection tests. Coverage of `marker_converter.py`: 88% → 98%.
 - `executemany` for chunk inserts could hit the 65535-param Postgres limit → batched at `_INSERT_BATCH_SIZE = 1000` in `store/chunks.py`.
 - `vlm_provider` field was dead config → removed from `settings.py`, `config.yaml` examples, and `docs/configuration.md` table.
 

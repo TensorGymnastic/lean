@@ -8,18 +8,15 @@ the inline code comments.
 
 ## Data correctness
 
-### `chunks.page_start` / `chunks.page_end` are always NULL
+### `chunks.page_start` / `chunks.page_end`
 
-The columns exist in the schema (`db/schemas/003_chunks.sql:10-11`) and
-the MCP resource `lean://documents/{id}/chunks` exposes them. **Ingestion
-hardcodes both to `None`** for text chunks at
-`src/lean/services/ingestion.py:231-232` and for image chunks at
-`src/lean/services/ingestion.py:251-252`. The chunker does not currently
-track which chunks came from which pages.
-
-If you need page-anchored citation, this needs implementation work
-(upstream marker/OCR would need to return page boundaries, and the
-chunker would need to preserve them).
+Populated by `_enrich_chunks_with_block_meta` in `services/ingestion.py` when
+marker's local extraction path is used. The enrichment matches chunks to
+marker blocks by word overlap and derives page numbers from
+`FlatBlockOutput.page`. The **remote marker server path returns empty
+block_metas** (the server hasn't been updated to return structured block data
+yet), so page fields will be NULL for remote-extracted documents until
+`scripts/marker_server.py` is updated and redeployed.
 
 ### Contextual Retrieval is irreversible
 
