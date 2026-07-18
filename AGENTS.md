@@ -27,7 +27,8 @@ Supabase pgvector, and exposes the corpus via fastmcp tools/resources/prompts.
 - `src/lean/cli.py` — Typer CLI (full parity with MCP tools)
 - `src/lean/eval/` — retrieval evaluation harness (hit_rate@k, MRR@k)
 - `db/schemas/` — SQL migrations (001-007)
-- `scripts/` — canonical-queries.json (eval fixture)
+- `scripts/` — canonical-queries.json (eval fixture) + `docs_lint.py` (drift detector)
+- `docs/` — reference docs (configuration, operations, architecture, evaluation, limitations, decisions)
 
 ## Engineering Rules
 
@@ -55,11 +56,27 @@ Supabase pgvector, and exposes the corpus via fastmcp tools/resources/prompts.
 - `make verify` — ruff + mypy + pytest (unit only, excludes integration/slow/e2e)
   + coverage gate at 80%
 - `make verify-all` — all tests
-- 148 unit tests + integration tests + e2e tests
+- `uv run python scripts/docs_lint.py` — detects drift between
+  `config.yaml` / CLI commands / MCP tools and `docs/` + `README.md`
+- 206 unit tests + integration tests + e2e tests (coverage 82.35%)
 - Integration tests need `SUPABASE_DB_URL` env var set
 - E2E tests need full stack running (Supabase + OCR server + models)
 - CI: 3 jobs (verify matrix Python 3.12+3.13, security pip-audit+trivy+CodeQL,
   integration with Postgres service container)
+
+## Documentation
+
+- `README.md` — onboarding entry point (~170 lines)
+- `docs/configuration.md` — every `Settings` field, defaults, validators
+- `docs/operations.md` — Docker, healthcheck, post-ingest reindex, reingest semantics
+- `docs/architecture.md` — pipeline + directory layout + transport tier pattern
+- `docs/evaluation.md` — `lean eval` methodology + caveats
+- `docs/limitations.md` — known caveats (page fields NULL, eval pseudo-queries, etc.)
+- `docs/decisions/` — ADR scaffolding (write new ADRs here when needed)
+
+**Rule:** if you add a field to `config.yaml`, a CLI command, or an MCP
+tool, update the corresponding doc page in the same commit. Run
+`scripts/docs_lint.py` before pushing to catch drift.
 
 ## Key Decisions
 
