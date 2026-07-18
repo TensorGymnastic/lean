@@ -277,6 +277,9 @@ chunking:
   overlap: 50
 retrieval:
   top_k: 5
+  max_k: 100                # hard ceiling on user-supplied k (DoS prevention)
+  max_query_len: 2000       # reject queries longer than this (DoS prevention)
+  fetch_k_cap: 500          # hard ceiling on fetch_k regardless of multiplier
   hybrid_search: true
   fetch_multiplier: 8
   fetch_k_floor: 40         # minimum candidate set size
@@ -292,6 +295,7 @@ storage:
   source_prefix: "sources/"
   markdown_prefix: "markdown/"
   corpus_root: "data"        # ingest paths must be within this directory (security)
+  max_pdf_mb: 200           # reject PDFs larger than this (resource exhaustion prevention)
 health:
   http_timeout: 10
 logging:

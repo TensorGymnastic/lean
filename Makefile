@@ -1,6 +1,6 @@
 .PHONY: install hooks-install format format-check lint typecheck test verify \
         verify-all db-init db-reset health ingest-all ingest-one search \
-        mcp-serve mcp-serve-http api-serve smoke build up down
+        mcp-serve mcp-serve-http api-serve build up down clean
 
 install:
 	uv sync --all-groups
@@ -57,8 +57,7 @@ mcp-serve-http:
 api-serve:
 	uv run lean api-serve
 
-smoke:
-	uv run lean health
+smoke: health
 
 build:
 	docker compose build
@@ -68,3 +67,7 @@ up:
 
 down:
 	docker compose down
+
+clean:
+	rm -rf .mypy_cache .pytest_cache .ruff_cache .coverage htmlcov
+	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true

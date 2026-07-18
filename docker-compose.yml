@@ -31,7 +31,7 @@ services:
     security_opt:
       - no-new-privileges:true
     healthcheck:
-      test: ["CMD-SHELL", "python3 -c 'import socket; s=socket.create_connection((\"127.0.0.1\",8765),timeout=5); s.close()' || exit 1"]
+      test: ["CMD-SHELL", "/app/.venv/bin/python -c 'import socket; s=socket.create_connection((\"127.0.0.1\",8765),timeout=5); s.close()' || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
