@@ -197,6 +197,18 @@ context, effort, and acceptance criteria.
   coverage (currently 85%; mostly `db_init` happy path and a handful
   of error edge cases remaining).
 
+## Closed in this session
+
+- **BLG-004 (2026-07-19) ✅** — M10: split `services/ingestion.py:ingest_pdf` per
+  AGENTS.md:77 SOLID-S roadmap. Extracted 5 module-private helpers
+  (`_validate_pdf_path`, `_extract_markdown`, `_chunk_sections`,
+  `_maybe_contextualize`, `_embed_chunks`); `ingest_pdf` reduced to a
+  34-line orchestrator. Five companion tests added to
+  `tests/test_services_ingestion.py`; the 12 pre-existing tests
+  continue to pass. `make verify`: 349 passed, 59 deselected,
+  91.80% coverage. Commit `b19ed8e`.
+
+
 Last reconciled against `master` HEAD `2420b58` during BLG-001.
 
 **Audit follow-ups (2026-07-19):** the architecture validation at
