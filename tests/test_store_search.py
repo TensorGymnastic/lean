@@ -297,3 +297,73 @@ class TestMetadataFiltersCombined:
             year_max=None,
         )
         assert join == ""
+
+
+class TestMetadataFiltersChunkType:
+    """chunk_type filter: chunks-table only, no documents join needed."""
+
+    def test_chunk_type_image_no_join(self, engine: SearchEngine) -> None:
+        """chunk_type=image adds a WHERE-clause but no documents join."""
+        join, conditions, params = engine._build_metadata_filters(
+            doc_id=None,
+            section_substring=None,
+            author=None,
+            year_min=None,
+            year_max=None,
+            chunk_type="image",
+        )
+        assert join == ""
+        assert any("c.chunk_type" in c for c in conditions)
+        assert "image" in params
+
+    def test_chunk_type_text_with_author_combines(self, engine: SearchEngine) -> None:
+        """chunk_type combines with author filter (which triggers the join)."""
+        join, conditions, params = engine._build_metadata_filters(
+            doc_id=None,
+            section_substring=None,
+            author="Smith",
+            year_min=None,
+            year_max=None,
+            chunk_type="text",
+        )
+        assert "join public.documents" in join
+        assert len(conditions) == 4
+        assert "text" in params
+
+    def test_chunk_type_none_omits_condition(self, engine: SearchEngine) -> None:
+        """None chunk_type means 'both text and image' — no WHERE added."""
+        join, conditions, params = engine._build_metadata_filters(
+            doc_id=None,
+            section_substring=None,
+            author=None,
+            year_min=None,
+            year_max=None,
+            chunk_type=None,
+        )
+        assert len(conditions) == 2
+        assert not any("c.chunk_type" in c for c in conditions)
+        assert all(p is None for p in params)
+
+
+class TestRRFRankBoundaries:
+    """RRF correctness at rank boundaries."""
+
+    def test_high_rank_chunk_appears_in_top_k(self, engine: SearchEngine) -> None:
+        """A chunk at rank 0 in BOTH lists beats all single-list competitors."""
+        rrf_k = 60
+        bm25 = [_hit("v0")] + [_hit(f"b{i}") for i in range(200)]
+        vector = [_hit("v0"), _hit("v1")]
+        result = engine.reciprocal_rank_fusion(vector, bm25, k=2, rrf_k=rrf_k)
+        assert len(result) == 2
+        assert result[0].chunk.id == "v0"
+        assert result[0].score == pytest.approx(2.0 / (rrf_k + 1))
+
+    def test_rrf_score_positive_always(self, engine: SearchEngine) -> None:
+        """Even the worst-ranked hit has a positive RRF score, never zero."""
+        rrf_k = 60
+        bm25 = [_hit(f"b{i}") for i in range(1000)]
+        vector = []
+        result = engine.reciprocal_rank_fusion(vector, bm25, k=1000, rrf_k=rrf_k)
+        assert len(result) == 1000
+        assert result[-1].score > 0
+        assert result[-1].score == pytest.approx(1.0 / (rrf_k + 999 + 1))

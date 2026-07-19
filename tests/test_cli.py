@@ -370,3 +370,125 @@ def test_cli_eval_without_dataset_flag_uses_builder(runner, monkeypatch):
     assert "Building eval dataset" in result.output
     mock_build.assert_called_once()
     mock_load.assert_not_called()
+
+
+def test_cli_get_markdown_json_output(runner):
+    """`get-markdown --json` returns a JSON envelope with doc_id and markdown."""
+    from lean.cli import app
+
+    with patch("lean.services.corpus.get_document_markdown", return_value="# Heading\n\nBody."):
+        result = runner.invoke(
+            app,
+            [
+                "get-markdown",
+                "00000000-0000-0000-0000-000000000001",
+                "--json",
+            ],
+        )
+    assert result.exit_code == 0, result.output
+    import json
+
+    parsed = json.loads(result.output)
+    assert parsed["doc_id"] == "00000000-0000-0000-0000-000000000001"
+    assert parsed["markdown"] == "# Heading\n\nBody."
+
+
+def test_cli_delete_json_output(runner):
+    """`delete --json` returns a JSON envelope with the deleted id."""
+    from lean.cli import app
+
+    with patch(
+        "lean.services.corpus.delete_document",
+        return_value={"deleted": "00000000-0000-0000-0000-000000000001"},
+    ):
+        result = runner.invoke(
+            app,
+            [
+                "delete",
+                "00000000-0000-0000-0000-000000000001",
+                "--json",
+            ],
+        )
+    assert result.exit_code == 0, result.output
+    import json
+
+    parsed = json.loads(result.output)
+    assert parsed["deleted"] == "00000000-0000-0000-0000-000000000001"
+
+
+def test_cli_health_with_no_services_configured(runner, monkeypatch):
+    """`health` exits 0 when no external services are configured (not_configured)."""
+    from lean.cli import app
+
+    monkeypatch.setattr("lean.config.settings.Settings.ocr_base_url", "", raising=False)
+    monkeypatch.setattr("lean.config.settings.Settings.embedding_remote_url", "", raising=False)
+
+    with patch("lean.store.base.StoreConnection") as mock_store_cls:
+        mock_conn = mock_store_cls.from_env.return_value
+        mock_cursor = mock_conn.conn.cursor.return_value.__enter__.return_value
+        mock_cursor.fetchone.return_value = ("vector",)
+        result = runner.invoke(app, ["health"])
+
+    assert result.exit_code == 0, result.output
+
+
+def test_cli_health_exits_1_when_subsystem_errors(runner, monkeypatch):
+    """A subsystem reporting status='error' (OCR) triggers typer.Exit(1)."""
+    import httpx
+
+    from lean.cli import app
+
+    monkeypatch.setattr(
+        "lean.config.settings.Settings.ocr_base_url", "http://gpu:8000", raising=False
+    )
+    monkeypatch.setattr("lean.config.settings.Settings.embedding_remote_url", "", raising=False)
+
+    with (
+        patch("httpx.get", side_effect=httpx.ConnectError("connection refused")),
+        patch("lean.store.base.StoreConnection") as mock_store_cls,
+    ):
+        mock_conn = mock_store_cls.from_env.return_value
+        mock_cursor = mock_conn.conn.cursor.return_value.__enter__.return_value
+        mock_cursor.fetchone.return_value = ("vector",)
+        result = runner.invoke(app, ["health"])
+
+    assert result.exit_code == 1, result.output
+
+
+def test_cli_db_init_parses_url_into_pg_env(runner, monkeypatch, tmp_path):
+    """`db-init` extracts PG* env vars from SUPABASE_DB_URL and shells out to psql."""
+    from lean.cli import app
+
+    monkeypatch.setenv(
+        "SUPABASE_DB_URL",
+        "postgresql://alice:p%40ss@db.local:54322/postgres",
+    )
+    monkeypatch.setenv("HF_TOKEN", "token")
+    monkeypatch.setenv("LEAN_MCP_API_KEY", _VALID_KEY)
+
+    sql_dir = tmp_path / "schemas"
+    sql_dir.mkdir()
+    (sql_dir / "001_test.sql").write_text("-- test")
+
+    sub_calls = []
+
+    def fake_run(cmd, env, check):
+        sub_calls.append({"cmd": cmd, "env": dict(env), "check": check})
+        from unittest.mock import MagicMock
+
+        return MagicMock(returncode=0)
+
+    with (
+        patch("subprocess.run", side_effect=fake_run),
+        patch("pathlib.Path.glob", return_value=[sql_dir / "001_test.sql"]),
+    ):
+        result = runner.invoke(app, ["db-init"])
+
+    assert result.exit_code == 0, result.output
+    assert len(sub_calls) == 1
+    env_passed = sub_calls[0]["env"]
+    assert env_passed["PGHOST"] == "db.local"
+    assert env_passed["PGPORT"] == "54322"
+    assert env_passed["PGUSER"] == "alice"
+    assert env_passed["PGPASSWORD"] == "p@ss"
+    assert env_passed["PGDATABASE"] == "postgres"

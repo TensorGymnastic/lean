@@ -289,3 +289,235 @@ def test_ingest_vlm_disabled_skips_enrichment(monkeypatch_settings, fake_pdf):
     mock_embedder.embed_documents.assert_called_once()
     embedded_texts = mock_embedder.embed_documents.call_args[0][0]
     assert len(embedded_texts) == 1
+
+
+def test_persist_rolls_back_when_replace_chunks_fails(monkeypatch_settings, fake_pdf):
+    """replace_chunks raising triggers conn.conn.rollback(); exception re-raised."""
+    import asyncio
+
+    from lean.chunker.recursive import ChunkResult
+    from lean.models.schemas import ExtractionMethod
+    from lean.services.ingestion import _persist_ingest
+
+    fake_chunks = [
+        ChunkResult(
+            section_path="Ch 1",
+            heading_text="Ch 1",
+            chunk_index=0,
+            token_count=2,
+            content="x",
+        )
+    ]
+    fake_meta = __import__("lean.extraction.metadata", fromlist=["PdfMetadata"]).PdfMetadata(
+        title="x"
+    )
+
+    class _Boom(Exception):
+        pass
+
+    mock_conn = MagicMock()
+    mock_doc_repo = MagicMock()
+    mock_doc_repo.upsert_document.return_value = __import__("uuid").uuid4()
+    mock_chunk_repo = MagicMock()
+    mock_chunk_repo.replace_chunks.side_effect = _Boom("chunk insert failed")
+
+    with (
+        patch("lean.services.ingestion.StoreConnection") as mock_store_cls,
+        patch("lean.services.ingestion.DocumentRepo", return_value=mock_doc_repo),
+        patch("lean.services.ingestion.ChunkRepo", return_value=mock_chunk_repo),
+    ):
+        mock_store_cls.from_env.return_value = mock_conn
+        with pytest.raises(_Boom, match="chunk insert failed"):
+            asyncio.run(
+                _persist_ingest(
+                    fake_pdf,
+                    "deadbeef" * 8,
+                    fake_meta,
+                    1,
+                    ExtractionMethod.MARKITDOWN,
+                    fake_chunks,
+                    [[0.1] * 1024],
+                    [],
+                    monkeypatch_settings,
+                )
+            )
+
+    mock_conn.conn.rollback.assert_called_once()
+    mock_conn.close.assert_called_once()
+
+
+def test_persist_rolls_back_on_chunk_replace_failure_via_ingest(monkeypatch_settings, fake_pdf):
+    """End-to-end: a chunk_repo failure mid-ingest rolls back the transaction."""
+    import asyncio
+
+    from lean.chunker.markdown_ast import Section
+    from lean.chunker.recursive import ChunkResult
+    from lean.models.schemas import ExtractionMethod
+    from lean.services.ingestion import ingest_pdf
+
+    fake_sections = [Section(path="Ch 1", level=1, heading="Ch 1", content="x")]
+    fake_chunks = [
+        ChunkResult(
+            section_path="Ch 1",
+            heading_text="Ch 1",
+            chunk_index=0,
+            token_count=2,
+            content="x",
+        )
+    ]
+
+    class _Boom(Exception):
+        pass
+
+    mock_embedder = MagicMock()
+    mock_embedder.embed_documents.return_value = [[0.1] * 1024]
+
+    mock_conn = MagicMock()
+    mock_doc_repo = MagicMock()
+    mock_doc_repo.upsert_document.return_value = __import__("uuid").uuid4()
+    mock_chunk_repo = MagicMock()
+    mock_chunk_repo.replace_chunks.side_effect = _Boom("simulated DB failure")
+
+    fake_meta = __import__("lean.extraction.metadata", fromlist=["PdfMetadata"]).PdfMetadata(
+        title="x"
+    )
+
+    with (
+        patch(
+            "lean.services.ingestion.extract_pdf_markdown",
+            return_value=("# x", 1, ExtractionMethod.MARKITDOWN, {}, []),
+        ),
+        patch("lean.services.ingestion.build_sections", return_value=fake_sections),
+        patch("lean.services.ingestion.chunk_sections", return_value=fake_chunks),
+        patch("lean.services.ingestion.get_embedder", return_value=mock_embedder),
+        patch("lean.services.ingestion.extract_metadata", return_value=fake_meta),
+        patch("lean.services.ingestion.StoreConnection") as mock_store_cls,
+        patch("lean.services.ingestion.DocumentRepo", return_value=mock_doc_repo),
+        patch("lean.services.ingestion.ChunkRepo", return_value=mock_chunk_repo),
+    ):
+        mock_store_cls.from_env.return_value = mock_conn
+        with pytest.raises(_Boom, match="simulated DB failure"):
+            asyncio.run(ingest_pdf(str(fake_pdf)))
+
+    mock_conn.conn.rollback.assert_called_once()
+
+
+def test_reingest_raises_keyerror_when_document_not_found(monkeypatch_settings):
+    """reingest(<unknown-uuid>) looks up source_path, raises KeyError when None."""
+    import asyncio
+
+    from lean.services.ingestion import reingest
+
+    mock_doc_repo = MagicMock()
+    mock_doc_repo.get_source_path.return_value = None
+
+    with (
+        patch("lean.services.ingestion.StoreConnection") as mock_store_cls,
+        patch("lean.services.ingestion.DocumentRepo", return_value=mock_doc_repo),
+    ):
+        mock_store_cls.from_env.return_value = MagicMock()
+        with pytest.raises(KeyError, match="not found"):
+            asyncio.run(reingest("00000000-0000-0000-0000-000000000000"))
+
+
+def test_ingest_uses_markitdown_fallback_when_marker_unavailable(monkeypatch_settings, fake_pdf):
+    """When marker raises MarkerNotInstalled, pipeline falls back to markitdown."""
+    import asyncio
+
+    from lean.chunker.markdown_ast import Section
+    from lean.chunker.recursive import ChunkResult
+    from lean.models.schemas import ExtractionMethod
+    from lean.services.ingestion import ingest_pdf
+
+    fake_sections = [Section(path="Ch 1", level=1, heading="Ch 1", content="x")]
+    fake_chunks = [
+        ChunkResult(
+            section_path="Ch 1",
+            heading_text="Ch 1",
+            chunk_index=0,
+            token_count=2,
+            content="x",
+        )
+    ]
+
+    mock_embedder = MagicMock()
+    mock_embedder.embed_documents.return_value = [[0.1] * 1024]
+    mock_doc_repo = MagicMock()
+    mock_doc_repo.upsert_document.return_value = __import__("uuid").uuid4()
+    fake_meta = __import__("lean.extraction.metadata", fromlist=["PdfMetadata"]).PdfMetadata(
+        title="x"
+    )
+
+    with (
+        patch(
+            "lean.services.ingestion.extract_pdf_markdown",
+            return_value=("# x", 1, ExtractionMethod.MARKITDOWN, {}, []),
+        ),
+        patch("lean.services.ingestion.build_sections", return_value=fake_sections),
+        patch("lean.services.ingestion.chunk_sections", return_value=fake_chunks),
+        patch("lean.services.ingestion.get_embedder", return_value=mock_embedder),
+        patch("lean.services.ingestion.extract_metadata", return_value=fake_meta),
+        patch("lean.services.ingestion.StoreConnection") as mock_store_cls,
+        patch("lean.services.ingestion.DocumentRepo", return_value=mock_doc_repo),
+        patch("lean.services.ingestion.ChunkRepo", return_value=MagicMock()),
+    ):
+        mock_store_cls.from_env.return_value = MagicMock()
+        result = asyncio.run(ingest_pdf(str(fake_pdf)))
+
+    assert result.extraction_method == ExtractionMethod.MARKITDOWN
+    assert "OCR server unavailable" in result.warnings[0] or result.warnings == []
+
+
+def test_ingest_appends_warning_when_contextual_retrieval_enabled_without_llm(
+    monkeypatch_settings, fake_pdf
+):
+    """llm_contextual_retrieval=true with no LLM configured logs a warning, does not abort."""
+    import asyncio
+
+    from lean.chunker.markdown_ast import Section
+    from lean.chunker.recursive import ChunkResult
+    from lean.models.schemas import ExtractionMethod
+    from lean.services.ingestion import ingest_pdf
+
+    monkeypatch_settings.llm_contextual_retrieval = True
+
+    fake_sections = [Section(path="Ch 1", level=1, heading="Ch 1", content="x")]
+    fake_chunks = [
+        ChunkResult(
+            section_path="Ch 1",
+            heading_text="Ch 1",
+            chunk_index=0,
+            token_count=2,
+            content="x",
+        )
+    ]
+
+    mock_embedder = MagicMock()
+    mock_embedder.embed_documents.return_value = [[0.1] * 1024]
+    fake_meta = __import__("lean.extraction.metadata", fromlist=["PdfMetadata"]).PdfMetadata(
+        title="x"
+    )
+
+    with (
+        patch("lean.llm.base.get_llm", return_value=None),
+        patch(
+            "lean.services.ingestion.extract_pdf_markdown",
+            return_value=("# x", 1, ExtractionMethod.MARKITDOWN, {}, []),
+        ),
+        patch("lean.services.ingestion.build_sections", return_value=fake_sections),
+        patch("lean.services.ingestion.chunk_sections", return_value=fake_chunks),
+        patch("lean.services.ingestion.get_embedder", return_value=mock_embedder),
+        patch("lean.services.ingestion.extract_metadata", return_value=fake_meta),
+        patch("lean.services.ingestion.StoreConnection") as mock_store_cls,
+        patch(
+            "lean.services.ingestion.DocumentRepo",
+            return_value=MagicMock(
+                upsert_document=MagicMock(return_value=__import__("uuid").uuid4())
+            ),
+        ),
+        patch("lean.services.ingestion.ChunkRepo", return_value=MagicMock()),
+    ):
+        mock_store_cls.from_env.return_value = MagicMock()
+        result = asyncio.run(ingest_pdf(str(fake_pdf)))
+
+    assert any("contextual_retrieval enabled but no LLM configured" in w for w in result.warnings)

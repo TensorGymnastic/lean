@@ -105,3 +105,81 @@ def test_corpus_stats(monkeypatch):
     assert stats.total_tokens == 859776
     assert stats.embedding_dim == 1024
     assert stats.extraction_method_breakdown["markitdown"] == 6
+
+
+def test_corpus_stats_raises_when_chunks_count_missing(monkeypatch):
+    """count(*) returning None on the chunks query triggers a RuntimeError."""
+    monkeypatch.setenv("LEAN_MCP_API_KEY", _VALID_KEY)
+    from lean.store.analytics import AnalyticsRepo
+
+    conn = MagicMock()
+    cursor = MagicMock()
+    cursor.__enter__ = MagicMock(return_value=cursor)
+    cursor.__exit__ = MagicMock(return_value=False)
+    cursor.fetchone.side_effect = [{"count": 10}, None]
+    cursor.fetchall.return_value = []
+    conn.conn.cursor.return_value = cursor
+
+    repo = AnalyticsRepo(conn)
+    with pytest.raises(RuntimeError, match="count"):
+        repo.corpus_stats(embedding_dim=1024, embedding_model="test-model")
+
+
+def test_corpus_stats_raises_when_total_tokens_missing(monkeypatch):
+    """sum(token_count) returning None triggers a RuntimeError."""
+    monkeypatch.setenv("LEAN_MCP_API_KEY", _VALID_KEY)
+    from lean.store.analytics import AnalyticsRepo
+
+    conn = MagicMock()
+    cursor = MagicMock()
+    cursor.__enter__ = MagicMock(return_value=cursor)
+    cursor.__exit__ = MagicMock(return_value=False)
+    cursor.fetchone.side_effect = [{"count": 10}, {"count": 100}, None]
+    cursor.fetchall.return_value = []
+    conn.conn.cursor.return_value = cursor
+
+    repo = AnalyticsRepo(conn)
+    with pytest.raises(RuntimeError, match="count"):
+        repo.corpus_stats(embedding_dim=1024, embedding_model="test-model")
+
+
+def test_corpus_stats_includes_last_ingested_timestamp(monkeypatch):
+    """When a max(ingested_at) row exists, last_ingested_at is set on the response."""
+    from datetime import datetime
+
+    from lean.store.analytics import AnalyticsRepo
+
+    conn = MagicMock()
+    cursor = MagicMock()
+    cursor.__enter__ = MagicMock(return_value=cursor)
+    cursor.__exit__ = MagicMock(return_value=False)
+    last_dt = datetime(2026, 7, 18, 12, 0, 0)
+    cursor.fetchone.side_effect = [
+        {"count": 5},
+        {"count": 100},
+        {"total": 5000},
+        {"last": last_dt},
+    ]
+    cursor.fetchall.return_value = [{"extraction_method": "marker", "cnt": 5}]
+    conn.conn.cursor.return_value = cursor
+
+    repo = AnalyticsRepo(conn)
+    stats = repo.corpus_stats(embedding_dim=1024, embedding_model="m")
+    assert stats.last_ingested_at == last_dt
+
+
+def test_count_documents_uses_int_cast(monkeypatch):
+    """count_documents returns int(row[0]) — guard against Decimal types from psycopg."""
+    monkeypatch.setenv("LEAN_MCP_API_KEY", _VALID_KEY)
+    from lean.store.analytics import AnalyticsRepo
+
+    conn = MagicMock()
+    cursor = MagicMock()
+    cursor.__enter__ = MagicMock(return_value=cursor)
+    cursor.__exit__ = MagicMock(return_value=False)
+    cursor.fetchone.return_value = (42,)
+    conn.conn.cursor.return_value = cursor
+
+    repo = AnalyticsRepo(conn)
+    assert repo.count_documents() == 42
+    assert isinstance(repo.count_documents(), int)

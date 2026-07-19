@@ -126,3 +126,104 @@ def test_rejects_non_positive_resource_limits(monkeypatch, field, value) -> None
 
     with pytest.raises(ValidationError, match=field):
         Settings(**{field: value})
+
+
+def test_rejects_hard_cap_le_target_max(monkeypatch) -> None:
+    """chunk_hard_cap must be strictly greater than chunk_target_max."""
+    monkeypatch.setenv("SUPABASE_DB_URL", "postgresql://localhost/postgres")
+    monkeypatch.setenv("HF_TOKEN", "token")
+    monkeypatch.setenv("LEAN_MCP_API_KEY", "x" * 32)
+
+    from lean.config.settings import Settings
+
+    with pytest.raises(ValidationError, match="chunk_hard_cap"):
+        Settings(chunk_target_max=500, chunk_hard_cap=500)
+
+
+def test_rejects_non_positive_rrf_k(monkeypatch) -> None:
+    """rrf_k must be > 0."""
+    monkeypatch.setenv("SUPABASE_DB_URL", "postgresql://localhost/postgres")
+    monkeypatch.setenv("HF_TOKEN", "token")
+    monkeypatch.setenv("LEAN_MCP_API_KEY", "x" * 32)
+
+    from lean.config.settings import Settings
+
+    with pytest.raises(ValidationError, match="rrf_k"):
+        Settings(rrf_k=0)
+
+
+def test_rejects_fetch_multiplier_below_one(monkeypatch) -> None:
+    """fetch_multiplier must be >= 1."""
+    monkeypatch.setenv("SUPABASE_DB_URL", "postgresql://localhost/postgres")
+    monkeypatch.setenv("HF_TOKEN", "token")
+    monkeypatch.setenv("LEAN_MCP_API_KEY", "x" * 32)
+
+    from lean.config.settings import Settings
+
+    with pytest.raises(ValidationError, match="fetch_multiplier"):
+        Settings(fetch_multiplier=0)
+
+
+def test_rejects_non_positive_eval_k(monkeypatch) -> None:
+    """eval_k must be > 0."""
+    monkeypatch.setenv("SUPABASE_DB_URL", "postgresql://localhost/postgres")
+    monkeypatch.setenv("HF_TOKEN", "token")
+    monkeypatch.setenv("LEAN_MCP_API_KEY", "x" * 32)
+
+    from lean.config.settings import Settings
+
+    with pytest.raises(ValidationError, match="eval_k"):
+        Settings(eval_k=0)
+
+
+def test_vlm_enabled_requires_base_url_and_model(monkeypatch) -> None:
+    """Enabling VLM without base_url or model is rejected at startup."""
+    monkeypatch.setenv("SUPABASE_DB_URL", "postgresql://localhost/postgres")
+    monkeypatch.setenv("HF_TOKEN", "token")
+    monkeypatch.setenv("LEAN_MCP_API_KEY", "x" * 32)
+
+    from lean.config.settings import Settings
+
+    with pytest.raises(ValidationError, match="vlm_enabled"):
+        Settings(vlm_enabled=True, vlm_base_url="", vlm_model="")
+
+
+def test_rejects_invalid_vlm_detail(monkeypatch) -> None:
+    """vlm_detail must be 'low', 'default', or 'high'."""
+    monkeypatch.setenv("SUPABASE_DB_URL", "postgresql://localhost/postgres")
+    monkeypatch.setenv("HF_TOKEN", "token")
+    monkeypatch.setenv("LEAN_MCP_API_KEY", "x" * 32)
+
+    from lean.config.settings import Settings
+
+    with pytest.raises(ValidationError, match="vlm_detail"):
+        Settings(vlm_detail="medium")
+
+
+def test_rejects_vlm_max_concurrency_below_one(monkeypatch) -> None:
+    """vlm_max_concurrency must be >= 1."""
+    monkeypatch.setenv("SUPABASE_DB_URL", "postgresql://localhost/postgres")
+    monkeypatch.setenv("HF_TOKEN", "token")
+    monkeypatch.setenv("LEAN_MCP_API_KEY", "x" * 32)
+
+    from lean.config.settings import Settings
+
+    with pytest.raises(ValidationError, match="vlm_max_concurrency"):
+        Settings(vlm_max_concurrency=0)
+
+
+@pytest.mark.parametrize("port_field", ["mcp_http_port", "api_port"])
+@pytest.mark.parametrize(
+    "bad_port",
+    [0, 70000],
+)
+def test_rejects_port_out_of_range(monkeypatch, port_field, bad_port) -> None:
+    """Ports must be in 1..65535."""
+    monkeypatch.setenv("SUPABASE_DB_URL", "postgresql://localhost/postgres")
+    monkeypatch.setenv("HF_TOKEN", "token")
+    monkeypatch.setenv("LEAN_MCP_API_KEY", "x" * 32)
+
+    from lean.config.settings import Settings
+
+    with pytest.raises(ValidationError, match="port"):
+        Settings(**{port_field: bad_port})
