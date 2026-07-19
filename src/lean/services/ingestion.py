@@ -29,7 +29,7 @@ from lean.extraction.marker_converter import BlockMeta
 from lean.extraction.metadata import PdfMetadata, extract_metadata
 from lean.extraction.pipeline import extract_pdf_markdown
 from lean.infrastructure.embedder import get_embedder
-from lean.models.schemas import ExtractionMethod, IngestResult
+from lean.models.schemas import CHUNK_TYPE_IMAGE, ExtractionMethod, IngestResult
 from lean.store.base import StoreConnection
 from lean.store.chunks import ChunkRepo, ChunkRow
 from lean.store.documents import DocumentRepo
@@ -243,7 +243,7 @@ def _build_chunk_rows(
                 token_count=max(len(desc.split()), 1),
                 content=desc,
                 embedding=embeddings[image_offset + i],
-                chunk_type="image",
+                chunk_type=CHUNK_TYPE_IMAGE,
                 image_meta=meta,
                 image_hash=img_hash,
                 provenance_model=settings.vlm_model,

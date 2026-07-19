@@ -8,6 +8,12 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+CHUNK_TYPE_TEXT = "text"
+CHUNK_TYPE_IMAGE = "image"
+"""Single source of truth for ``chunks.chunk_type`` values. Mirrored at
+the DB level by ``db/schemas/012_add_chunk_type_check.sql`` (CHECK
+constraint enforcing the same two values)."""
+
 
 class ExtractionMethod(StrEnum):
     """Which extraction path produced this document's markdown."""
@@ -45,7 +51,7 @@ class Chunk(BaseModel):
     page_end: int | None = None
     token_count: int
     content: str
-    chunk_type: str = "text"
+    chunk_type: str = CHUNK_TYPE_TEXT
     image_meta: dict[str, Any] | None = None
     bbox: dict[str, Any] | None = None
     image_hash: str | None = None
@@ -67,7 +73,7 @@ class Chunk(BaseModel):
             page_end=r["page_end"],
             token_count=r["token_count"],
             content=r["content"],
-            chunk_type=r.get("chunk_type", "text"),
+            chunk_type=r.get("chunk_type", CHUNK_TYPE_TEXT),
             image_meta=r.get("image_meta"),
             bbox=r.get("bbox"),
             image_hash=r.get("image_hash"),

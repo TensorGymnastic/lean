@@ -9,7 +9,7 @@ from uuid import UUID  # noqa: TC003
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
-from lean.models.schemas import Chunk
+from lean.models.schemas import CHUNK_TYPE_TEXT, Chunk
 from lean.store.base import StoreConnection
 
 # Postgres caps prepared statements at 65535 parameters. The chunks INSERT has 16
@@ -31,7 +31,7 @@ class ChunkRow:
     token_count: int
     content: str
     embedding: list[float]
-    chunk_type: str = "text"
+    chunk_type: str = CHUNK_TYPE_TEXT
     image_meta: dict[str, Any] | None = None
     bbox: dict[str, Any] | None = None
     image_hash: str | None = None

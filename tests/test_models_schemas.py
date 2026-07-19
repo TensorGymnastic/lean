@@ -4,7 +4,14 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from lean.models.schemas import Chunk, CorpusStats, DocumentSummary, IngestResult
+from lean.models.schemas import (
+    CHUNK_TYPE_IMAGE,
+    CHUNK_TYPE_TEXT,
+    Chunk,
+    CorpusStats,
+    DocumentSummary,
+    IngestResult,
+)
 
 
 def test_document_summary_round_trip() -> None:
@@ -42,6 +49,28 @@ def test_chunk_score_optional() -> None:
     # Can set score
     chunk.score = 0.95
     assert chunk.score == 0.95
+
+
+def test_chunk_type_constants_and_default() -> None:
+    """CHUNK_TYPE_TEXT and CHUNK_TYPE_IMAGE are the single source of truth
+    for the two valid chunk_type values (audit finding 3.1). Chunk defaults
+    to CHUNK_TYPE_TEXT.
+    """
+    assert CHUNK_TYPE_TEXT == "text"
+    assert CHUNK_TYPE_IMAGE == "image"
+
+    chunk = Chunk(
+        id="c1",
+        document_id="d1",
+        chunk_index=0,
+        section_path="s",
+        heading_text="h",
+        page_start=1,
+        page_end=1,
+        token_count=1,
+        content="x",
+    )
+    assert chunk.chunk_type == CHUNK_TYPE_TEXT
 
 
 def test_ingest_result_warnings_default_empty() -> None:

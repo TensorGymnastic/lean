@@ -221,3 +221,12 @@ tracked here as M1–M5.
   no longer bake `/v1` into the URL (the client appends it). One new
   test `test_posts_to_v1_chat_completions` asserts the path; the
   class docstring was updated to document the new convention.
+- **M4 (audit 3.1) ✅** — `CHUNK_TYPE_TEXT = "text"` and
+  `CHUNK_TYPE_IMAGE = "image"` constants introduced in
+  `lean/models/schemas.py` as the single source of truth for
+  `chunks.chunk_type`. Replaced 4 string literal sites: `Chunk` field
+  default, `Chunk.from_row` fallback, `ChunkRow` dataclass default,
+  `_build_chunk_rows` image assignment. The DB-level CHECK constraint
+  in migration `012` continues to enforce the same two values at the
+  database layer. One new test asserts the constants and the `Chunk`
+  default.
