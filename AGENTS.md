@@ -35,7 +35,7 @@ No business logic in transports. Each store repo is CRUD-narrow.
 - `src/lean/llm/` — OpenAI-compatible LLM client (MiniMax/Ollama), optional sidecar for HyDE/multi-query/contextual retrieval
 - `src/lean/services/` — business logic: `ingestion` (extract+VLM+embed+store), `search` (hybrid+rerank), `corpus` (CRUD)
 - `src/lean/mcp_server/` — 8 tools, 4 resources, 3 prompts, stdio/http entrypoint
-- `src/lean/api/routes.py` — FastAPI mirror (bearer-authed REST, 5 endpoints)
+- `src/lean/api/routes.py` — FastAPI mirror (bearer-authed REST, 7 MCP-mirroring endpoints + `/health`; `reingest` is intentionally CLI-only)
 - `src/lean/auth/bearer.py` — ASGI middleware, `hmac.compare_digest` token check
 - `src/lean/cli.py` — Typer CLI (full parity with MCP tools)
 - `src/lean/eval/` — retrieval evaluation harness (hit_rate@k, MRR@k, NDCG@k, Recall@k)
@@ -81,7 +81,7 @@ No business logic in transports. Each store repo is CRUD-narrow.
 ## Validation
 
 - `make verify` — ruff + mypy + pytest (unit only, excludes integration/slow/e2e)
-  + coverage gate at 80%
+  + coverage gate at 80%. Current: 338 unit passed, 59 deselected, 91.82% coverage.
 - `make verify-all` — all tests
 - `uv run python scripts/docs_lint.py` — detects drift between
   `config.yaml` / CLI commands / MCP tools and `docs/` + `README.md`

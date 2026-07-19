@@ -16,7 +16,7 @@ storage, and hybrid BM25 + vector search via pgvector.
 - **GPU-accelerated embeddings** — LiquidAI/LFM2.5-Embedding-350M (1024-dim) served via Ollama on the GPU server, with automatic local CPU fallback
 - **Hybrid search** — BM25 full-text (PostgreSQL tsvector) fused with pgvector cosine similarity via Reciprocal Rank Fusion (RRF, k=60)
 - **Cross-encoder reranking** — fetch wide candidate set, rerank with `ms-marco-MiniLM-L-6-v2`, return top-k
-- **MCP server** — 8 tools, 4 resources, 3 prompts exposed over stdio or HTTP, plus a REST mirror (7 endpoints)
+- **MCP server** — 8 tools, 4 resources, 3 prompts exposed over stdio or HTTP, plus a REST mirror (7 MCP-mirroring endpoints plus `/health`; `reingest` is intentionally CLI-only)
 - **Retrieval evaluation** — `lean eval` command computing hit_rate@k, MRR@k, NDCG@k, Recall@k (see [`docs/evaluation.md`](docs/evaluation.md) for caveats)
 - **Optional LLM sidecar** — Contextual Retrieval, HyDE, multi-query generation — all opt-in, pipeline works without LLM
 - **Security hardening** — corpus-root path confinement, API key validation (min 16 chars, `change-me` rejected), HuggingFace model revisions pinned to SHA hashes, non-root Docker user, multi-stage build
