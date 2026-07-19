@@ -37,8 +37,9 @@ def test_cli_search_no_results(runner):
 
 
 def test_cli_search_with_results(runner):
-    from lean.cli import app
     from lean.models.schemas import Chunk
+
+    from lean.cli import app
 
     fake_chunks = [
         Chunk(
@@ -59,8 +60,9 @@ def test_cli_search_with_results(runner):
 
 
 def test_cli_corpus_stats(runner):
-    from lean.cli import app
     from lean.models.schemas import CorpusStats
+
+    from lean.cli import app
 
     fake_stats = CorpusStats(
         document_count=10,
@@ -82,8 +84,9 @@ def test_cli_corpus_stats(runner):
 def test_cli_list_documents(runner):
     from datetime import datetime
 
-    from lean.cli import app
     from lean.models.schemas import DocumentSummary, ExtractionMethod
+
+    from lean.cli import app
 
     fake_docs = [
         DocumentSummary(
@@ -113,8 +116,9 @@ def test_cli_get_chunk_not_found(runner):
 
 
 def test_cli_get_chunk_found(runner):
-    from lean.cli import app
     from lean.models.schemas import Chunk
+
+    from lean.cli import app
 
     fake = Chunk(
         id="00000000-0000-0000-0000-000000000001",
@@ -176,8 +180,9 @@ def test_cli_reingest_all(runner):
     import json
     from datetime import datetime
 
-    from lean.cli import app
     from lean.models.schemas import DocumentSummary, ExtractionMethod, IngestResult
+
+    from lean.cli import app
 
     fake_docs = [
         DocumentSummary(
@@ -217,8 +222,9 @@ def test_cli_reingest_all_skips_ocr_without_force(runner):
     import json
     from datetime import datetime
 
-    from lean.cli import app
     from lean.models.schemas import DocumentSummary, ExtractionMethod
+
+    from lean.cli import app
 
     fake_docs = [
         DocumentSummary(
@@ -247,8 +253,9 @@ def test_cli_reingest_all_skips_ocr_without_force(runner):
 
 
 def test_cli_search_json(runner):
-    from lean.cli import app
     from lean.models.schemas import Chunk
+
+    from lean.cli import app
 
     fake_chunks = [
         Chunk(
@@ -271,8 +278,9 @@ def test_cli_eval_with_dataset_flag_uses_curated_loader(runner, tmp_path, monkey
     import json
     from pathlib import Path
 
-    from lean.cli import app
     from lean.eval.runner import EvalSample
+
+    from lean.cli import app
 
     dataset_path: Path = tmp_path / "curated.json"
     dataset_path.write_text(
@@ -336,8 +344,9 @@ def test_cli_eval_with_dataset_flag_uses_curated_loader(runner, tmp_path, monkey
 
 def test_cli_eval_without_dataset_flag_uses_builder(runner, monkeypatch):
     """Without --dataset, build_eval_dataset is used (existing behavior preserved)."""
-    from lean.cli import app
     from lean.eval.runner import EvalSample
+
+    from lean.cli import app
 
     with (
         patch(
@@ -435,6 +444,7 @@ def test_cli_health_with_no_services_configured(runner, monkeypatch):
 def test_cli_health_exits_1_when_subsystem_errors(runner, monkeypatch):
     """A subsystem reporting status='error' (OCR) triggers typer.Exit(1)."""
     import httpx
+
     from lean.cli import app
 
     monkeypatch.setattr(
@@ -538,6 +548,7 @@ def test_check_ocr_error_on_non_200():
 def test_check_ocr_handles_network_error():
     """_check_ocr catches network errors and reports them."""
     import httpx
+
     from lean.cli import _check_ocr
 
     settings = MagicMock()
@@ -579,6 +590,7 @@ def test_check_ollama_ok_status():
 def test_check_ollama_error_on_connection_failure():
     """_check_ollama catches network errors and returns error status."""
     import httpx
+
     from lean.cli import _check_ollama
 
     settings = MagicMock()

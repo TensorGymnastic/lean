@@ -1,0 +1,49 @@
+# lean-code: Source code / markdown corpus
+#
+# Use:
+#   lean --config configs/lean-code.yaml ingest path/to/file.md
+#   lean --config configs/lean-code.yaml search "function foo"
+#   lean --config configs/lean-code.yaml ingest-directory --dir ~/repos/myproject --pattern "*.md"
+#
+# This domain treats every file as a single-page document. No extraction
+# pipeline — just chunk + embed + store. Drop a directory of markdowns
+# and search semantically.
+
+domain:
+  name: lean-code
+  version: 0.1.0
+  description: Code and markdown corpus (single-file ingest)
+
+settings:
+  embedding:
+    model: LiquidAI/LFM2.5-Embedding-350M
+    model_revision: f35ae2c91d687658dbf1f2b449382f0b019b9808
+    dim: 1024
+  chunking:
+    target_max: 600
+    hard_cap: 800
+    overlap: 50
+  retrieval:
+    hybrid_search: true
+    rerank:
+      enabled: false
+  storage:
+    corpus_root: "data"
+    max_pdf_mb: 50
+  transport:
+    mcp_port: 8767
+    api_port: 8768
+  vlm:
+    enabled: false
+
+extractors:
+  - adapter: lean.domains.code.adapters.MarkdownFileExtractor
+    config: {}
+
+metadata:
+  extractor: lean.domains.code.metadata.extract
+
+tools:
+  module: lean.domains.code.tools
+  enabled: []
+  disabled: []

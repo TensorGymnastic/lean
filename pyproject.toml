@@ -1,13 +1,28 @@
 [project]
-name = "lean-lss"
-version = "0.1.0"
-description = "Lean Six Sigma PDF corpus MCP server (built on lean-core)."
+name = "lean"
+version = "0.2.0"
+description = "Universal MCP+pgvector corpus server. YAML-driven domains; reusable across PDFs, code, web, and any structured text source."
 readme = "README.md"
 requires-python = ">=3.12"
 license = "MIT"
+authors = [
+    { name = "Quanti" },
+]
 dependencies = [
-    "lean-core",
+    "fastmcp>=3.4.4,<4",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "typer>=0.12",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.14.2",
+    "httpx>=0.27",
+    "psycopg[binary]>=3.2",
+    "pgvector>=0.3",
+    "mistune>=3.0",
+    "tiktoken>=0.7",
     "pymupdf>=1.24",
+    "anyio>=4.4",
+    "pyyaml>=6.0.3",
 ]
 
 [project.optional-dependencies]
@@ -18,6 +33,9 @@ local-models = [
 ]
 marker = [
     "marker-pdf",
+]
+web = [
+    "trafilatura>=1.6",
 ]
 
 [dependency-groups]
@@ -35,27 +53,28 @@ dev = [
 ]
 
 [project.scripts]
-lean = "lean_lss.cli:main"
+lean = "lean.cli:main"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/lean_lss"]
+packages = ["src/lean"]
+include = ["src/lean/py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 addopts = "-q"
 markers = [
-    "integration: requires local Supabase running",
-    "e2e: requires full stack (Supabase + OCR server + real models)",
+    "integration: requires local Postgres running",
+    "e2e: requires full stack (Postgres + OCR server + real models)",
     "slow: downloads or computes something large",
 ]
 
 [tool.coverage.run]
-source = ["src/lean_lss"]
+source = ["src/lean"]
 
 [tool.coverage.report]
 fail_under = 80
@@ -71,20 +90,20 @@ ignore = ["TC001", "TC002", "TC003", "S603", "S607", "S105"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["S101", "S105", "S106"]
-"src/lean_lss/cli.py" = ["B008"]
+"src/lean/core/store/search.py" = ["S608"]
+"src/lean/core/eval/runner.py" = ["S311"]
+"src/lean/core/transports/cli.py" = ["B008"]
+"src/lean/core/transports/api.py" = ["B008"]
 
 [tool.mypy]
 python_version = "3.12"
 strict = true
 plugins = ["pydantic.mypy"]
-packages = ["src/lean_lss"]
+packages = ["src/lean"]
 
 [[tool.mypy.overrides]]
-module = ["fitz", "markitdown", "marker.*"]
+module = ["fitz", "markitdown", "marker.*", "PIL.*", "sentence_transformers.*", "trafilatura.*"]
 ignore_missing_imports = true
 
 [tool.uv]
 package = true
-
-[tool.uv.sources]
-lean-core = { path = "../../lean-core", editable = true }

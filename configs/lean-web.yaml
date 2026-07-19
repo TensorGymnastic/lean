@@ -1,0 +1,49 @@
+# lean-web: URL-scraped web page corpus
+#
+# Use:
+#   lean --config configs/lean-web.yaml ingest https://example.com
+#   lean --config configs/lean-web.yaml search "Lean Six Sigma"
+#   lean --config configs/lean-web.yaml ingest-list --file urls.txt
+#
+# Fetches each URL with httpx, converts HTML to markdown via
+# trafilatura (or regex fallback), then chunks + embeds + stores.
+
+domain:
+  name: lean-web
+  version: 0.1.0
+  description: URL-scraped web page corpus MCP server
+
+settings:
+  embedding:
+    model: LiquidAI/LFM2.5-Embedding-350M
+    model_revision: f35ae2c91d687658dbf1f2b449382f0b019b9808
+    dim: 1024
+  chunking:
+    target_max: 600
+    hard_cap: 800
+    overlap: 50
+  retrieval:
+    hybrid_search: true
+    rerank:
+      enabled: false
+  storage:
+    corpus_root: "."
+    max_pdf_mb: 50
+  transport:
+    mcp_port: 8769
+    api_port: 8770
+  vlm:
+    enabled: false
+
+extractors:
+  - adapter: lean.domains.web.adapters.WebPageExtractor
+    config:
+      timeout_s: 30.0
+
+metadata:
+  extractor: lean.domains.web.metadata.extract
+
+tools:
+  module: lean.domains.web.tools
+  enabled: []
+  disabled: []

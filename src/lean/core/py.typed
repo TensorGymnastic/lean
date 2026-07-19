@@ -1,0 +1,3 @@
+Marker file per PEP 561 — declares lean_core as a typed package so
+mypy in dependent projects (e.g. lean-lss) type-checks against its
+public API.

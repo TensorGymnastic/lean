@@ -1,0 +1,80 @@
+# lean-pdf-lss: Lean Six Sigma PDF corpus
+#
+# Use:
+#   lean --config configs/lean-pdf-lss.yaml ingest path/to.pdf
+#   lean --config configs/lean-pdf-lss.yaml search "What is DMAIC?"
+#   lean --config configs/lean-pdf-lss.yaml mcp-serve
+#
+# The extraction chain is marker-pdf → Unlimited-OCR → markitdown (fallback).
+# VLM enrichment (when enabled) describes charts/images via MiniMax M3.
+
+domain:
+  name: lean-pdf-lss
+  version: 0.1.0
+  description: Lean Six Sigma PDF corpus MCP server
+
+settings:
+  embedding:
+    model: LiquidAI/LFM2.5-Embedding-350M
+    model_revision: f35ae2c91d687658dbf1f2b449382f0b019b9808
+    dim: 1024
+  chunking:
+    target_max: 450
+    hard_cap: 500
+    overlap: 50
+  retrieval:
+    hybrid_search: true
+    rerank:
+      enabled: true
+  ocr:
+    base_url: ""
+    model: baidu/Unlimited-OCR
+    dpi: 300
+  marker:
+    force_ocr: false
+    remote_url: "http://192.168.2.37:8000"
+  storage:
+    corpus_root: "data"
+    max_pdf_mb: 200
+  transport:
+    mcp_port: 8765
+    api_port: 8766
+  vlm:
+    enabled: false
+    base_url: ""
+    model: ""
+    detail: high
+    timeout_s: 120.0
+    max_concurrency: 4
+    max_tokens: 8192
+
+extractors:
+  - adapter: lean.domains.pdf_lss.adapters.MarkerAdapter
+    config:
+      force_ocr: false
+      remote_url: ""
+  - adapter: lean.domains.pdf_lss.adapters.UnlimitedOCRAdapter
+    config:
+      base_url: ""
+      hf_token: ""
+      model: baidu/Unlimited-OCR
+      dpi: 300
+      timeout: 1800.0
+      max_tokens: 32768
+      batch_size: 20
+  - adapter: lean.domains.pdf_lss.adapters.MarkitdownAdapter
+    config: {}
+
+vlm:
+  enabled: false
+  prompt_file: lean/domains/pdf_lss/chart_extraction_prompt.txt
+  parser: lean.domains.pdf_lss.parser.parse
+  image_heading_format: "{title}"
+
+metadata:
+  extractor: lean.domains.pdf_lss.metadata.extract
+
+tools:
+  module: lean.domains.pdf_lss.tools
+  enabled: []
+  disabled: []
