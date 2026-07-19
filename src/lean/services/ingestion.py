@@ -12,7 +12,7 @@ import logging
 import time
 from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 import anyio
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
     from lean.vlm.client import VLMClient
 
-from lean.chunker.markdown_ast import build_sections
+from lean.chunker.markdown_ast import Section, build_sections
 from lean.chunker.recursive import ChunkResult, chunk_sections
 from lean.config.settings import Settings, get_settings
 from lean.extraction.marker_converter import BlockMeta
@@ -304,26 +304,13 @@ async def _persist_ingest(
         conn.close()
 
 
-async def ingest_pdf(path: str) -> IngestResult:
-    """Full pipeline: PDF → extract → metadata → chunk → embed → store.
+async def _validate_pdf_path(path: str, settings: Settings) -> tuple[Path, str]:
+    """Resolve a PDF path, enforce the corpus-root + size guard, and stream-hash it.
 
-    Steps:
-        1. Validate path is within the configured corpus root (security).
-        2. SHA-256 the source PDF (dedup key).
-        3. Extract markdown via marker → OCR → markitdown fallback chain.
-        4. Build section AST and split into token-bounded chunks.
-        5. (Optional) Describe images via VLM, bounded by ``vlm_max_concurrency``.
-        6. Embed all chunks + image descriptions.
-        7. Extract PDF metadata (title, authors, publisher, year).
-        8. Persist document + chunks atomically in a single transaction.
-
-    Re-ingesting the same PDF (matched by SHA-256) updates the existing
-    document row and replaces its chunks.
-
-    Raises ``PermissionError`` if the path resolves outside the corpus root.
+    Returns ``(resolved_path, source_sha256_hex)``. Raises ``FileNotFoundError``
+    for missing files, ``PermissionError`` for paths outside the configured
+    ``corpus_root``, and ``ValueError`` for files above ``settings.max_pdf_mb``.
     """
-    start = time.monotonic()
-    settings = get_settings()
     pdf_path = Path(path)
     if not pdf_path.is_file():
         raise FileNotFoundError(f"PDF not found: {path}")
@@ -341,9 +328,19 @@ async def ingest_pdf(path: str) -> IngestResult:
             f"(max {settings.max_pdf_mb} MB): {path}"
         )
 
-    source_sha256 = _sha256_streaming(pdf_path)
+    return resolved, _sha256_streaming(pdf_path)
 
-    markdown, page_count, method, images, block_metas = await anyio.to_thread.run_sync(
+
+async def _extract_markdown(
+    pdf_path: Path,
+    settings: Settings,
+) -> tuple[str, int, ExtractionMethod, dict[str, Any], list[BlockMeta]]:  # noqa: E501
+    """Run the configured PDF→markdown extraction pipeline.
+
+    Returns ``(markdown, page_count, method, images, block_metas)``. Settings
+    flow directly to ``extract_pdf_markdown``; no other behavior lives here.
+    """
+    return await anyio.to_thread.run_sync(
         lambda: extract_pdf_markdown(
             pdf_path,
             ocr_base_url=settings.ocr_base_url,
@@ -358,6 +355,19 @@ async def ingest_pdf(path: str) -> IngestResult:
         )
     )
 
+
+async def _chunk_sections(
+    markdown: str,
+    page_count: int,
+    method: ExtractionMethod,
+    block_metas: list[BlockMeta],
+    settings: Settings,
+) -> tuple[list[Section], list[ChunkResult], list[str]]:
+    """Build the section AST, split it into token-bounded chunks, attach provenance.
+
+    Returns ``(sections, chunk_results, warnings)``. The markitdown fallback
+    warning is appended when the extraction method is ``MARKITDOWN``.
+    """
     warnings: list[str] = []
     if method == ExtractionMethod.MARKITDOWN:
         warnings.append("OCR server unavailable, fell back to markitdown")
@@ -374,41 +384,80 @@ async def ingest_pdf(path: str) -> IngestResult:
             encoding=settings.token_counter_encoding,
         )
     )
-
     _enrich_chunks_with_block_meta(
         chunk_results,
         block_metas,
         min_overlap=settings.block_match_min_overlap,
     )
+    return sections, chunk_results, warnings
 
-    if settings.llm_contextual_retrieval:
-        from lean.extraction.contextual import add_context_to_chunks
-        from lean.llm.base import get_llm
 
-        llm = get_llm()
-        if llm:
-            chunk_results = await anyio.to_thread.run_sync(
-                lambda: add_context_to_chunks(
-                    chunk_results,
-                    sections,
-                    llm,
-                    max_tokens=settings.llm_generate_max_tokens,
-                    temperature=settings.llm_generate_temperature,
-                )
-            )
-        else:
-            warnings.append("contextual_retrieval enabled but no LLM configured")
+async def _maybe_contextualize(
+    chunks: list[ChunkResult],
+    sections: list[Section],
+    settings: Settings,
+    warnings: list[str],
+) -> tuple[list[ChunkResult], list[str]]:
+    """Apply Contextual Retrieval only when enabled and an LLM sidecar is configured.
 
+    Returns the chunk list (possibly replaced) and the warnings accumulator. A
+    warning is appended when ``llm_contextual_retrieval`` is True but no LLM
+    client is available, and the original chunk list is returned by identity.
+    """
+    if not settings.llm_contextual_retrieval:
+        return chunks, warnings
+
+    from lean.extraction.contextual import add_context_to_chunks
+    from lean.llm.base import get_llm
+
+    llm = get_llm()
+    if llm is None:
+        warnings.append("contextual_retrieval enabled but no LLM configured")
+        return chunks, warnings
+
+    new_chunks = await anyio.to_thread.run_sync(
+        lambda: add_context_to_chunks(
+            chunks,
+            sections,
+            llm,
+            max_tokens=settings.llm_generate_max_tokens,
+            temperature=settings.llm_generate_temperature,
+        )
+    )
+    return new_chunks, warnings
+
+
+async def _embed_chunks(
+    chunks: list[ChunkResult],
+    image_descriptions: list[tuple[str, dict[str, object], str]],
+) -> list[list[float]]:
+    """Embed chunk content followed by image descriptions, preserving order.
+
+    Uses the ``get_embedder`` singleton so the test surface can patch the
+    embedder module-level without threading the dependency through callers.
+    """
+    embedder = get_embedder()
+    texts = [c.content for c in chunks]
+    texts.extend(desc for desc, _, _ in image_descriptions)
+    return await anyio.to_thread.run_sync(lambda: embedder.embed_documents(texts))
+
+
+async def ingest_pdf(path: str) -> IngestResult:
+    """PDF → extract → chunk → optional context → optional VLM → embed → persist."""
+    start = time.monotonic()
+    settings = get_settings()
+    pdf_path, source_sha256 = await _validate_pdf_path(path, settings)
+    markdown, page_count, method, images, block_metas = await _extract_markdown(pdf_path, settings)
+    sections, chunk_results, warnings = await _chunk_sections(
+        markdown, page_count, method, block_metas, settings
+    )
+    chunk_results, warnings = await _maybe_contextualize(
+        chunk_results, sections, settings, warnings
+    )
     image_descriptions, image_warnings = await _describe_images(images, settings)
     warnings.extend(image_warnings)
-
-    embedder = get_embedder()
-    chunk_texts = [c.content for c in chunk_results]
-    chunk_texts.extend(desc for desc, _, _ in image_descriptions)
-    embeddings = await anyio.to_thread.run_sync(lambda: embedder.embed_documents(chunk_texts))
-
+    embeddings = await _embed_chunks(chunk_results, image_descriptions)
     pdf_meta = await anyio.to_thread.run_sync(lambda: extract_metadata(pdf_path))
-
     doc_id, chunk_count = await _persist_ingest(
         pdf_path,
         source_sha256,
@@ -420,7 +469,6 @@ async def ingest_pdf(path: str) -> IngestResult:
         image_descriptions,
         settings,
     )
-
     elapsed = time.monotonic() - start
     logger.info(
         "ingested path=%s sha256=%s chunks=%d pages=%d method=%s elapsed=%.2fs",

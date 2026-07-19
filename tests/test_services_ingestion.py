@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+from lean.models.schemas import ExtractionMethod
 
 _VALID_KEY = "x" * 32
 
@@ -521,3 +524,118 @@ def test_ingest_appends_warning_when_contextual_retrieval_enabled_without_llm(
         result = asyncio.run(ingest_pdf(str(fake_pdf)))
 
     assert any("contextual_retrieval enabled but no LLM configured" in w for w in result.warnings)
+
+
+# BLG-004: per-helper coverage for the ingest_pdf decomposition (see BLG-004 in the active backlog).
+
+
+def test_validate_pdf_path_rejects_oversized_pdf_for_blg004(monkeypatch_settings, tmp_path):
+    """_validate_pdf_path rejects files above settings.max_pdf_mb before any read_bytes."""
+    from lean.services.ingestion import _validate_pdf_path
+
+    monkeypatch_settings.max_pdf_mb = 1
+    big_pdf = tmp_path / "huge.pdf"
+    big_pdf.write_bytes(b"%PDF-1.4\n" + b"x" * (2 * 1024 * 1024))
+
+    with pytest.raises(ValueError, match="PDF too large"):
+        asyncio.run(_validate_pdf_path(str(big_pdf), monkeypatch_settings))
+
+
+def test_extract_markdown_delegates_to_extraction_pipeline_for_blg004(
+    monkeypatch_settings, fake_pdf
+):
+    """_extract_markdown forwards Settings OCR/marker fields to extract_pdf_markdown."""
+    from lean.services.ingestion import _extract_markdown
+
+    fake_metadata = ("# Title", 7, ExtractionMethod.MARKER, {"img": 1}, [])
+    with patch(
+        "lean.services.ingestion.extract_pdf_markdown", return_value=fake_metadata
+    ) as mock_extract:
+        result = asyncio.run(_extract_markdown(fake_pdf, monkeypatch_settings))
+
+    assert result == fake_metadata
+    assert mock_extract.call_count == 1
+    kwargs = mock_extract.call_args.kwargs
+    assert kwargs["ocr_base_url"] == monkeypatch_settings.ocr_base_url
+    assert kwargs["marker_force_ocr"] == monkeypatch_settings.marker_force_ocr
+    assert kwargs["marker_remote_url"] == monkeypatch_settings.marker_remote_url
+
+
+def test_chunk_sections_appends_markitdown_warning_for_blg004(monkeypatch_settings, fake_pdf):
+    """_chunk_sections returns sections, chunks, and warnings; markitdown only on MARKITDOWN."""  # noqa: E501
+    from lean.chunker.markdown_ast import Section
+    from lean.chunker.recursive import ChunkResult
+    from lean.services.ingestion import _chunk_sections
+
+    fake_sections = [Section(path="Ch 1", level=1, heading="Ch 1", content="x")]
+    fake_chunks = [
+        ChunkResult(
+            section_path="Ch 1", heading_text="Ch 1", chunk_index=0, token_count=1, content="x"
+        )
+    ]
+
+    with (
+        patch("lean.services.ingestion.build_sections", return_value=fake_sections),
+        patch("lean.services.ingestion.chunk_sections", return_value=fake_chunks),
+    ):
+        sections, chunks, warnings = asyncio.run(
+            _chunk_sections("# x", 1, ExtractionMethod.MARKITDOWN, [], monkeypatch_settings)
+        )
+        sections_marker, chunks_marker, warnings_marker = asyncio.run(
+            _chunk_sections("# x", 1, ExtractionMethod.MARKER, [], monkeypatch_settings)
+        )
+
+    assert sections == fake_sections
+    assert chunks == fake_chunks
+    assert "OCR server unavailable, fell back to markitdown" in warnings
+    assert sections_marker == fake_sections
+    assert chunks_marker == fake_chunks
+    assert "OCR server unavailable, fell back to markitdown" not in warnings_marker
+
+
+def test_maybe_contextualize_returns_chunks_unchanged_when_no_llm_for_blg004(
+    monkeypatch_settings,
+):
+    """_maybe_contextualize is a no-op when get_llm() is None, returning the same list object and a warning."""  # noqa: E501
+    from lean.chunker.recursive import ChunkResult
+    from lean.services.ingestion import _maybe_contextualize
+
+    monkeypatch_settings.llm_contextual_retrieval = True
+    chunks = [
+        ChunkResult(section_path="S", heading_text="H", chunk_index=0, token_count=1, content="c")
+    ]
+    sections: list = []
+
+    with patch("lean.llm.base.get_llm", return_value=None):
+        result, warnings = asyncio.run(
+            _maybe_contextualize(chunks, sections, monkeypatch_settings, [])
+        )
+
+    assert result is chunks
+    assert any("contextual_retrieval enabled but no LLM configured" in w for w in warnings)
+
+
+def test_embed_chunks_concatenates_text_then_image_embeddings_for_blg004(monkeypatch_settings):
+    """_embed_chunks embeds chunk content first, then image descriptions, preserving order."""
+    from lean.chunker.recursive import ChunkResult
+    from lean.services.ingestion import _embed_chunks
+
+    chunks = [
+        ChunkResult(
+            section_path="S1", heading_text="H1", chunk_index=0, token_count=1, content="text-1"
+        ),
+        ChunkResult(
+            section_path="S2", heading_text="H2", chunk_index=1, token_count=1, content="text-2"
+        ),
+    ]
+    image_descriptions = [("img-desc-1", {"chart_type": "bar"}, "hash-1")]
+
+    mock_embedder = MagicMock()
+    mock_embedder.embed_documents.return_value = [[0.1] * 1024, [0.2] * 1024, [0.3] * 1024]
+
+    with patch("lean.services.ingestion.get_embedder", return_value=mock_embedder):
+        embeddings = asyncio.run(_embed_chunks(chunks, image_descriptions))
+
+    assert embeddings == [[0.1] * 1024, [0.2] * 1024, [0.3] * 1024]
+    called_texts = mock_embedder.embed_documents.call_args[0][0]
+    assert called_texts == ["text-1", "text-2", "img-desc-1"]
