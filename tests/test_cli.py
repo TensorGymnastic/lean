@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from typer.testing import CliRunner
@@ -492,3 +492,169 @@ def test_cli_db_init_parses_url_into_pg_env(runner, monkeypatch, tmp_path):
     assert env_passed["PGUSER"] == "alice"
     assert env_passed["PGPASSWORD"] == "p@ss"
     assert env_passed["PGDATABASE"] == "postgres"
+
+
+def test_check_ocr_not_configured():
+    """_check_ocr returns not_configured when ocr_base_url is empty."""
+    from lean.cli import _check_ocr
+
+    settings = MagicMock()
+    settings.ocr_base_url = ""
+    assert _check_ocr(settings) == {"status": "not_configured"}
+
+
+def test_check_ocr_ok_status():
+    """_check_ocr reports ok on HTTP 200."""
+
+    from lean.cli import _check_ocr
+
+    settings = MagicMock()
+    settings.ocr_base_url = "http://gpu:8000"
+    settings.health_http_timeout = 5.0
+
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    with patch("httpx.get", return_value=mock_resp):
+        result = _check_ocr(settings)
+    assert result == {"status": "ok", "url": "http://gpu:8000"}
+
+
+def test_check_ocr_error_on_non_200():
+    """_check_ocr reports error on non-200 status codes."""
+
+    from lean.cli import _check_ocr
+
+    settings = MagicMock()
+    settings.ocr_base_url = "http://gpu:8000"
+    settings.health_http_timeout = 5.0
+
+    mock_resp = MagicMock()
+    mock_resp.status_code = 503
+    with patch("httpx.get", return_value=mock_resp):
+        result = _check_ocr(settings)
+    assert result["status"] == "error"
+    assert result["url"] == "http://gpu:8000"
+
+
+def test_check_ocr_handles_network_error():
+    """_check_ocr catches network errors and reports them."""
+    import httpx
+
+    from lean.cli import _check_ocr
+
+    settings = MagicMock()
+    settings.ocr_base_url = "http://gpu:8000"
+    settings.health_http_timeout = 5.0
+
+    with patch("httpx.get", side_effect=httpx.ConnectError("connection refused")):
+        result = _check_ocr(settings)
+    assert result["status"] == "error"
+    assert "connection refused" in result["error"]
+
+
+def test_check_ollama_not_configured():
+    """_check_ollama returns not_configured when embedding_remote_url is empty."""
+    from lean.cli import _check_ollama
+
+    settings = MagicMock()
+    settings.embedding_remote_url = ""
+    assert _check_ollama(settings) == {"status": "not_configured"}
+
+
+def test_check_ollama_ok_status():
+    """_check_ollama reports ok on HTTP 200."""
+
+    from lean.cli import _check_ollama
+
+    settings = MagicMock()
+    settings.embedding_remote_url = "http://gpu:11434"
+    settings.health_http_timeout = 5.0
+
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    with patch("httpx.get", return_value=mock_resp):
+        result = _check_ollama(settings)
+    assert result["status"] == "ok"
+    assert result["url"] == "http://gpu:11434"
+
+
+def test_check_ollama_error_on_connection_failure():
+    """_check_ollama catches network errors and returns error status."""
+    import httpx
+
+    from lean.cli import _check_ollama
+
+    settings = MagicMock()
+    settings.embedding_remote_url = "http://gpu:11434"
+    settings.health_http_timeout = 5.0
+
+    with patch("httpx.get", side_effect=httpx.ConnectError("refused")):
+        result = _check_ollama(settings)
+    assert result["status"] == "error"
+    assert "refused" in result["error"]
+
+
+def test_check_database_ok_with_pgvector():
+    """_check_database reports ok + pgvector=True when extension is installed."""
+    from lean.cli import _check_database
+
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+    mock_cursor.__enter__ = MagicMock(return_value=mock_cursor)
+    mock_cursor.__exit__ = MagicMock(return_value=False)
+    mock_cursor.fetchone.return_value = ("vector",)
+
+    mock_conn.conn.cursor.return_value = mock_cursor
+
+    with patch("lean.store.base.StoreConnection") as mock_cls:
+        mock_cls.from_env.return_value = mock_conn
+        result = _check_database()
+
+    assert result["status"] == "ok"
+    assert result["pgvector"] is True
+    mock_conn.close.assert_called_once()
+
+
+def test_check_database_ok_without_pgvector():
+    """_check_database reports ok with pgvector=False when extension is absent."""
+    from lean.cli import _check_database
+
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+    mock_cursor.__enter__ = MagicMock(return_value=mock_cursor)
+    mock_cursor.__exit__ = MagicMock(return_value=False)
+    mock_cursor.fetchone.return_value = None
+
+    mock_conn.conn.cursor.return_value = mock_cursor
+
+    with patch("lean.store.base.StoreConnection") as mock_cls:
+        mock_cls.from_env.return_value = mock_conn
+        result = _check_database()
+
+    assert result["status"] == "ok"
+    assert result["pgvector"] is False
+
+
+def test_check_database_connection_failure():
+    """_check_database returns error status when StoreConnection raises."""
+    from lean.cli import _check_database
+
+    with patch(
+        "lean.store.base.StoreConnection.from_env",
+        side_effect=RuntimeError("connection refused"),
+    ):
+        result = _check_database()
+
+    assert result["status"] == "error"
+    assert "connection refused" in result["error"]
+
+
+def test_health_function_size_under_ceiling():
+    """The health command body itself is under the 50 LOC ceiling after refactor."""
+    import inspect
+
+    from lean.cli import health
+
+    source = inspect.getsource(health)
+    lines = [ln for ln in source.splitlines() if ln.strip()]
+    assert len(lines) <= 50, f"health() is {len(lines)} LOC, exceeds AGENTS.md 50-LOC ceiling"

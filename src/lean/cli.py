@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 import typer
 
 if TYPE_CHECKING:
+    from lean.config.settings import Settings
     from lean.eval.runner import EvalResult
     from lean.store.base import StoreConnection
 
@@ -260,57 +261,14 @@ def health(
     json_output: bool = typer.Option(False, "--json"),
 ) -> None:
     """Check health of OCR server, database, and Ollama embedding server."""
-    import httpx
-
     from lean.config.settings import get_settings
 
     settings = get_settings()
-    checks: dict[str, dict[str, object]] = {}
-
-    if settings.ocr_base_url:
-        try:
-            resp = httpx.get(
-                f"{settings.ocr_base_url.rstrip('/')}/health", timeout=settings.health_http_timeout
-            )
-            checks["ocr"] = {
-                "status": "ok" if resp.status_code == 200 else "error",
-                "url": settings.ocr_base_url,
-            }
-        except Exception as exc:
-            checks["ocr"] = {"status": "error", "url": settings.ocr_base_url, "error": str(exc)}
-    else:
-        checks["ocr"] = {"status": "not_configured"}
-
-    try:
-        from lean.store.base import StoreConnection
-
-        conn = StoreConnection.from_env()
-        with conn.conn.cursor() as cur:
-            cur.execute("SELECT extname FROM pg_extension WHERE extname = 'vector'")
-            has_pgvector = cur.fetchone() is not None
-        conn.close()
-        checks["database"] = {"status": "ok", "pgvector": has_pgvector}
-    except Exception as exc:
-        checks["database"] = {"status": "error", "error": str(exc)}
-
-    if settings.embedding_remote_url:
-        try:
-            resp = httpx.get(
-                f"{settings.embedding_remote_url.rstrip('/')}/api/tags",
-                timeout=settings.health_http_timeout,
-            )
-            checks["ollama"] = {
-                "status": "ok" if resp.status_code == 200 else "error",
-                "url": settings.embedding_remote_url,
-            }
-        except Exception as exc:
-            checks["ollama"] = {
-                "status": "error",
-                "url": settings.embedding_remote_url,
-                "error": str(exc),
-            }
-    else:
-        checks["ollama"] = {"status": "not_configured"}
+    checks: dict[str, dict[str, object]] = {
+        "ocr": _check_ocr(settings),
+        "database": _check_database(),
+        "ollama": _check_ollama(settings),
+    }
 
     if json_output:
         typer.echo(json.dumps(checks, indent=2))
@@ -322,6 +280,69 @@ def health(
 
     if any(r["status"] == "error" for r in checks.values()):
         raise typer.Exit(1)
+
+
+def _check_ocr(settings: Settings) -> dict[str, object]:
+    """Probe the OCR server's /health endpoint. Returns ``{status, url?, error?}``."""
+    if not settings.ocr_base_url:
+        return {"status": "not_configured"}
+    import httpx
+
+    try:
+        resp = httpx.get(
+            f"{settings.ocr_base_url.rstrip('/')}/health",
+            timeout=settings.health_http_timeout,
+        )
+        return {
+            "status": "ok" if resp.status_code == 200 else "error",
+            "url": settings.ocr_base_url,
+        }
+    except Exception as exc:
+        return {
+            "status": "error",
+            "url": settings.ocr_base_url,
+            "error": str(exc),
+        }
+
+
+def _check_database() -> dict[str, object]:
+    """Verify Postgres connectivity + pgvector extension presence."""
+    try:
+        from lean.store.base import StoreConnection
+
+        conn = StoreConnection.from_env()
+        try:
+            with conn.conn.cursor() as cur:
+                cur.execute("SELECT extname FROM pg_extension WHERE extname = 'vector'")
+                has_pgvector = cur.fetchone() is not None
+        finally:
+            conn.close()
+        return {"status": "ok", "pgvector": has_pgvector}
+    except Exception as exc:
+        return {"status": "error", "error": str(exc)}
+
+
+def _check_ollama(settings: Settings) -> dict[str, object]:
+    """Probe the Ollama /api/tags endpoint. Returns ``{status, url?, error?}``."""
+    if not settings.embedding_remote_url:
+        return {"status": "not_configured"}
+    import httpx
+
+    try:
+        resp = httpx.get(
+            f"{settings.embedding_remote_url.rstrip('/')}/api/tags",
+            timeout=settings.health_http_timeout,
+        )
+        return {
+            "status": "ok" if resp.status_code == 200 else "error",
+            "url": settings.embedding_remote_url,
+        }
+    except Exception as exc:
+        return {
+            "status": "error",
+            "url": settings.embedding_remote_url,
+            "error": str(exc),
+        }
 
 
 @app.command(name="mcp-serve")
