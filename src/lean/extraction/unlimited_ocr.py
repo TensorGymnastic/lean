@@ -28,11 +28,11 @@ def extract_markdown(
     *,
     ocr_base_url: str,
     hf_token: str | None = None,
-    model: str = "baidu/Unlimited-OCR",
-    dpi: int = 300,
-    timeout: float = 1800.0,
-    max_tokens: int = 32768,
-    batch_size: int = 20,
+    model: str,
+    dpi: int,
+    timeout: float,
+    max_tokens: int,
+    batch_size: int,
 ) -> tuple[str, int]:
     """Extract markdown from a PDF via Unlimited-OCR, batching pages to avoid oversized requests.
 

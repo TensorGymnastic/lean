@@ -25,11 +25,11 @@ class LiquidLMFEmbedder:
     def __init__(
         self,
         *,
-        model: str = "LiquidAI/LFM2.5-Embedding-350M",
+        model: str,
         hf_token: str | None = None,
         device: str = "cpu",
         dim: int = 1024,
-        revision: str = "f35ae2c91d687658dbf1f2b449382f0b019b9808",
+        revision: str,
     ) -> None:
         logger.info("loading embedding model %s@%s on %s", model, revision[:8], device)
         self._model = SentenceTransformer(

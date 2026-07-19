@@ -20,6 +20,15 @@ def _write_minimal_pdf(path: Path) -> None:
     pdf.output(str(path))
 
 
+_OCR_TUNABLES = {
+    "model": "baidu/Unlimited-OCR",
+    "dpi": 300,
+    "timeout": 1800.0,
+    "max_tokens": 32768,
+    "batch_size": 20,
+}
+
+
 @respx.mock
 def test_extract_markdown_success(tmp_path: Path) -> None:
     """Successful OCR call returns markdown."""
@@ -37,7 +46,9 @@ def test_extract_markdown_success(tmp_path: Path) -> None:
 
     from lean.extraction.unlimited_ocr import extract_markdown
 
-    markdown, page_count = extract_markdown(pdf_path, ocr_base_url="http://fake-ocr:8000")
+    markdown, page_count = extract_markdown(
+        pdf_path, ocr_base_url="http://fake-ocr:8000", **_OCR_TUNABLES
+    )
     assert "DMAIC" in markdown
     assert page_count == 1
 
@@ -52,7 +63,7 @@ def test_extract_markdown_raises_on_503(tmp_path: Path) -> None:
     from lean.extraction.unlimited_ocr import OCRBackendUnavailable, extract_markdown
 
     with pytest.raises(OCRBackendUnavailable):
-        extract_markdown(pdf_path, ocr_base_url="http://fake-ocr:8000")
+        extract_markdown(pdf_path, ocr_base_url="http://fake-ocr:8000", **_OCR_TUNABLES)
 
 
 def test_extract_markdown_raises_on_connection_error(tmp_path: Path) -> None:
@@ -66,7 +77,7 @@ def test_extract_markdown_raises_on_connection_error(tmp_path: Path) -> None:
         extract_markdown(
             pdf_path,
             ocr_base_url="http://127.0.0.1:59999",
-            timeout=2.0,
+            **{**_OCR_TUNABLES, "timeout": 2.0},
         )
 
 
@@ -79,4 +90,21 @@ def test_extract_markdown_missing_file() -> None:
         extract_markdown(
             Path("/nonexistent.pdf"),
             ocr_base_url="http://fake-ocr:8000",
+            **_OCR_TUNABLES,
         )
+
+
+def test_extract_markdown_requires_ocr_tunables(tmp_path: Path) -> None:
+    """No function-level defaults: caller must pass model/dpi/timeout/max_tokens/batch_size.
+
+    The pipeline orchestrator in extraction/pipeline.py is the only
+    production caller and threads from Settings. Function-level
+    defaults were an unused YAGNI surface (see
+    audit-architecture-2026-07-19 finding 2.2).
+    """
+    from lean.extraction.unlimited_ocr import extract_markdown
+
+    pdf_path = tmp_path / "test.pdf"
+    _write_minimal_pdf(pdf_path)
+    with pytest.raises(TypeError):
+        extract_markdown(pdf_path, ocr_base_url="http://fake-ocr:8000")

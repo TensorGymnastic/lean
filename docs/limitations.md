@@ -206,3 +206,12 @@ tracked here as M1–M5.
 - **M1 (audit 4.1) ✅** — `_find_best_block_match` Jaccard threshold
   lifted to `Settings.block_match_min_overlap` (default 0.15). Tunable
   per-corpus without code changes. Validated `(0, 1]`.
+- **M2 (audit 2.1 + 2.2) ✅** — `LiquidLMFEmbedder.__init__` now
+  requires `model` and `revision` (no class-level defaults).
+  `unlimited_ocr.extract_markdown` now requires `model`, `dpi`,
+  `timeout`, `max_tokens`, `batch_size` (no function-level defaults).
+  The singleton factory in `infrastructure/embedder.py` and the
+  pipeline orchestrator in `extraction/pipeline.py` were the only
+  production callers and already thread from `Settings`. Two new
+  contract tests assert the new "no defaults" invariant; six
+  existing tests updated to pass values explicitly.
