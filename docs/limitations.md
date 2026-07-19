@@ -230,3 +230,11 @@ tracked here as M1–M5.
   in migration `012` continues to enforce the same two values at the
   database layer. One new test asserts the constants and the `Chunk`
   default.
+- **M5 (audit 2.3) ✅** — `Settings.mcp_http_port` and
+  `Settings.api_port` no longer carry Python-side defaults (8765 and
+  8766 respectively); both come exclusively from
+  `config.yaml:transport.mcp_port` and `api_port`, overridable via
+  `MCP_HTTP_PORT` / `API_PORT` env vars. The 22 pre-existing settings
+  tests still pass (they were already exercising the YAML path, not
+  the Python default). One new test asserts both the YAML default and
+  the env-var override work.

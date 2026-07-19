@@ -43,6 +43,28 @@ def test_settings_defaults_for_optional_fields(monkeypatch) -> None:
     assert settings.ocr_base_url is not None
 
 
+def test_transport_ports_come_from_yaml_overridable_by_env(monkeypatch) -> None:
+    """mcp_http_port and api_port have no Python default — they come from
+    config.yaml's transport section and can be overridden via env. Removing
+    the Python defaults (M5) makes config.yaml the single source of truth.
+    """
+    monkeypatch.setenv("SUPABASE_DB_URL", "postgresql://localhost/postgres")
+    monkeypatch.setenv("HF_TOKEN", "token")
+    monkeypatch.setenv("LEAN_MCP_API_KEY", _VALID_KEY)
+
+    from lean.config.settings import Settings
+
+    settings = Settings()
+    assert settings.mcp_http_port == 8765
+    assert settings.api_port == 8766
+
+    monkeypatch.setenv("MCP_HTTP_PORT", "9999")
+    monkeypatch.setenv("API_PORT", "9998")
+    settings = Settings()
+    assert settings.mcp_http_port == 9999
+    assert settings.api_port == 9998
+
+
 def test_get_settings_factory_caches_singleton(monkeypatch) -> None:
     """get_settings() returns the SAME cached instance each call."""
     monkeypatch.setenv("SUPABASE_DB_URL", "postgresql://localhost/postgres")

@@ -93,8 +93,8 @@ class Settings(BaseSettings):
     rerank_top_n: int = _yaml.get("retrieval", {}).get("rerank", {}).get("top_n", 5)
 
     mcp_http_host: str = _yaml.get("transport", {}).get("mcp_host", "127.0.0.1")
-    mcp_http_port: int = _yaml.get("transport", {}).get("mcp_port", 8765)
-    api_port: int = _yaml.get("transport", {}).get("api_port", 8766)
+    mcp_http_port: int = _yaml.get("transport", {}).get("mcp_port")
+    api_port: int = _yaml.get("transport", {}).get("api_port")
 
     # --- Storage paths ---
     corpus_root: str = _yaml.get("storage", {}).get("corpus_root", "data")
