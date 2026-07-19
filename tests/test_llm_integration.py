@@ -19,7 +19,7 @@ from lean.chunker.markdown_ast import Section
 from lean.chunker.recursive import ChunkResult
 
 MINIMAX_KEY = os.environ.get("MINIMAX_API_KEY", "")
-OLLAMA_URL = "http://192.168.2.37:11434"
+OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://192.168.2.37:11434")
 OLLAMA_MODEL = "hf.co/LiquidAI/LFM2.5-8B-A1B-GGUF:Q6_K"
 
 pytestmark = pytest.mark.integration
@@ -45,8 +45,8 @@ minimax_skip = pytest.mark.skipif(
 )
 
 ollama_skip = pytest.mark.skipif(
-    True,
-    reason="Set OLLAMA_URL to run Ollama integration tests",
+    not os.environ.get("OLLAMA_URL"),
+    reason="OLLAMA_URL not set — required for Ollama integration tests",
 )
 
 

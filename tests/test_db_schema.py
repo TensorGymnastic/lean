@@ -98,3 +98,78 @@ def test_chunks_unique_constraint(db_url: str) -> None:
         )
         constraints = cur.fetchall()
     assert len(constraints) >= 1, "expected at least one UNIQUE constraint on chunks"
+
+
+def test_chunk_type_check_constraint_rejects_invalid(db_url: str) -> None:
+    """Migration 012's CHECK (chunk_type IN ('text','image')) rejects bogus values."""
+    import psycopg
+
+    fake_doc_id = "00000000-0000-0000-0000-000000000001"
+    with psycopg.connect(db_url, autocommit=False) as conn, conn.cursor() as cur:
+        try:
+            cur.execute(
+                "insert into public.chunks "
+                "(document_id, chunk_index, section_path, token_count, content, "
+                " embedding, chunk_type) "
+                "values (%s, 999999, 'X', 1, 'x', '[0]'::vector, 'bogus_type')",
+                (fake_doc_id,),
+            )
+        except psycopg.errors.CheckViolation:
+            conn.rollback()
+        else:
+            conn.rollback()
+            raise AssertionError("CHECK constraint did not reject chunk_type='bogus_type'")
+
+
+def test_on_delete_cascade_removes_chunks(db_url: str) -> None:
+    """FK from chunks.document_id -> documents.id has ON DELETE CASCADE."""
+    import psycopg
+
+    fake_doc_id = "00000000-0000-0000-0000-000000000002"
+    with psycopg.connect(db_url, autocommit=True) as conn, conn.cursor() as cur:
+        cur.execute(
+            "insert into public.documents "
+            "(id, source_path, source_sha256, title, extraction_method) "
+            "values (%s, 'cascade-test.pdf', 'cascade-test-%s', 'Cascade Test', 'markitdown') "
+            "on conflict (source_sha256) do nothing",
+            (fake_doc_id, fake_doc_id),
+        )
+        cur.execute(
+            "insert into public.chunks "
+            "(document_id, chunk_index, section_path, token_count, content, embedding) "
+            "values (%s, 0, 'X', 1, 'x', '[0]'::vector)",
+            (fake_doc_id,),
+        )
+        cur.execute(
+            "select count(*) from public.chunks where document_id = %s",
+            (fake_doc_id,),
+        )
+        assert cur.fetchone()[0] == 1
+
+        cur.execute("delete from public.documents where id = %s", (fake_doc_id,))
+
+        cur.execute(
+            "select count(*) from public.chunks where document_id = %s",
+            (fake_doc_id,),
+        )
+        assert cur.fetchone()[0] == 0, "CASCADE did not remove chunks"
+
+
+def test_vector_1024_embedding_dim_validated(db_url: str) -> None:
+    """The vector(1024) type rejects embeddings of a different dimension."""
+    import psycopg
+
+    fake_doc_id = "00000000-0000-0000-0000-000000000003"
+    with psycopg.connect(db_url, autocommit=False) as conn, conn.cursor() as cur:
+        try:
+            cur.execute(
+                "insert into public.chunks "
+                "(document_id, chunk_index, section_path, token_count, content, embedding) "
+                "values (%s, 888888, 'X', 1, 'x', %s::vector)",
+                (fake_doc_id, "[" + ",".join(["0"] * 1536) + "]"),
+            )
+        except psycopg.errors.DataException:
+            conn.rollback()
+        else:
+            conn.rollback()
+            raise AssertionError("vector(1024) did not reject a 1536-dim embedding")
