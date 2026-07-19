@@ -18,10 +18,10 @@ lint:
 	uv run ruff check .
 
 typecheck:
-	uv run mypy src/lean
+	uv run mypy src/lean_lss
 
 test:
-	uv run python3 -m pytest -m 'not slow and not integration and not e2e' --cov=lean --cov-report=term-missing
+	uv run python3 -m pytest -m 'not slow and not integration and not e2e' --cov=lean_lss --cov-report=term-missing
 
 verify: format-check lint typecheck test
 
