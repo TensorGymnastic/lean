@@ -140,6 +140,20 @@ class TestDescribeImage:
         ):
             client.describe_image(_make_image(), prompt="x")
 
+    def test_posts_to_v1_chat_completions(self):
+        """The VLM client must POST to ``/v1/chat/completions`` to match the
+        OCR client and the OpenAI-compatible LLM client. Previously the path
+        was ``/chat/completions`` (no /v1 prefix), which 404s on providers
+        like MiniMax unless the base_url already includes ``/v1`` (audit
+        finding 4.3 in docs/audit-architecture-2026-07-19.md).
+        """
+        client = VLMClient(base_url="http://gpu:11434", model="m")
+        mock_resp = _mock_response("desc")
+        with patch.object(client._client, "post", return_value=mock_resp) as mock_post:
+            client.describe_image(_make_image(), prompt="x")
+        url = mock_post.call_args.args[0]
+        assert url == "http://gpu:11434/v1/chat/completions"
+
 
 class TestChartExtractionPrompt:
     def test_prompt_contains_json_instruction(self):

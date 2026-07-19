@@ -30,7 +30,10 @@ class VLMClient:
     """Calls /v1/chat/completions on an OpenAI-compatible endpoint with image input.
 
     Args:
-        base_url: API root (e.g. http://gpu:11434/v1, https://api.minimax.io/v1).
+        base_url: API root, no trailing ``/v1`` (e.g. ``http://gpu:11434``,
+            ``https://api.minimax.io``). The client appends
+            ``/v1/chat/completions`` to match the OpenAI-compatible
+            convention used by the OCR and LLM clients.
         model: Model ID (e.g. gemma3:27b, qwen2.5-vl:7b, MiniMax-M3).
         api_key: Bearer token (empty for local servers that don't require auth).
         timeout: Request timeout in seconds.
@@ -104,7 +107,7 @@ class VLMClient:
 
         try:
             resp = self._client.post(
-                f"{self._base_url}/chat/completions",
+                f"{self._base_url}/v1/chat/completions",
                 headers=self._headers,
                 json=request_body,
             )

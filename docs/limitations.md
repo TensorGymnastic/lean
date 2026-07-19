@@ -215,3 +215,9 @@ tracked here as M1–M5.
   production callers and already thread from `Settings`. Two new
   contract tests assert the new "no defaults" invariant; six
   existing tests updated to pass values explicitly.
+- **M3 (audit 4.3) ✅** — `vlm/client.py:107` now POSTs to
+  `/v1/chat/completions` (was `/chat/completions` without `/v1`),
+  matching the OCR and LLM clients. The YAML `vlm.base_url` examples
+  no longer bake `/v1` into the URL (the client appends it). One new
+  test `test_posts_to_v1_chat_completions` asserts the path; the
+  class docstring was updated to document the new convention.
