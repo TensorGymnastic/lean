@@ -142,12 +142,14 @@ async def _describe_images(
 def _enrich_chunks_with_block_meta(
     chunks: list[ChunkResult],
     block_metas: list[BlockMeta],
+    *,
+    min_overlap: float,
 ) -> None:
     """Populate bbox + page_start/page_end on chunks by matching content to blocks."""
     if not block_metas:
         return
     for chunk in chunks:
-        page, bbox = _find_best_block_match(chunk.content, block_metas)
+        page, bbox = _find_best_block_match(chunk.content, block_metas, min_overlap=min_overlap)
         chunk.page_start = page
         chunk.page_end = page
         chunk.bbox = bbox
@@ -156,11 +158,15 @@ def _enrich_chunks_with_block_meta(
 def _find_best_block_match(
     content: str,
     blocks: list[BlockMeta],
+    *,
+    min_overlap: float = 0.15,
 ) -> tuple[int | None, dict[str, float] | None]:
     """Find the block whose text overlaps most with the chunk content.
 
     Uses Jaccard-like word overlap. Returns (page, bbox_dict) or (None, None)
-    if no block meets the 0.15 minimum overlap threshold.
+    if no block meets the ``min_overlap`` threshold. The production caller
+    threads ``Settings.block_match_min_overlap`` so operators can retune
+    per-corpus without code changes.
     """
     content_words = set(content.lower().split())
     if not content_words:
@@ -181,7 +187,7 @@ def _find_best_block_match(
             best_page = block.page
             best_bbox = block.bbox
 
-    if best_score < 0.15:
+    if best_score < min_overlap:
         return None, None
     if best_bbox and len(best_bbox) == 4:
         return best_page, {
@@ -369,7 +375,11 @@ async def ingest_pdf(path: str) -> IngestResult:
         )
     )
 
-    _enrich_chunks_with_block_meta(chunk_results, block_metas)
+    _enrich_chunks_with_block_meta(
+        chunk_results,
+        block_metas,
+        min_overlap=settings.block_match_min_overlap,
+    )
 
     if settings.llm_contextual_retrieval:
         from lean.extraction.contextual import add_context_to_chunks

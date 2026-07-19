@@ -125,3 +125,23 @@ def test_highest_scoring_block_wins_when_multiple_match():
 
     assert page == 2
     assert bbox == {"x0": 2.0, "y0": 2.0, "x1": 2.0, "y1": 2.0}
+
+
+def test_min_overlap_param_rejects_partial_match():
+    """min_overlap=0.9 rejects the 0.67-score block; min_overlap=0.5 accepts it.
+
+    Confirms the threshold is configurable per-call (the production caller
+    threads Settings.block_match_min_overlap; tests verify the parameter
+    contract independently of Settings).
+    """
+    content = "alpha beta gamma delta"
+    blocks = [
+        BlockMeta(page=2, bbox=[2.0, 2.0, 2.0, 2.0], text="alpha beta yyy"),
+    ]
+
+    page_strict, _ = _find_best_block_match(content, blocks, min_overlap=0.9)
+    assert page_strict is None
+
+    page_lenient, bbox_lenient = _find_best_block_match(content, blocks, min_overlap=0.5)
+    assert page_lenient == 2
+    assert bbox_lenient == {"x0": 2.0, "y0": 2.0, "x1": 2.0, "y1": 2.0}

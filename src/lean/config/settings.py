@@ -106,6 +106,9 @@ class Settings(BaseSettings):
     # --- Logging ---
     log_level: str = _yaml.get("logging", {}).get("level", "INFO")
 
+    # --- Ingestion tuning ---
+    block_match_min_overlap: float = _yaml.get("ingestion", {}).get("block_match_min_overlap", 0.15)
+
     # --- Eval ---
     eval_sample_size: int = _yaml.get("eval", {}).get("sample_size", 50)
     eval_k: int = _yaml.get("eval", {}).get("k", 5)
@@ -189,6 +192,10 @@ class Settings(BaseSettings):
             )
         if self.vlm_max_concurrency < 1:
             raise ValueError(f"vlm_max_concurrency must be >= 1, got {self.vlm_max_concurrency}")
+        if not 0.0 < self.block_match_min_overlap <= 1.0:
+            raise ValueError(
+                f"block_match_min_overlap must be in (0, 1], got {self.block_match_min_overlap}"
+            )
         return self
 
 

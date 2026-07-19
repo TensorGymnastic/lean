@@ -64,6 +64,9 @@ health:
 logging:
   level: INFO               # Python logging level (DEBUG/INFO/WARNING/ERROR)
 
+ingestion:
+  block_match_min_overlap: 0.15  # min Jaccard-like word overlap (0,1] for chunk->block match. Higher = fewer, cleaner matches.
+
 llm:
   minimax_base_url: https://api.minimax.io
   minimax_model: MiniMax-Text-01

@@ -198,3 +198,11 @@ context, effort, and acceptance criteria.
   of error edge cases remaining).
 
 Last reconciled against `master` HEAD `2420b58` during BLG-001.
+
+**Audit follow-ups (2026-07-19):** the architecture validation at
+`docs/audit-architecture-2026-07-19.md` produced 5 findings; remediation
+tracked here as M1–M5.
+
+- **M1 (audit 4.1) ✅** — `_find_best_block_match` Jaccard threshold
+  lifted to `Settings.block_match_min_overlap` (default 0.15). Tunable
+  per-corpus without code changes. Validated `(0, 1]`.

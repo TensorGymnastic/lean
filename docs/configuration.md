@@ -144,6 +144,12 @@ success**. Watch `IngestResult.warnings` or `extraction_method` to detect this.
 |---|---|---|
 | `level` | `INFO` | Python logging level (`DEBUG`/`INFO`/`WARNING`/`ERROR`) |
 
+### `ingestion`
+
+| Field | Default | Notes |
+|---|---|---|
+| `block_match_min_overlap` | `0.15` | Minimum Jaccard-like word-overlap score (in `(0, 1]`) for `_find_best_block_match` to attach a chunk to a marker block. Lower values yield more (noisier) `bbox`/`page_start`/`page_end` matches; higher values yield fewer but cleaner matches. Set higher for low-OCR-quality PDFs. See `services/ingestion.py:_find_best_block_match` and `tests/test_services_ingestion_block_match.py`. |
+
 ### `llm` (optional sidecar)
 
 | Field | Default | Notes |
