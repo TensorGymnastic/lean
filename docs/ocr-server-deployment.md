@@ -52,7 +52,7 @@ sudo systemctl status ollama
 ## Firewall
 
 ```bash
-sudo ufw allow from 192.168.2.0/24 to any port 8000  # OCR
+sudo ufw allow from 192.168.2.0/24 to any port 8001  # OCR
 sudo ufw allow from 192.168.2.0/24 to any port 11434 # Ollama
 ```
 
