@@ -172,3 +172,29 @@ These have been observed in the codebase and may resurface:
 
 - README previously described `make smoke` and `make health` as
   different — they are identical (`smoke: health` in the Makefile).
+
+---
+
+## Active backlog
+
+Known follow-up items that are owned in the workspace backlog but not
+yet addressed in the lean repo. See
+`/home/sl/dev/_ai/workspace/lean-backlog-2026-07-19/BACKLOG.md` for full
+context, effort, and acceptance criteria.
+
+- **BLG-002** — `cli.py` `_output()` consistency: four commands
+  (`get_markdown`, `delete`, `reingest_all`, `health`) bypass the
+  unified `_output()` helper and call `typer.echo(json.dumps(...))`
+  directly. Cosmetic JSON-envelope drift, not a bug.
+- **BLG-007** — `embedding_model` mismatch warning: stored per-chunk
+  `embedding_model` is never compared with `Settings.embedding_model`,
+  so corpus model drift has no visible signal at `corpus_stats` or at
+  reingest. On the AGENTS.md roadmap; warn, do not fail.
+- **BLG-009** — Embedding-dim mismatch validation: query embeddings
+  whose `dim` differs from stored `embedding_dim` produce nonsense
+  results with no runtime guard. Log + warn + degrade gracefully.
+- **BLG-010** — More per-command CLI tests to push `cli.py` ≥ 90%
+  coverage (currently 85%; mostly `db_init` happy path and a handful
+  of error edge cases remaining).
+
+Last reconciled against `master` HEAD `2420b58` during BLG-001.
