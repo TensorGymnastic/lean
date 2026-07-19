@@ -179,9 +179,7 @@ class LssDomain(DomainRegistration[LssSettings]):
 
         @mcp.tool
         async def delete_document(document_id: str) -> dict[str, str]:
-            return await anyio.to_thread.run_sync(
-                lambda: services["delete_document"](document_id)
-            )
+            return await anyio.to_thread.run_sync(lambda: services["delete_document"](document_id))
 
         @mcp.tool
         async def reingest(document_id: str) -> IngestResult:
@@ -260,16 +258,14 @@ class LssDomain(DomainRegistration[LssSettings]):
             except KeyError:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND, detail="document not found"
-                )
+                ) from None
             return {"document_id": document_id, "markdown": markdown}
 
         @app.delete("/documents/{document_id}")
         async def delete_document(document_id: str) -> dict[str, str]:
             import anyio
 
-            return await anyio.to_thread.run_sync(
-                lambda: services["delete_document"](document_id)
-            )
+            return await anyio.to_thread.run_sync(lambda: services["delete_document"](document_id))
 
         @app.get("/stats")
         async def stats() -> dict[str, Any]:
@@ -322,7 +318,9 @@ class LssDomain(DomainRegistration[LssSettings]):
                 chunk_type=chunk_type,
             )
             if json_output:
-                typer.echo(json.dumps([c.model_dump(mode="json") for c in chunks], indent=2, default=str))
+                typer.echo(
+                    json.dumps([c.model_dump(mode="json") for c in chunks], indent=2, default=str)
+                )
                 return
             if not chunks:
                 typer.echo("No results found.")
@@ -418,7 +416,9 @@ class LssDomain(DomainRegistration[LssSettings]):
                     results.append({"id": doc.id, "status": "skipped"})
                     typer.echo(f"SKIP  {doc.id}  (already OCR'd, {doc.chunk_count} chunks)")
                     continue
-                typer.echo(f"START {doc.id}  ({doc.page_count or '?'} pages, was {doc.extraction_method})")
+                typer.echo(
+                    f"START {doc.id}  ({doc.page_count or '?'} pages, was {doc.extraction_method})"
+                )
                 try:
                     res = asyncio.run(services["reingest"](doc.id))
                     success += 1
@@ -430,7 +430,9 @@ class LssDomain(DomainRegistration[LssSettings]):
                             "seconds": res.elapsed_seconds,
                         }
                     )
-                    typer.echo(f"DONE  {doc.id}  ({res.chunk_count} chunks, {res.elapsed_seconds:.1f}s)")
+                    typer.echo(
+                        f"DONE  {doc.id}  ({res.chunk_count} chunks, {res.elapsed_seconds:.1f}s)"
+                    )
                 except Exception as exc:
                     failed += 1
                     results.append({"id": doc.id, "status": "failed", "error": str(exc)})
@@ -438,7 +440,12 @@ class LssDomain(DomainRegistration[LssSettings]):
             if json_output:
                 typer.echo(
                     json.dumps(
-                        {"success": success, "failed": failed, "skipped": skipped, "details": results},
+                        {
+                            "success": success,
+                            "failed": failed,
+                            "skipped": skipped,
+                            "details": results,
+                        },
                         indent=2,
                         default=str,
                     )

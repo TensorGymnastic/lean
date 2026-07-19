@@ -6,7 +6,6 @@ import asyncio
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from lean.models.schemas import ExtractionMethod
 
 _VALID_KEY = "x" * 32

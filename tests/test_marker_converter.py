@@ -8,7 +8,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import respx
-
 from lean.extraction.marker_converter import MarkerNotInstalled, MarkerRemoteError
 
 

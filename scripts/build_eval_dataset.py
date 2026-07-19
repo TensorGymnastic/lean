@@ -11,9 +11,8 @@ import random
 import re
 from pathlib import Path
 
-from psycopg.rows import dict_row
-
 from lean.store.base import StoreConnection
+from psycopg.rows import dict_row
 
 _GENERIC_HEADINGS = frozenset(
     {

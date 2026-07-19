@@ -14,7 +14,6 @@ import os
 from pathlib import Path
 
 import pytest
-
 from lean.chunker.markdown_ast import Section
 from lean.chunker.recursive import ChunkResult
 

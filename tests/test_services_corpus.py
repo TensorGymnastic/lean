@@ -6,7 +6,6 @@ from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from lean.models.schemas import CorpusStats, DocumentSummary, ExtractionMethod
 
 _VALID_KEY = "x" * 32

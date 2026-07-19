@@ -9,10 +9,9 @@ from unittest.mock import MagicMock, patch
 
 import httpx
 import pytest
-from PIL import Image
-
 from lean.vlm.client import VLMClient, VLMError
 from lean.vlm.prompts import CHART_EXTRACTION_PROMPT, parse_description
+from PIL import Image
 
 
 def _make_image(width: int = 100, height: int = 100) -> Image.Image:

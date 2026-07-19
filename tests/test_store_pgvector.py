@@ -493,9 +493,8 @@ def test_find_duplicate_image_hashes_returns_real_duplicates(conn) -> None:
 
 def test_log_query_persists_filter_payload(conn) -> None:
     """log_query writes the row with the JSONB filter payload preserved."""
-    from psycopg.rows import dict_row
-
     from lean.store.analytics import AnalyticsRepo
+    from psycopg.rows import dict_row
 
     repo = AnalyticsRepo(conn)
     repo.log_query(
@@ -529,9 +528,8 @@ def test_log_query_persists_filter_payload(conn) -> None:
 def test_reingested_at_updates_on_upsert(conn) -> None:
     """The upsert_document() ON CONFLICT clause sets reingested_at = now() on re-upsert."""
 
-    from psycopg.rows import dict_row
-
     from lean.store.documents import DocumentRepo
+    from psycopg.rows import dict_row
 
     sha = "reingested-at-test"
     doc_id_1 = _make_doc(conn, sha)
@@ -571,7 +569,6 @@ def test_reingested_at_updates_on_upsert(conn) -> None:
 def test_replace_chunks_atomic_on_failure(conn) -> None:
     """If a chunk insert fails mid-replace, rollback leaves the table unchanged."""
     import psycopg
-
     from lean.store.chunks import ChunkRepo, ChunkRow
     from lean.store.documents import DocumentRepo
 
@@ -646,9 +643,8 @@ def test_replace_chunks_atomic_on_failure(conn) -> None:
 
 def test_save_eval_run_persists_metrics(conn) -> None:
     """save_eval_run writes a row that round-trips through the eval_runs table."""
-    from psycopg.rows import dict_row
-
     from lean.store.analytics import AnalyticsRepo
+    from psycopg.rows import dict_row
 
     repo = AnalyticsRepo(conn)
     repo.save_eval_run(

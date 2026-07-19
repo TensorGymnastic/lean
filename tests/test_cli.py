@@ -435,7 +435,6 @@ def test_cli_health_with_no_services_configured(runner, monkeypatch):
 def test_cli_health_exits_1_when_subsystem_errors(runner, monkeypatch):
     """A subsystem reporting status='error' (OCR) triggers typer.Exit(1)."""
     import httpx
-
     from lean.cli import app
 
     monkeypatch.setattr(
@@ -539,7 +538,6 @@ def test_check_ocr_error_on_non_200():
 def test_check_ocr_handles_network_error():
     """_check_ocr catches network errors and reports them."""
     import httpx
-
     from lean.cli import _check_ocr
 
     settings = MagicMock()
@@ -581,7 +579,6 @@ def test_check_ollama_ok_status():
 def test_check_ollama_error_on_connection_failure():
     """_check_ollama catches network errors and returns error status."""
     import httpx
-
     from lean.cli import _check_ollama
 
     settings = MagicMock()
