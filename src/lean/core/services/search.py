@@ -15,14 +15,14 @@ from uuid import UUID
 from lean.core.config.settings import CoreSettings, get_settings
 from lean.core.infrastructure.embedder import Embedder, get_embedder
 from lean.core.llm.base import LLMClient, get_llm
-from lean.core.models import Chunk
+from lean.core.models import CHUNK_TYPE_IMAGE, CHUNK_TYPE_TEXT, Chunk
 from lean.core.store.analytics import AnalyticsRepo
 from lean.core.store.base import StoreConnection
 from lean.core.store.search import SearchEngine, SearchHit
 
 logger = logging.getLogger(__name__)
 
-VALID_CHUNK_TYPES = frozenset({"text", "image"})
+VALID_CHUNK_TYPES = frozenset({CHUNK_TYPE_TEXT, CHUNK_TYPE_IMAGE})
 
 
 @dataclass(frozen=True)

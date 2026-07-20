@@ -60,66 +60,105 @@ interleave for lost-in-the-middle mitigation.
 
 ```
 src/lean/
-├── config/
-│   ├── settings.py          # pydantic-settings (.env + config.yaml, validated)
-│   └── config.yaml          # committed app config (URLs, thresholds, revisions)
-├── models/
-│   └── schemas.py           # shared Pydantic types (Chunk, Document, SearchHit…)
-├── extraction/              # PDF → markdown
-│   ├── pipeline.py          # marker → OCR → markitdown orchestrator
-│   ├── marker_converter.py  # PRIMARY: datalab-to/marker (surya + texify), local + remote GPU
-│   ├── unlimited_ocr.py     # SECONDARY: baidu/Unlimited-OCR via remote transformers
-│   ├── markitdown_fallback.py  # TERTIARY: pure-Python fallback
-│   ├── ocr_postprocess.py   # annotation stripper + empty-paragraph filter
-│   ├── metadata.py          # title / authors / year / publisher
-│   └── contextual.py        # optional Contextual Retrieval (LLM)
-├── chunker/
-│   ├── markdown_ast.py      # mistune section parser
-│   └── recursive.py         # tiktoken recursive splitter
-├── embeddings/
-│   ├── liquid_lmf.py        # local CPU embedder (sentence-transformers)
-│   └── remote_ollama.py     # remote Ollama embedder (HTTP)
-├── infrastructure/
-│   └── embedder.py          # singleton factory: remote Ollama when set, else local CPU
-├── store/                   # Postgres repositories
-│   ├── base.py              # StoreConnection wrapper
-│   ├── documents.py         # upsert by SHA-256
-│   ├── chunks.py            # batch upsert + replace
-│   ├── search.py            # vector + BM25 + RRF
-│   └── analytics.py         # query logs + eval runs + corpus stats
-├── retrieval/
-│   ├── reranker.py          # cross-encoder (ms-marco-MiniLM-L-6-v2)
-│   └── postprocessors.py    # similarity cutoff + long-context reorder
-├── llm/                     # optional sidecar
-│   ├── base.py              # MiniMax / Ollama factory
-│   └── openai_compatible.py # OpenAI-compatible HTTP client
-├── services/                # business logic (the only place logic lives)
-│   ├── ingestion.py         # ingest_pdf
-│   ├── search.py            # search (orchestrates the pipeline above)
-│   └── corpus.py            # list, get, delete, stats
-├── mcp_server/              # MCP transport (8 tools, 4 resources, 3 prompts)
-├── api/routes.py            # FastAPI REST mirror (7/8 endpoints — see limitations.md)
-├── auth/bearer.py           # ASGI bearer-token middleware
-├── cli.py                   # Typer CLI (full parity with MCP tools)
-└── eval/runner.py           # retrieval evaluation (see evaluation.md)
+├── cli.py                          # universal entry: lean --config <yaml> <command>
+├── core/                           # universal framework
+│   ├── adapters.py                 # @mcp_tool / @rest_route / @cli_command + discover_tools
+│   ├── config/
+│   │   ├── settings.py             # CoreSettings: pydantic-settings (.env + YAML overlay)
+│   │   └── domain_config.py        # DomainConfig: YAML manifest schema (extractors, vlm, tools, metadata)
+│   ├── models/
+│   │   └── schemas.py              # Chunk, DocumentSummary, IngestResult, CorpusStats, ExtractionMethod
+│   ├── extraction/
+│   │   ├── base.py                 # Pipeline + Extractor Protocol + BackendUnavailable
+│   │   ├── marker.py               # MarkerExtractor (remote URL or in-process marker)
+│   │   ├── ocr.py                  # UnlimitedOCRExtractor
+│   │   ├── markitdown.py           # MarkitdownExtractor (fallback)
+│   │   ├── metadata.py             # extract_metadata, PdfMetadata
+│   │   └── pipeline_helpers.py     # find_best_block_match, hash_image, build_chunk_rows, describe_images
+│   ├── chunker/
+│   │   ├── markdown_ast.py         # mistune section parser
+│   │   └── recursive.py            # tiktoken recursive splitter
+│   ├── embeddings/
+│   │   ├── liquid_lmf.py           # local CPU (lazy-imports sentence-transformers)
+│   │   └── remote_ollama.py        # remote Ollama (HTTP)
+│   ├── infrastructure/
+│   │   └── embedder.py             # get_embedder() factory: remote Ollama → local CPU
+│   ├── store/
+│   │   ├── base.py                 # StoreConnection wrapper
+│   │   ├── documents.py            # upsert by SHA-256
+│   │   ├── chunks.py               # ChunkRepo + ChunkRow
+│   │   ├── search.py               # SearchEngine + SearchHit
+│   │   └── analytics.py            # query logs + eval runs
+│   ├── retrieval/
+│   │   ├── reranker.py             # cross-encoder
+│   │   ├── postprocessors.py       # similarity cutoff + long-context reorder
+│   │   └── query_transform.py      # HyDE / multi-query helpers
+│   ├── llm/                        # optional sidecar
+│   │   ├── base.py                 # get_llm() factory
+│   │   └── openai_compatible.py    # OpenAI-compatible HTTP client
+│   ├── vlm/
+│   │   ├── client.py               # OpenAICompatibleVLM (Protocol VLMClient)
+│   │   └── prompts.py              # default chart-extraction prompt + JSON parser
+│   ├── services/                   # business logic
+│   │   ├── ingestion.py            # ingest_pdf, reingest
+│   │   ├── search.py               # search (orchestrates the pipeline above)
+│   │   └── corpus.py               # list, get, delete, stats
+│   ├── transports/                 # universal transport factories
+│   │   ├── cli.py                  # universal Typer CLI (db_init, health, mcp-serve, api-serve, eval)
+│   │   ├── api.py                  # build_api() FastAPI factory (bearer auth)
+│   │   ├── mcp.py                  # build_mcp() FastMCP factory
+│   │   ├── yaml_loader.py          # build_from_yaml() — full domain wiring
+│   │   ├── builder.py              # TransportBuilder (legacy class-based path)
+│   │   ├── registration.py         # DomainRegistration Protocol
+│   │   └── health.py               # check_health() + _check_database/_check_ocr/_check_ollama
+│   ├── auth/
+│   │   └── bearer.py               # ASGI bearer-token middleware
+│   ├── eval/                       # retrieval evaluation
+│   │   └── runner.py               # hit_rate@k, MRR@k, NDCG@k, Recall@k
+│   └── __init__.py
+├── domains/                        # built-in domain adapters
+│   ├── pdf_lss/                    # Lean Six Sigma PDF corpus
+│   │   ├── adapters.py             # MarkerAdapter / OCRAdapter / MarkitdownAdapter
+│   │   ├── metadata.py             # PDF metadata extraction (overrides core)
+│   │   ├── parser.py               # JSON + fence parser
+│   │   ├── prompts.py              # domain-specific prompt extensions
+│   │   ├── chart_extraction_prompt.txt
+│   │   └── tools.py                # 8 MCP + 7 REST + 9 CLI (registers via lean.core.adapters)
+│   ├── code/                       # markdown / source-file corpus
+│   │   ├── adapters.py             # MarkdownFileExtractor
+│   │   ├── metadata.py             # file-stats metadata
+│   │   └── tools.py                # 7 MCP + 6 REST + 8 CLI
+│   └── web/                        # URL corpus
+│       ├── adapters.py             # WebPageExtractor (httpx + trafilatura)
+│       ├── metadata.py             # URL metadata
+│       └── tools.py                # 7 MCP + 4 REST + 6 CLI
+configs/                            # three example domain manifests
+├── lean-pdf-lss.yaml               # LSS corpus config (24 inline comments)
+├── lean-code.yaml                  # code/markdown corpus config
+└── lean-web.yaml                   # URL corpus config
+tests/                              # unit tests + integration + e2e (see Makefile targets)
+db/schemas/                         # SQL migrations (universal + LSS-extended)
+docs/                               # reference docs (this directory)
+└── decisions/                       # ADR scaffolding
 ```
 
 ---
 
 ## Transport tier pattern
 
-Three transports all delegate to the same service layer:
+Three transports all delegate to the same service layer. The YAML loader
+plugs the domain's tools into each:
 
 ```
 ┌─────────────┐  ┌─────────────┐  ┌─────────────┐
 │  CLI (Typer)│  │ MCP server  │  │  REST API   │
-│  cli.py     │  │ mcp_server/ │  │ api/routes  │
+│  cli.py     │  │ mcp.py      │  │ api.py      │
 └──────┬──────┘  └──────┬──────┘  └──────┬──────┘
        │                │                │
        └────────────────┼────────────────┘
                         ▼
               ┌──────────────────┐
-              │ services/        │   ← business logic lives here, only here
+              │ core/services/   │   ← business logic lives here, only here
               │  ingestion.py    │
               │  search.py       │
               │  corpus.py       │
@@ -127,10 +166,17 @@ Three transports all delegate to the same service layer:
                         │
                         ▼
               ┌──────────────────┐
-              │ store/ + embedder│   ← infrastructure
-              │ + llm + retrieval│
+              │ core/store/ +    │   ← infrastructure
+              │ embedder + llm + │
+              │ retrieval        │
               └──────────────────┘
 ```
+
+The universal CLI in `core/transports/cli.py` registers 5 commands
+(`db_init`, `health`, `mcp-serve`, `api-serve`, `eval`) and merges the
+domain's `register_cli(...)` commands on top. The same pattern applies
+to MCP (`build_mcp` + `register_mcp`) and REST (`build_api` +
+`register_api`).
 
 **Rule:** transport modules (CLI / MCP / REST) contain no business
 logic. They parse args, call a service, format the response. If you find

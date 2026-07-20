@@ -1,13 +1,19 @@
-"""Universal settings: .env for secrets, config.yaml for app config.
+"""Universal settings: .env for secrets, YAML overlay for app config.
 
-``CoreSettings`` is the universal base. Domains extend it with their
-own fields and pass their own ``config.yaml`` path to
-``MySettings.from_yaml(domain_yaml_path)``.
+``CoreSettings`` is the universal base. ``CoreSettings.from_yaml(path)``
+loads env vars (from ``.env``) and then overlays YAML values on top, so
+the singleton path (``get_settings``) sees the same end-state as
+``lean.core.transports.yaml_loader.build_from_yaml``.
+
+The single overlay rule lives in ``_apply_settings_overrides`` here so
+there is exactly one canonical implementation — ``yaml_loader`` and
+``CoreSettings.from_yaml`` both call it.
 """
 
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 from typing import Any
 
@@ -26,20 +32,64 @@ def _load_yaml(config_path: Path | None) -> dict[str, Any]:
         return yaml.safe_load(f) or {}
 
 
-def _apply_yaml_overlay(instance: CoreSettings, yaml_data: dict[str, Any]) -> None:
-    """Walk YAML and set known fields on the instance.
+def _apply_overlay_to_kwargs(
+    kwargs: dict[str, Any], field_names: set[str], overrides: dict[str, Any]
+) -> dict[str, Any]:
+    """Overlay ``overrides`` onto a kwargs dict for ``cls(**kwargs)``.
 
-    Flat YAML keys map directly to Settings field names. Nested keys
-    (``embedding.model``) are tried as ``f"{section}_{key}"`` first,
-    then fall back to storing under ``domain_config[section][key]``
-    so the domain can still read them.
-
-    Examples (with CoreSettings):
-        ``embedding: {model: foo}``  →  ``instance.embedding_model = "foo"``
-        ``foo: {bar: 1}``            →  ``instance.domain_config["foo"]["bar"] = 1``
+    Same rules as ``_apply_settings_overrides``: flat keys, composite
+    ``f"{section}_{key}"``, and unknown keys stashed under
+    ``domain_config``. Returns a new dict — does not mutate ``kwargs``.
     """
-    fields = instance.__class__.model_fields
-    for section, sub in yaml_data.items():
+    out = dict(kwargs)
+    for section, sub in overrides.items():
+        if not isinstance(sub, dict):
+            if section in field_names:
+                out[section] = sub
+                continue
+            bucket = out.setdefault("domain_config", {})
+            bucket[section] = sub
+            continue
+        for key, value in sub.items():
+            if key in field_names:
+                out[key] = value
+                continue
+            composite = f"{section}_{key}"
+            if composite in field_names:
+                out[composite] = value
+                continue
+            bucket = out.setdefault("domain_config", {})
+            bucket_section = bucket.setdefault(section, {})
+            bucket_section[key] = value
+    return out
+
+
+def _read_env_kwargs(cls: type[CoreSettings]) -> dict[str, Any]:
+    """Read every field's env var and return a kwargs dict for ``cls(**kwargs)``.
+
+    Reads ``os.environ`` for each field's ``validation_alias`` (uppercased)
+    or field name. Skips fields whose env var isn't set. Used by
+    ``from_yaml`` so the YAML overlay is applied via kwargs (no need
+    to construct, mutate, and re-validate).
+    """
+    out: dict[str, Any] = {}
+    for name, field in cls.model_fields.items():
+        alias = field.validation_alias or name
+        env_val = os.environ.get(str(alias).upper())
+        if env_val is not None:
+            out[name] = env_val
+    return out
+
+
+def _apply_settings_overrides(instance: CoreSettings, overrides: dict[str, Any]) -> None:
+    """Overlay a settings dict onto a CoreSettings instance.
+
+    Used by ``lean.core.transports.yaml_loader`` callers that already
+    have an instance (e.g. legacy tests). The YAML-aware constructor
+    path uses ``_apply_overlay_to_kwargs`` + ``cls(**kwargs)`` instead.
+    """
+    fields = type(instance).model_fields
+    for section, sub in overrides.items():
         if not isinstance(sub, dict):
             if section in fields:
                 setattr(instance, section, sub)
@@ -60,10 +110,12 @@ def _apply_yaml_overlay(instance: CoreSettings, yaml_data: dict[str, Any]) -> No
 
 
 class CoreSettings(BaseSettings):
-    """Universal settings: env vars (secrets) override YAML defaults (app config).
+    """Universal settings: env vars (secrets) + pydantic defaults + YAML overlay.
 
-    Subclass to add domain-specific fields. Domains construct via
-    ``MySettings.from_yaml(my_yaml_path)``.
+    ``from_yaml(path)`` reads env first, then overlays the YAML so a
+    missing Python default for ``mcp_http_port`` / ``api_port`` can be
+    supplied by either ``settings.transport.mcp_port`` in YAML or
+    ``MCP_HTTP_PORT`` env var.
     """
 
     model_config = SettingsConfigDict(
@@ -95,6 +147,15 @@ class CoreSettings(BaseSettings):
     embedding_http_timeout: float = 30.0
     embedding_max_retries: int = 3
 
+    marker_remote_url: str = ""
+    marker_force_ocr: bool = False
+
+    ocr_model: str = "baidu/Unlimited-OCR"
+    ocr_dpi: int = 300
+    ocr_timeout_s: float = 1800.0
+    ocr_max_tokens: int = 32768
+    ocr_batch_size: int = 20
+
     # --- Chunker (universal) ---
     chunk_target_max: int = 450
     chunk_hard_cap: int = 500
@@ -118,9 +179,9 @@ class CoreSettings(BaseSettings):
     rerank_top_n: int = 5
 
     # --- Transports (universal) ---
-    mcp_http_host: str = "127.0.0.1"
-    mcp_http_port: int = 8765
-    api_port: int = 8766
+    mcp_http_host: str = Field(default="127.0.0.1", validation_alias="MCP_HTTP_HOST")
+    mcp_http_port: int = Field(validation_alias="MCP_HTTP_PORT")
+    api_port: int = Field(validation_alias="API_PORT")
 
     # --- Storage (universal) ---
     corpus_root: str = "data"
@@ -138,7 +199,11 @@ class CoreSettings(BaseSettings):
     eval_seed: int = 42
 
     # --- LLM sidecar (universal; optional) ---
-    llm_api_key: str = Field(default="", description="LLM provider API key")
+    llm_api_key: str = Field(
+        default="",
+        description="LLM provider API key (MiniMax by default)",
+        validation_alias="MINIMAX_API_KEY",
+    )
     llm_base_url: str = "https://api.minimax.io"
     llm_model: str = "MiniMax-Text-01"
     llm_ollama_url: str = ""
@@ -151,9 +216,10 @@ class CoreSettings(BaseSettings):
     llm_hyde: bool = False
     llm_multi_query_count: int = 4
 
-    # --- VLM sidecar (universal; optional) ---
-    # No domain prompt here — lean-core ships the transport; domains register prompts.
-    vlm_enabled: bool = False
+    # OCR server URL — universal env-overridable knob (used by the pdf_lss domain).
+    ocr_base_url: str = Field(
+        default="", description="OCR server URL", validation_alias="OCR_BASE_URL"
+    )
     vlm_base_url: str = ""
     vlm_model: str = ""
     vlm_api_key: str = Field(default="", description="VLM API key")
@@ -206,9 +272,12 @@ class CoreSettings(BaseSettings):
             raise ValueError(f"search_fetch_k_cap must be >= 1, got {self.search_fetch_k_cap}")
         if self.max_pdf_mb < 1:
             raise ValueError(f"max_pdf_mb must be >= 1, got {self.max_pdf_mb}")
-        if self.vlm_enabled and (not self.vlm_base_url or not self.vlm_model):
-            raise ValueError("vlm_enabled=true requires vlm_base_url and vlm_model to be set")
-        if self.vlm_enabled:
+        vlm_enabled = bool(self.domain_config.get("vlm", {}).get("enabled", False))
+        if vlm_enabled and (not self.vlm_base_url or not self.vlm_model):
+            raise ValueError(
+                "vlm.enabled=true requires settings.vlm.base_url and settings.vlm.model to be set"
+            )
+        if vlm_enabled:
             logger.warning(
                 "VLM enabled — images will be sent to %s. "
                 "Disable for corpora with PII/trade-secret concerns.",
@@ -224,46 +293,82 @@ class CoreSettings(BaseSettings):
             raise ValueError(
                 f"block_match_min_overlap must be in (0, 1], got {self.block_match_min_overlap}"
             )
+        if self.ocr_dpi < 50 or self.ocr_dpi > 1200:
+            raise ValueError(f"ocr_dpi must be in [50, 1200], got {self.ocr_dpi}")
+        if self.ocr_timeout_s <= 0:
+            raise ValueError(f"ocr_timeout_s must be > 0, got {self.ocr_timeout_s}")
+        if self.ocr_max_tokens < 256:
+            raise ValueError(f"ocr_max_tokens must be >= 256, got {self.ocr_max_tokens}")
+        if self.ocr_batch_size < 1:
+            raise ValueError(f"ocr_batch_size must be >= 1, got {self.ocr_batch_size}")
         return self
 
     @classmethod
     def from_yaml(cls, config_path: Path | None = None) -> CoreSettings:
-        """Build a Settings instance, overlaying YAML values onto defaults.
+        """Build a Settings instance: env vars first, then YAML overlay, then validate.
 
-        Lean-core itself ships no ``config.yaml`` — domains pass their
-        own. Calling ``CoreSettings.from_yaml(None)`` uses pure defaults.
+        Reads every field's env var into a kwargs dict, applies the YAML
+        ``settings:`` block (only) to the dict, then constructs via
+        ``cls(**kwargs)``. Pydantic-settings requires kwargs to be
+        keyed by ``validation_alias`` (not field name) when an alias is
+        set, so the overlay results are re-keyed accordingly.
+
+        Top-level YAML keys (``domain``, ``extractors``, ``vlm``, etc.)
+        belong to ``DomainConfig`` and are not merged into settings here.
+
+        Pass ``None`` to skip the YAML step (uses pure env + defaults).
         """
         yaml_data = _load_yaml(config_path)
-        instance = cls()
-        _apply_yaml_overlay(instance, yaml_data)
-        return instance
+        env_kwargs = _read_env_kwargs(cls)
+        field_names = set(cls.model_fields.keys())
+        settings_block = yaml_data.get("settings", {})
+        merged = _apply_overlay_to_kwargs(env_kwargs, field_names, settings_block)
+        aliased: dict[str, Any] = {}
+        for name, value in merged.items():
+            field = cls.model_fields[name]
+            key = str(field.validation_alias) if field.validation_alias else name
+            aliased[key] = value
+        return cls(**aliased)
 
 
 # Backward-compat alias — code paths that imported ``Settings`` before
-# the lean-core split. Domains should subclass ``CoreSettings``.
+# the lean split. Domains should subclass ``CoreSettings``.
 Settings = CoreSettings
 
 
 # Singleton — per-subclass so subclasses don't share a cached instance.
 _settings_cache: dict[type, Any] = {}
+_active_yaml_path: Path | None = None
+
+
+def set_active_yaml_path(path: Path | None) -> None:
+    """Pin the YAML path used by the next ``get_settings()`` call.
+
+    Called by ``lean.core.transports.yaml_loader.build_from_yaml`` so
+    the singleton reads the manifest even though validation runs
+    during ``cls()``. Cleared by ``clear_settings_cache()``.
+    """
+    global _active_yaml_path
+    _active_yaml_path = path
 
 
 def get_settings(cls: type[CoreSettings] = CoreSettings) -> CoreSettings:
     """Cached singleton for the given Settings subclass.
 
-    Usage:
-        get_settings()                       # → CoreSettings
-        get_settings(LeanLssSettings)        # → LeanLssSettings
-
-    Tests should call ``clear_settings_cache()`` after mutating env.
+    When ``set_active_yaml_path`` has been called (i.e. the process is
+    being driven by ``build_from_yaml``), the YAML overlay is applied
+    before the instance is cached. Tests should call
+    ``clear_settings_cache()`` after mutating env.
     """
     if cls not in _settings_cache:
-        _settings_cache[cls] = cls.from_yaml()
+        _settings_cache[cls] = cls.from_yaml(_active_yaml_path)
     return _settings_cache[cls]  # type: ignore[no-any-return]
 
 
 def clear_settings_cache() -> None:
     """Clear all cached settings — call in tests after env mutation."""
+    global _active_yaml_path
+    _active_yaml_path = None
     _settings_cache.clear()
 
 

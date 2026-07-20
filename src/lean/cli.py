@@ -73,7 +73,7 @@ def _main(
     else:
         try:
             level = getattr(logging, _peek_log_level(config_path), logging.INFO)
-        except Exception:
+        except (AttributeError, ValueError):
             level = logging.INFO
     logging.basicConfig(
         level=level,
@@ -85,16 +85,29 @@ def _main(
     builder = build_from_yaml(config_path)
     domain_name = getattr(builder.settings, "domain_name", None) or config_path.stem
 
-    typer.echo(f"lean: loaded domain '{domain_name}' from {config_path}", err=True)
+    if verbose:
+        typer.echo(f"lean: loaded domain '{domain_name}' from {config_path}", err=True)
 
     ctx.obj = {"config_path": config_path, "builder": builder}
 
 
 def _peek_log_level(config_path: Path) -> str:
-    """Cheap parse of just the log_level from YAML before settings load."""
+    """Cheap parse of just the log_level from YAML before settings load.
+
+    Malformed YAML is logged at DEBUG and treated as INFO — the real
+    settings load happens later and will produce its own actionable error.
+    """
+    import logging
+
     import yaml
 
-    data = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+    try:
+        data = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError:
+        logging.getLogger(__name__).debug(
+            "could not peek log level from %s", config_path, exc_info=True
+        )
+        return "INFO"
     return str(data.get("settings", {}).get("log_level", "INFO")).upper()
 
 
@@ -129,7 +142,11 @@ def main() -> None:
         sys.argv = [sys.argv[0], "--config", str(config_path), *sys.argv[1:]]
 
     clear_settings_cache()
-    builder = build_from_yaml(config_path)
+    try:
+        builder = build_from_yaml(config_path)
+    except ValueError as e:
+        typer.echo(f"lean: {e}", err=True)
+        sys.exit(2)
     _merge_cli_commands(app, builder.cli)
     app()
 

@@ -14,8 +14,9 @@ import os
 from pathlib import Path
 
 import pytest
-from lean.chunker.markdown_ast import Section
-from lean.chunker.recursive import ChunkResult
+
+from lean.core.chunker.markdown_ast import Section
+from lean.core.chunker.recursive import ChunkResult
 
 MINIMAX_KEY = os.environ.get("MINIMAX_API_KEY", "")
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://192.168.2.37:11434")
@@ -50,7 +51,7 @@ ollama_skip = pytest.mark.skipif(
 
 
 def _make_minimax():
-    from lean.llm.openai_compatible import OpenAICompatibleLLM
+    from lean.core.llm.openai_compatible import OpenAICompatibleLLM
 
     return OpenAICompatibleLLM(
         base_url="https://api.minimax.io",
@@ -61,7 +62,7 @@ def _make_minimax():
 
 
 def _make_ollama():
-    from lean.llm.openai_compatible import OpenAICompatibleLLM
+    from lean.core.llm.openai_compatible import OpenAICompatibleLLM
 
     return OpenAICompatibleLLM(
         base_url=OLLAMA_URL,
@@ -115,7 +116,7 @@ def test_minimax_generate_returns_text() -> None:
 @minimax_skip
 def test_minimax_hyde_returns_passage() -> None:
     """HyDE generates a hypothetical document about the query topic."""
-    from lean.retrieval.query_transform import hyde_transform
+    from lean.core.retrieval.query_transform import hyde_transform
 
     llm = _make_minimax()
     passage = hyde_transform(
@@ -128,7 +129,7 @@ def test_minimax_hyde_returns_passage() -> None:
 @minimax_skip
 def test_minimax_multi_query_returns_variants() -> None:
     """Multi-query generates paraphrased queries."""
-    from lean.retrieval.query_transform import multi_query_transform
+    from lean.core.retrieval.query_transform import multi_query_transform
 
     llm = _make_minimax()
     queries = multi_query_transform(
@@ -142,7 +143,7 @@ def test_minimax_multi_query_returns_variants() -> None:
 @minimax_skip
 def test_minimax_contextual_adds_context() -> None:
     """Contextual retrieval prepends LLM-generated context to chunks."""
-    from lean.extraction.contextual import add_context_to_chunks
+    from lean.core.extraction.contextual import add_context_to_chunks
 
     llm = _make_minimax()
     chunks, sections = _make_test_chunks()
@@ -172,7 +173,7 @@ def test_ollama_lfm_generate_returns_text() -> None:
 
 def test_ollama_lfm_hyde_returns_passage() -> None:
     """HyDE via Ollama generates a passage about the query topic."""
-    from lean.retrieval.query_transform import hyde_transform
+    from lean.core.retrieval.query_transform import hyde_transform
 
     try:
         llm = _make_ollama()
@@ -189,7 +190,7 @@ def test_ollama_lfm_hyde_returns_passage() -> None:
 
 def test_ollama_lfm_multi_query_returns_variants() -> None:
     """Multi-query via Ollama generates paraphrased queries."""
-    from lean.retrieval.query_transform import multi_query_transform
+    from lean.core.retrieval.query_transform import multi_query_transform
 
     try:
         llm = _make_ollama()
@@ -206,7 +207,7 @@ def test_ollama_lfm_multi_query_returns_variants() -> None:
 
 def test_ollama_lfm_contextual_adds_context() -> None:
     """Contextual retrieval via Ollama adds context to chunks."""
-    from lean.extraction.contextual import add_context_to_chunks
+    from lean.core.extraction.contextual import add_context_to_chunks
 
     try:
         llm = _make_ollama()

@@ -11,8 +11,9 @@ from unittest.mock import MagicMock
 from uuid import UUID
 
 import pytest
-from lean.models.schemas import Chunk
-from lean.store.search import SearchEngine, SearchHit
+
+from lean.core.models.schemas import Chunk
+from lean.core.store.search import SearchEngine, SearchHit
 
 # --- Helpers ------------------------------------------------------------------
 

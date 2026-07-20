@@ -10,7 +10,7 @@ import pytest
 @pytest.mark.asyncio
 async def test_bearer_middleware_accepts_valid_token() -> None:
     """Request with correct Bearer token passes through."""
-    from lean.auth.bearer import BearerTokenMiddleware
+    from lean.core.auth.bearer import BearerTokenMiddleware
 
     received: list[dict] = []
 
@@ -43,7 +43,7 @@ async def test_bearer_middleware_accepts_valid_token() -> None:
 @pytest.mark.asyncio
 async def test_bearer_middleware_rejects_missing_token() -> None:
     """Request without Authorization header gets 401."""
-    from lean.auth.bearer import BearerTokenMiddleware
+    from lean.core.auth.bearer import BearerTokenMiddleware
 
     async def mock_app(scope, receive, send):
         pytest.fail("Should not reach app")
@@ -68,7 +68,7 @@ async def test_bearer_middleware_rejects_missing_token() -> None:
 @pytest.mark.asyncio
 async def test_bearer_middleware_rejects_wrong_token() -> None:
     """Request with wrong token gets 401."""
-    from lean.auth.bearer import BearerTokenMiddleware
+    from lean.core.auth.bearer import BearerTokenMiddleware
 
     async def mock_app(scope, receive, send):
         pytest.fail("Should not reach app")
@@ -100,7 +100,7 @@ async def test_bearer_middleware_rejects_wrong_token() -> None:
 @pytest.mark.asyncio
 async def test_bearer_middleware_passes_non_http() -> None:
     """Non-HTTP requests (e.g. lifespan) pass through without auth check."""
-    from lean.auth.bearer import BearerTokenMiddleware
+    from lean.core.auth.bearer import BearerTokenMiddleware
 
     received: list[dict] = []
 

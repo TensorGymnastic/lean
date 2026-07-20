@@ -28,7 +28,7 @@ def _mock_conn(cursor=None):
 
 def test_replace_chunks_empty(monkeypatch):
     monkeypatch.setenv("LEAN_MCP_API_KEY", _VALID_KEY)
-    from lean.store.chunks import ChunkRepo
+    from lean.core.store.chunks import ChunkRepo
 
     cursor = _mock_cursor()
     conn = _mock_conn(cursor)
@@ -39,7 +39,7 @@ def test_replace_chunks_empty(monkeypatch):
 
 def test_replace_chunks_with_data(monkeypatch):
     monkeypatch.setenv("LEAN_MCP_API_KEY", _VALID_KEY)
-    from lean.store.chunks import ChunkRepo, ChunkRow
+    from lean.core.store.chunks import ChunkRepo, ChunkRow
 
     cursor = _mock_cursor()
     conn = _mock_conn(cursor)
@@ -67,7 +67,7 @@ def test_replace_chunks_with_data(monkeypatch):
 def test_replace_chunks_commit_false_skips_commit(monkeypatch):
     """When commit=False, replace_chunks must NOT commit — caller controls the transaction."""
     monkeypatch.setenv("LEAN_MCP_API_KEY", _VALID_KEY)
-    from lean.store.chunks import ChunkRepo, ChunkRow
+    from lean.core.store.chunks import ChunkRepo, ChunkRow
 
     cursor = _mock_cursor()
     conn = _mock_conn(cursor)
@@ -94,7 +94,7 @@ def test_replace_chunks_commit_false_skips_commit(monkeypatch):
 
 def _make_chunk_rows(doc_id: uuid.UUID, n: int) -> list:
     """Build n minimal ChunkRow instances for batch-insert tests."""
-    from lean.store.chunks import ChunkRow
+    from lean.core.store.chunks import ChunkRow
 
     return [
         ChunkRow(
@@ -119,7 +119,7 @@ def test_replace_chunks_batches_large_inserts(monkeypatch):
     past the 65535 ceiling. The repo must split into batches of <= _INSERT_BATCH_SIZE.
     """
     monkeypatch.setenv("LEAN_MCP_API_KEY", _VALID_KEY)
-    from lean.store.chunks import _INSERT_BATCH_SIZE, ChunkRepo
+    from lean.core.store.chunks import _INSERT_BATCH_SIZE, ChunkRepo
 
     cursor = _mock_cursor()
     conn = _mock_conn(cursor)
@@ -141,7 +141,7 @@ def test_replace_chunks_batches_large_inserts(monkeypatch):
 def test_replace_chunks_batch_size_keeps_params_under_postgres_limit(monkeypatch):
     """_INSERT_BATCH_SIZE × column count must stay well below 65535 params."""
     monkeypatch.setenv("LEAN_MCP_API_KEY", _VALID_KEY)
-    from lean.store.chunks import _INSERT_BATCH_SIZE
+    from lean.core.store.chunks import _INSERT_BATCH_SIZE
 
     column_count = 24
     assert _INSERT_BATCH_SIZE * column_count <= 65535, (
@@ -153,7 +153,7 @@ def test_replace_chunks_batch_size_keeps_params_under_postgres_limit(monkeypatch
 def test_replace_chunks_small_list_single_batch(monkeypatch):
     """Small lists fit in one batch — do not over-batch."""
     monkeypatch.setenv("LEAN_MCP_API_KEY", _VALID_KEY)
-    from lean.store.chunks import ChunkRepo
+    from lean.core.store.chunks import ChunkRepo
 
     cursor = _mock_cursor()
     conn = _mock_conn(cursor)
@@ -167,7 +167,7 @@ def test_replace_chunks_small_list_single_batch(monkeypatch):
 
 def test_get_chunk_found(monkeypatch):
     monkeypatch.setenv("LEAN_MCP_API_KEY", _VALID_KEY)
-    from lean.store.chunks import ChunkRepo
+    from lean.core.store.chunks import ChunkRepo
 
     fake_row = {
         "id": "00000000-0000-0000-0000-000000000001",
@@ -190,7 +190,7 @@ def test_get_chunk_found(monkeypatch):
 
 def test_get_chunk_not_found(monkeypatch):
     monkeypatch.setenv("LEAN_MCP_API_KEY", _VALID_KEY)
-    from lean.store.chunks import ChunkRepo
+    from lean.core.store.chunks import ChunkRepo
 
     cursor = _mock_cursor(fetchone_return=None)
     conn = _mock_conn(cursor)
@@ -200,7 +200,7 @@ def test_get_chunk_not_found(monkeypatch):
 
 def test_count_chunks(monkeypatch):
     monkeypatch.setenv("LEAN_MCP_API_KEY", _VALID_KEY)
-    from lean.store.chunks import ChunkRepo
+    from lean.core.store.chunks import ChunkRepo
 
     cursor = _mock_cursor(fetchone_return=(42,))
     conn = _mock_conn(cursor)
@@ -210,7 +210,7 @@ def test_count_chunks(monkeypatch):
 
 def test_get_chunks_by_document(monkeypatch):
     monkeypatch.setenv("LEAN_MCP_API_KEY", _VALID_KEY)
-    from lean.store.chunks import ChunkRepo
+    from lean.core.store.chunks import ChunkRepo
 
     fake_rows = [
         {
@@ -239,7 +239,7 @@ def test_get_chunks_by_document(monkeypatch):
 
 def test_upsert_document(monkeypatch):
     monkeypatch.setenv("LEAN_MCP_API_KEY", _VALID_KEY)
-    from lean.store.documents import DocumentRepo
+    from lean.core.store.documents import DocumentRepo
 
     doc_uuid = uuid.uuid4()
     cursor = _mock_cursor(fetchone_return=(doc_uuid,))
@@ -264,7 +264,7 @@ def test_upsert_document(monkeypatch):
 def test_upsert_document_commit_false_skips_commit(monkeypatch):
     """When commit=False, upsert_document must NOT commit — caller controls the transaction."""
     monkeypatch.setenv("LEAN_MCP_API_KEY", _VALID_KEY)
-    from lean.store.documents import DocumentRepo
+    from lean.core.store.documents import DocumentRepo
 
     doc_uuid = uuid.uuid4()
     cursor = _mock_cursor(fetchone_return=(doc_uuid,))
@@ -284,7 +284,7 @@ def test_upsert_document_commit_false_skips_commit(monkeypatch):
 
 def test_delete_document(monkeypatch):
     monkeypatch.setenv("LEAN_MCP_API_KEY", _VALID_KEY)
-    from lean.store.documents import DocumentRepo
+    from lean.core.store.documents import DocumentRepo
 
     cursor = _mock_cursor()
     conn = _mock_conn(cursor)
@@ -296,7 +296,7 @@ def test_delete_document(monkeypatch):
 
 def test_get_source_path_found(monkeypatch):
     monkeypatch.setenv("LEAN_MCP_API_KEY", _VALID_KEY)
-    from lean.store.documents import DocumentRepo
+    from lean.core.store.documents import DocumentRepo
 
     cursor = _mock_cursor(fetchone_return=("data/test.pdf",))
     conn = _mock_conn(cursor)
@@ -306,7 +306,7 @@ def test_get_source_path_found(monkeypatch):
 
 def test_get_source_path_not_found(monkeypatch):
     monkeypatch.setenv("LEAN_MCP_API_KEY", _VALID_KEY)
-    from lean.store.documents import DocumentRepo
+    from lean.core.store.documents import DocumentRepo
 
     cursor = _mock_cursor(fetchone_return=None)
     conn = _mock_conn(cursor)
@@ -318,7 +318,7 @@ def test_list_documents(monkeypatch):
     monkeypatch.setenv("LEAN_MCP_API_KEY", _VALID_KEY)
     from datetime import datetime
 
-    from lean.store.documents import DocumentRepo
+    from lean.core.store.documents import DocumentRepo
 
     fake_rows = [
         {

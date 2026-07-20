@@ -1,26 +1,65 @@
 # lean
 
-An MCP server for ingesting Lean Six Sigma PDFs into a searchable multimodal
-knowledge base. Uses marker-pdf for high-quality extraction (with optional
-remote GPU acceleration), Vision-Language Model enrichment for charts and
-figures, section-aware chunking, GPU-accelerated embeddings, provenance-tracked
+A dockerized MCP server driven by YAML domain manifests. Built-in domains
+ship out of the box: PDF (marker-pdf + OCR + markitdown + optional VLM),
+markdown/source-file corpus, and URL corpus. Adding a fourth domain = drop
+a YAML in `configs/` + a `tools.py` in `src/lean/domains/`.
+
+Uses marker-pdf for high-quality PDF extraction (with optional remote GPU
+acceleration), Vision-Language Model enrichment for charts and figures,
+section-aware chunking, GPU-accelerated embeddings, provenance-tracked
 storage, and hybrid BM25 + vector search via pgvector.
 
 ## Features
 
-- **Marker-pdf extraction (primary)** — `datalab-to/marker` (surya OCR + texify) with proper table/equation/heading formatting and figure extraction. Runs locally on CPU or on a remote GPU server via HTTP (44× faster — 14s vs 626s for a 29-page PDF). Falls back to Unlimited-OCR (remote transformers) then markitdown (pure Python) when unavailable.
-- **VLM chart/image enrichment** — Vision-Language Model (MiniMax M3 default, Ollama Qwen3.5 fallback) describes every chart, diagram, and figure at ingest time. Descriptions are structured (`title`, `chart_type`, `axis_labels`, `key_data_points`, `description`) and embedded alongside text, making visual content searchable. **~3.5s/image, ~$0.004/image via MiniMax M3 API.**
-- **Provenance metadata** — every chunk tracks `embedding_model`, `embedding_dim`; every image chunk tracks `image_hash`, `provenance_model` (which VLM described it). Enables model-version auditing and future dedup.
-- **Chunk-type filter** — search returns `text` and `image` chunks; filter by `chunk_type="image"` to surface only charts/figures.
-- **Section-aware chunking** — mistune AST parser splits markdown by headings, then a recursive tiktoken-based splitter bounds chunks to a target token window
-- **GPU-accelerated embeddings** — LiquidAI/LFM2.5-Embedding-350M (1024-dim) served via Ollama on the GPU server, with automatic local CPU fallback
-- **Hybrid search** — BM25 full-text (PostgreSQL tsvector) fused with pgvector cosine similarity via Reciprocal Rank Fusion (RRF, k=60)
-- **Cross-encoder reranking** — fetch wide candidate set, rerank with `ms-marco-MiniLM-L-6-v2`, return top-k
-- **MCP server** — 8 tools, 4 resources, 3 prompts exposed over stdio or HTTP, plus a REST mirror (7 MCP-mirroring endpoints plus `/health`; `reingest` is intentionally CLI-only)
-- **Retrieval evaluation** — `lean eval` command computing hit_rate@k, MRR@k, NDCG@k, Recall@k (see [`docs/evaluation.md`](docs/evaluation.md) for caveats)
-- **Optional LLM sidecar** — Contextual Retrieval, HyDE, multi-query generation — all opt-in, pipeline works without LLM
-- **Security hardening** — corpus-root path confinement, API key validation (min 16 chars, `change-me` rejected), HuggingFace model revisions pinned to SHA hashes, non-root Docker user, multi-stage build
-- **Optional ML deps** — torch/transformers/sentence-transformers only when local CPU embeddings are needed (`uv sync --extra local-models`); marker-pdf for high-quality extraction (`uv sync --extra marker`)
+- **YAML-driven domains** — every command (`ingest`, `search`, `reingest`,
+  `eval`, `health`, `db-init`, `mcp-serve`, `api-serve`) is selected via
+  `--config <yaml>`. Built-in domains: `lean-pdf-lss`, `lean-code`,
+  `lean-web`. Domain-specific tools register via shared `@mcp_tool` /
+  `@rest_route` / `@cli_command` decorators in `lean.core.adapters`.
+- **Marker-pdf extraction (primary)** — `datalab-to/marker` (surya OCR +
+  texify) with proper table/equation/heading formatting and figure
+  extraction. Runs locally on CPU or on a remote GPU server via HTTP (44×
+  faster — 14s vs 626s for a 29-page PDF). Falls back to Unlimited-OCR
+  (remote transformers) then markitdown (pure Python) when unavailable.
+- **VLM chart/image enrichment** — Vision-Language Model (MiniMax M3
+  default, Ollama Qwen3.5 fallback) describes every chart, diagram, and
+  figure at ingest time. Descriptions are structured
+  (`title`, `chart_type`, `axis_labels`, `key_data_points`, `description`)
+  and embedded alongside text, making visual content searchable.
+  **~3.5s/image, ~$0.004/image via MiniMax M3 API.**
+- **Provenance metadata** — every chunk tracks `embedding_model`,
+  `embedding_dim`; every image chunk tracks `image_hash`,
+  `provenance_model` (which VLM described it). Enables model-version
+  auditing and future dedup.
+- **Chunk-type filter** — search returns `text` and `image` chunks;
+  filter by `chunk_type="image"` to surface only charts/figures.
+- **Section-aware chunking** — mistune AST parser splits markdown by
+  headings, then a recursive tiktoken-based splitter bounds chunks to a
+  target token window
+- **GPU-accelerated embeddings** — LiquidAI/LFM2.5-Embedding-350M
+  (1024-dim) served via Ollama on the GPU server, with automatic local
+  CPU fallback
+- **Hybrid search** — BM25 full-text (PostgreSQL tsvector) fused with
+  pgvector cosine similarity via Reciprocal Rank Fusion (RRF, k=60)
+- **Cross-encoder reranking** — fetch wide candidate set, rerank with
+  `ms-marco-MiniLM-L-6-v2`, return top-k
+- **MCP server** — tools exposed over stdio or HTTP, configured per YAML
+  manifest. Built-in domains ship tools + matching REST routes via shared
+  decorators.
+- **Retrieval evaluation** — `lean eval` command computing hit_rate@k,
+  MRR@k, NDCG@k, Recall@k (see [`docs/evaluation.md`](docs/evaluation.md)
+  for caveats)
+- **Optional LLM sidecar** — Contextual Retrieval, HyDE, multi-query
+  generation — all opt-in, pipeline works without LLM
+- **Security hardening** — corpus-root path confinement, API key
+  validation (min 16 chars, `change-me` rejected), HuggingFace model
+  revisions pinned to SHA hashes, non-root Docker user, multi-stage
+  build
+- **Optional ML deps** — torch/transformers/sentence-transformers only
+  when local CPU embeddings are needed (`uv sync --extra local-models`);
+  marker-pdf for high-quality extraction (`uv sync --extra marker`);
+  trafilatura for web extraction (`uv sync --extra web`)
 
 ## Tech Stack
 
@@ -40,11 +79,18 @@ storage, and hybrid BM25 + vector search via pgvector.
 - **Python 3.12+** with [uv](https://docs.astral.sh/uv/)
 - **Docker** (for local Supabase)
 - **Remote GPU server** (NVIDIA, 12GB+ VRAM) running:
-  - **Marker server**: pure-Python HTTP wrapper around marker's `PdfConverter` on port 8000 (44× faster than CPU)
-  - **Ollama**: `lfm2.5-embed-32k` model (LFM2.5-Embedding-350M, 32K context) on port 11434
-  - *(optional)* **Unlimited-OCR server**: `baidu/Unlimited-OCR` via transformers on port 8001 (secondary extraction fallback)
+  - **Marker server**: pure-Python HTTP wrapper around marker's
+    `PdfConverter` on port 8000 (44× faster than CPU). Configure at
+    `settings.marker.remote_url` in the YAML, or `MARKER_REMOTE_URL` env.
+  - **Ollama**: `lfm2.5-embed-32k` model (LFM2.5-Embedding-350M, 32K
+    context) on port 11434
+  - *(optional)* **Unlimited-OCR server**: `baidu/Unlimited-OCR` via
+    transformers on port 8001 (secondary extraction fallback)
 
-> All GPU services are optional — `lean` falls back to local marker-pdf (CPU), local CPU embeddings, and markitdown when remote servers are not configured. VLM enrichment is also optional (disable via `vlm.enabled: false`).
+> All GPU services are optional — `lean` falls back to local marker-pdf
+> (CPU), local CPU embeddings, and markitdown when remote servers are
+> not configured. VLM enrichment is also optional (disable via
+> `vlm.enabled: false` at the top level of the YAML).
 
 ## Quick Start
 
@@ -56,20 +102,24 @@ uv sync --all-groups
 uv sync --extra marker          # marker-pdf for high-quality extraction
 # (optional) Local CPU embeddings + reranker (~2GB torch):
 uv sync --extra local-models
+# (optional) URL extraction for the lean-web domain:
+uv sync --extra web
 
 # 2. Install git hooks
 make hooks-install
 
 # 3. Configure secrets
 cp .env.example .env  # set SUPABASE_DB_URL, LEAN_MCP_API_KEY (min 16 chars, not 'change-me')
-# (optional) VLM_API_KEY for MiniMax, MARKER_REMOTE_URL for GPU marker server
+# (optional) VLM_API_KEY for MiniMax, MINIMAX_API_KEY for LLM features
 
 # 4. Start local database
 docker compose up -d supabase-db
 make db-init
 
-# 5. Ingest PDFs
-make ingest-all
+# 5. Pick a domain and ingest
+make CONFIG=configs/lean-pdf-lss.yaml ingest-all   # PDFs
+make CONFIG=configs/lean-code.yaml ingest-one FILE=README.md   # markdown
+make CONFIG=configs/lean-web.yaml ingest https://example.com    # URL
 
 # 6. Search (text + image chunks)
 make search QUERY="What is DMAIC?"
@@ -83,23 +133,30 @@ For the remote GPU server (marker + Ollama + optional OCR setup), see
 
 ### CLI (`lean`)
 
-All commands support `--json` for structured output. Use `-v` / `--verbose` for debug logging.
+All commands support `--json` for structured output. Use `-v` / `--verbose`
+for debug logging.
+
+**Every command requires `--config <yaml>` (or `LEAN_CONFIG` env var).**
 
 | Command | Description |
 |---|---|
-| `lean ingest <path>` | Ingest a PDF into the corpus (uses marker → OCR → markitdown fallback chain, optional VLM enrichment) |
-| `lean search "<query>"` | Semantic + hybrid search (`--k`, `--doc-id`, `--section`, `--author`, `--year-min`, `--year-max`, `--min-score`, `--chunk-type text\|image`) |
-| `lean list-documents` | List all documents in the corpus |
-| `lean get-chunk <chunk_id>` | Retrieve a single chunk by UUID |
-| `lean get-markdown <doc_id>` | Get extracted markdown for a document |
-| `lean delete <doc_id>` | Delete a document and all its chunks |
-| `lean reingest <doc_id>` | Re-extract a document with current settings |
-| `lean reingest-all` | Batch reingest all documents (`--force` to re-extract OCR'd docs) |
-| `lean eval` | Run retrieval evaluation (`--sample-size`, `--k`, `--dataset <path>` for curated queries) |
-| `lean health` | Check marker server, OCR server, database, and Ollama connectivity |
-| `lean mcp-serve` | Start the MCP server (`--transport stdio\|http`, `--port`) |
-| `lean api-serve` | Start the FastAPI REST API server (`--reload` for dev) |
-| `lean db-init` | Apply all SQL migrations to the database |
+| `lean --config <yaml> db-init` | Apply SQL migrations from `db/schemas/` |
+| `lean --config <yaml> health` | Check DB + embedder + optional VLM/LLM connectivity |
+| `lean --config <yaml> mcp-serve` | Start MCP server (`--transport stdio\|http`, `--port`) |
+| `lean --config <yaml> api-serve` | Start FastAPI REST API server (`--reload` for dev) |
+| `lean --config <yaml> eval` | Run retrieval evaluation (`--sample-size`, `--k`, `--dataset <path>`) |
+
+**Domain-specific commands** (auto-registered from the domain's
+`tools.py`):
+
+| Domain | Commands |
+|---|---|
+| `lean-pdf-lss` | `ingest <pdf>`, `search "<query>"`, `list-documents`, `get-chunk <chunk_id>`, `get-markdown <doc_id>`, `delete <doc_id>`, `reingest <doc_id>`, `reingest-all [--force]` |
+| `lean-code` | `ingest <file>`, `ingest-directory --dir <dir> [--pattern <glob>]`, `search`, `list-documents`, `corpus-stats`, `get-chunk`, `get-markdown`, `delete` |
+| `lean-web` | `ingest <url>`, `ingest-list --file <urls.txt>`, `search`, `list-documents`, `corpus-stats` |
+
+Search options (all domains): `--k`, `--doc-id`, `--section`, `--author`,
+`--year-min`, `--year-max`, `--min-score`, `--chunk-type text\|image`.
 
 ### Makefile
 
@@ -110,10 +167,10 @@ All commands support `--json` for structured output. Use `-v` / `--verbose` for 
 | `make format` / `make format-check` / `make lint` / `make typecheck` | individual checks |
 | `make db-init` | apply all SQL migrations |
 | `make db-reset` | `supabase db reset` (destroys data) |
-| `make ingest-all` / `make ingest-one FILE=…` | ingest PDFs |
+| `make ingest-all` / `make ingest-one FILE=…` | ingest PDFs (uses `CONFIG`) |
 | `make search QUERY="…"` | search from the command line |
 | `make mcp-serve` / `make mcp-serve-http` | start MCP server (stdio / HTTP) |
-| `make api-serve` | start FastAPI REST mirror (port 8766) |
+| `make api-serve` | start FastAPI REST mirror |
 | `make health` / `make smoke` | check marker server, OCR server, database, Ollama (`smoke` is an alias for `health`) |
 | `make build` / `make up` / `make down` | Docker lifecycle |
 
@@ -126,21 +183,26 @@ All commands support `--json` for structured output. Use `-v` / `--verbose` for 
   "mcpServers": {
     "lean": {
       "command": "uv",
-      "args": ["run", "--directory", "/path/to/lean", "lean", "mcp-serve"]
+      "args": ["run", "--directory", "/path/to/lean", "lean", "--config",
+               "configs/lean-pdf-lss.yaml", "mcp-serve"]
     }
   }
 }
 ```
 
-**8 tools:** `ingest_pdf`, `search`, `get_chunk`, `list_documents`,
-`get_document_markdown`, `delete_document`, `reingest`, `corpus_stats`
+Tools exposed by each domain (via shared `@mcp_tool` /
+`@rest_route` / `@cli_command` decorators in `lean.core.adapters`):
 
-**4 resources:** `lean://documents`, `lean://documents/{id}/markdown`,
-`lean://documents/{id}/chunks`, `lean://stats`
+- `lean-pdf-lss` — `ingest_pdf`, `search`, `get_chunk`, `list_documents`,
+  `get_document_markdown`, `delete_document`, `reingest`, `corpus_stats`
+- `lean-code` — `ingest_file`, `search`, `get_chunk`, `list_documents`,
+  `corpus_stats`, `get_document_markdown`, `delete_document`
+- `lean-web` — `ingest_url`, `search`, `list_documents`, `corpus_stats`
 
-**3 prompts:** `lean_qa`, `lean_glossary`, `lean_compare_concepts`
+Resources and prompts are **not** auto-shipped. Add them by writing
+`@mcp.resource` / `@mcp.prompt` functions in your domain's `tools.py`.
 
-### REST API (near-full mirror)
+### REST API
 
 ```bash
 make api-serve   # http://localhost:8766
@@ -149,34 +211,40 @@ curl -H "Authorization: Bearer $LEAN_MCP_API_KEY" \
      "http://localhost:8766/search?query=What+is+DMAIC%3F&k=5"
 ```
 
-Endpoints (7/8 MCP tools — `reingest` is CLI-only; see [`docs/limitations.md`](docs/limitations.md#rest-api-now-mirrors-7-of-8-mcp-tools-near-full-parity)):
+Domain errors map to HTTP codes: `ValueError` → 400, `PermissionError` →
+403, `FileNotFoundError` → 404. See `docs/architecture.md` for the
+universal error-handling contract.
 
-| Endpoint | MCP equivalent |
-|---|---|
-| `GET /health` | (no auth, always 200) |
-| `GET /search` | `search` (supports `chunk_type` filter) |
-| `GET /documents` | `list_documents` |
-| `GET /documents/{id}/markdown` | `get_document_markdown` |
-| `DELETE /documents/{id}` | `delete_document` |
-| `GET /chunks/{chunk_id}` | `get_chunk` |
-| `GET /stats` | `corpus_stats` |
-| `POST /ingest` | `ingest_pdf` |
+## Adding a new domain
 
-Domain errors map to HTTP codes: `ValueError` → 400, `PermissionError` → 403,
-`FileNotFoundError` → 404.
+1. Create `src/lean/domains/<my_domain>/` with `adapters.py`, `tools.py`,
+   optionally `metadata.py`.
+2. Drop a YAML manifest in `configs/<my-domain>.yaml`.
+3. Run `uv run lean --config configs/<my-domain>.yaml --help` to verify
+   the surface.
+
+The shared decorators in `lean.core.adapters` register the same function
+across MCP, REST, and CLI surfaces — write once, expose everywhere.
 
 ## Documentation
 
-- **[`docs/`](docs/)** — reference docs (configuration, operations, architecture, evaluation, limitations)
-- **[`docs/configuration.md`](docs/configuration.md)** — every `Settings` field, defaults, validators, gotchas
-- **[`docs/operations.md`](docs/operations.md)** — Docker ports, healthcheck semantics, post-ingest reindex, reingest semantics
-- **[`docs/architecture.md`](docs/architecture.md)** — pipeline, directory layout, transport tier pattern
-- **[`docs/limitations.md`](docs/limitations.md)** — known caveats (page fields on remote path, eval pseudo-queries, SHA-256 dedup orphans, REST near-full mirror)
+- **[`docs/`](docs/)** — reference docs (configuration, operations,
+  architecture, evaluation, limitations)
+- **[`docs/configuration.md`](docs/configuration.md)** — every
+  `Settings` field, defaults, validators, gotchas
+- **[`docs/operations.md`](docs/operations.md)** — Docker ports,
+  healthcheck semantics, post-ingest reindex, reingest semantics
+- **[`docs/architecture.md`](docs/architecture.md)** — pipeline,
+  directory layout, transport tier pattern
+- **[`docs/limitations.md`](docs/limitations.md)** — known caveats
 - **[`docs/decisions/`](docs/decisions/)** — Architecture Decision Records
 - **[`AGENTS.md`](AGENTS.md)** — operational rules for agents
 
 ## License
 
-MIT for project code. See model licenses for third-party weights (`datalab-to/marker`, `baidu/Unlimited-OCR`, `LiquidAI/LFM2.5-Embedding-350M`, MiniMax M3).
+MIT for project code. See model licenses for third-party weights
+(`datalab-to/marker`, `baidu/Unlimited-OCR`,
+`LiquidAI/LFM2.5-Embedding-350M`, MiniMax M3).
 
-For known caveats and runtime behavior, see [`docs/limitations.md`](docs/limitations.md) and [`AGENTS.md`](AGENTS.md).
+For known caveats and runtime behavior, see
+[`docs/limitations.md`](docs/limitations.md) and [`AGENTS.md`](AGENTS.md).

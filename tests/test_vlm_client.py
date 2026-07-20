@@ -9,9 +9,10 @@ from unittest.mock import MagicMock, patch
 
 import httpx
 import pytest
-from lean.vlm.client import VLMClient, VLMError
-from lean.vlm.prompts import CHART_EXTRACTION_PROMPT, parse_description
 from PIL import Image
+
+from lean.core.vlm.client import OpenAICompatibleVLM, VLMError
+from lean.core.vlm.prompts import CHART_EXTRACTION_PROMPT, parse_description
 
 
 def _make_image(width: int = 100, height: int = 100) -> Image.Image:
@@ -28,7 +29,7 @@ def _mock_response(content: str) -> MagicMock:
 
 class TestVLMClientInit:
     def test_creates_client_with_api_key(self):
-        client = VLMClient(
+        client = OpenAICompatibleVLM(
             base_url="http://gpu:11434/v1",
             model="gemma3:27b",
             api_key="test-key",
@@ -37,20 +38,20 @@ class TestVLMClientInit:
         assert "Authorization" in client._headers
 
     def test_creates_client_without_api_key(self):
-        client = VLMClient(
+        client = OpenAICompatibleVLM(
             base_url="http://gpu:11434/v1",
             model="gemma3:27b",
         )
         assert "Authorization" not in client._headers
 
     def test_strips_trailing_slash_from_base_url(self):
-        client = VLMClient(base_url="http://gpu:11434/v1/", model="m")
+        client = OpenAICompatibleVLM(base_url="http://gpu:11434/v1/", model="m")
         assert client._base_url == "http://gpu:11434/v1"
 
 
 class TestDescribeImage:
     def test_sends_image_and_returns_text(self):
-        client = VLMClient(base_url="http://gpu:11434/v1", model="gemma3:27b")
+        client = OpenAICompatibleVLM(base_url="http://gpu:11434/v1", model="gemma3:27b")
         mock_resp = _mock_response("A bar chart showing Q1-Q4 revenue.")
         with patch.object(client._client, "post", return_value=mock_resp) as mock_post:
             result = client.describe_image(_make_image(), prompt="Describe this.")
@@ -62,7 +63,7 @@ class TestDescribeImage:
         assert any(p["type"] == "text" for p in content)
 
     def test_image_is_base64_png_data_uri(self):
-        client = VLMClient(base_url="http://gpu:11434/v1", model="m")
+        client = OpenAICompatibleVLM(base_url="http://gpu:11434/v1", model="m")
         mock_resp = _mock_response("desc")
         with patch.object(client._client, "post", return_value=mock_resp) as mock_post:
             client.describe_image(_make_image(50, 50), prompt="x")
@@ -76,7 +77,7 @@ class TestDescribeImage:
         assert img.size == (50, 50)
 
     def test_includes_detail_in_image_url(self):
-        client = VLMClient(base_url="http://gpu:11434/v1", model="m", detail="high")
+        client = OpenAICompatibleVLM(base_url="http://gpu:11434/v1", model="m", detail="high")
         mock_resp = _mock_response("desc")
         with patch.object(client._client, "post", return_value=mock_resp) as mock_post:
             client.describe_image(_make_image(), prompt="x")
@@ -85,7 +86,7 @@ class TestDescribeImage:
         assert image_part["image_url"]["detail"] == "high"
 
     def test_uses_custom_max_tokens(self):
-        client = VLMClient(base_url="http://gpu:11434/v1", model="m")
+        client = OpenAICompatibleVLM(base_url="http://gpu:11434/v1", model="m")
         mock_resp = _mock_response("desc")
         with patch.object(client._client, "post", return_value=mock_resp) as mock_post:
             client.describe_image(_make_image(), prompt="x", max_tokens=500)
@@ -93,7 +94,7 @@ class TestDescribeImage:
         assert body["max_tokens"] == 500
 
     def test_disable_thinking_adds_field(self):
-        client = VLMClient(
+        client = OpenAICompatibleVLM(
             base_url="http://gpu:11434/v1", model="MiniMax-M3", disable_thinking=True
         )
         mock_resp = _mock_response("desc")
@@ -103,7 +104,7 @@ class TestDescribeImage:
         assert body["thinking"] == {"type": "disabled"}
 
     def test_thinking_not_in_body_by_default(self):
-        client = VLMClient(base_url="http://gpu:11434/v1", model="m")
+        client = OpenAICompatibleVLM(base_url="http://gpu:11434/v1", model="m")
         mock_resp = _mock_response("desc")
         with patch.object(client._client, "post", return_value=mock_resp) as mock_post:
             client.describe_image(_make_image(), prompt="x")
@@ -111,7 +112,7 @@ class TestDescribeImage:
         assert "thinking" not in body
 
     def test_raises_on_http_error(self):
-        client = VLMClient(base_url="http://gpu:11434/v1", model="m")
+        client = OpenAICompatibleVLM(base_url="http://gpu:11434/v1", model="m")
         with (
             patch.object(client._client, "post", side_effect=httpx.ConnectError("refused")),
             pytest.raises(VLMError, match="VLM request failed"),
@@ -119,7 +120,7 @@ class TestDescribeImage:
             client.describe_image(_make_image(), prompt="x")
 
     def test_raises_on_empty_content(self):
-        client = VLMClient(base_url="http://gpu:11434/v1", model="m")
+        client = OpenAICompatibleVLM(base_url="http://gpu:11434/v1", model="m")
         mock_resp = _mock_response("")
         with (
             patch.object(client._client, "post", return_value=mock_resp),
@@ -128,7 +129,7 @@ class TestDescribeImage:
             client.describe_image(_make_image(), prompt="x")
 
     def test_raises_on_missing_choices(self):
-        client = VLMClient(base_url="http://gpu:11434/v1", model="m")
+        client = OpenAICompatibleVLM(base_url="http://gpu:11434/v1", model="m")
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.json.return_value = {"error": "model not found"}
@@ -146,7 +147,7 @@ class TestDescribeImage:
         like MiniMax unless the base_url already includes ``/v1`` (audit
         finding 4.3 in docs/audit-architecture-2026-07-19.md).
         """
-        client = VLMClient(base_url="http://gpu:11434", model="m")
+        client = OpenAICompatibleVLM(base_url="http://gpu:11434", model="m")
         mock_resp = _mock_response("desc")
         with patch.object(client._client, "post", return_value=mock_resp) as mock_post:
             client.describe_image(_make_image(), prompt="x")

@@ -12,8 +12,9 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 import pytest
-from lean.retrieval.reranker import rerank
-from lean.store.search import SearchHit
+
+from lean.core.retrieval.reranker import rerank
+from lean.core.store.search import SearchHit
 
 
 @pytest.fixture
@@ -47,7 +48,7 @@ class TestRerankEmpty:
 
     def test_empty_does_not_load_model(self) -> None:
         """No _get_reranker call when hits list is empty."""
-        with patch("lean.retrieval.reranker._get_reranker") as mock_get:
+        with patch("lean.core.retrieval.reranker._get_reranker") as mock_get:
             rerank([], query="test", model="m", top_n=5, device="cpu")
             mock_get.assert_not_called()
 
@@ -61,7 +62,7 @@ class TestRerankSorting:
         # Encoder reverses the ranking: last hit scores highest
         mock_encoder.predict.return_value = [0.3, 0.95, 0.6]
 
-        with patch("lean.retrieval.reranker._get_reranker", return_value=mock_encoder):
+        with patch("lean.core.retrieval.reranker._get_reranker", return_value=mock_encoder):
             result = rerank(hits, "query", model="m", top_n=3, device="cpu")
 
         assert [r.chunk.id for r in result] == ["c1", "c2", "c0"]
@@ -73,7 +74,7 @@ class TestRerankSorting:
         hits = make_hits([0.42])
         mock_encoder.predict.return_value = [0.88]
 
-        with patch("lean.retrieval.reranker._get_reranker", return_value=mock_encoder):
+        with patch("lean.core.retrieval.reranker._get_reranker", return_value=mock_encoder):
             result = rerank(hits, "query", model="m", top_n=5, device="cpu")
 
         assert len(result) == 1
@@ -88,7 +89,7 @@ class TestRerankTopN:
         hits = make_hits([0.1, 0.2, 0.3, 0.4, 0.5])
         mock_encoder.predict.return_value = [0.9, 0.8, 0.7, 0.6, 0.5]
 
-        with patch("lean.retrieval.reranker._get_reranker", return_value=mock_encoder):
+        with patch("lean.core.retrieval.reranker._get_reranker", return_value=mock_encoder):
             result = rerank(hits, "query", model="m", top_n=2, device="cpu")
 
         assert len(result) == 2
@@ -97,7 +98,7 @@ class TestRerankTopN:
         hits = make_hits([0.3, 0.6])
         mock_encoder.predict.return_value = [0.4, 0.9]
 
-        with patch("lean.retrieval.reranker._get_reranker", return_value=mock_encoder):
+        with patch("lean.core.retrieval.reranker._get_reranker", return_value=mock_encoder):
             result = rerank(hits, "query", model="m", top_n=10, device="cpu")
 
         assert len(result) == 2
@@ -111,7 +112,7 @@ class TestRerankScoreUpdate:
         hits = make_hits([original_score])
         mock_encoder.predict.return_value = [0.111]
 
-        with patch("lean.retrieval.reranker._get_reranker", return_value=mock_encoder):
+        with patch("lean.core.retrieval.reranker._get_reranker", return_value=mock_encoder):
             result = rerank(hits, "query", model="m", top_n=5, device="cpu")
 
         assert result[0].chunk.score == pytest.approx(0.111)
@@ -122,7 +123,7 @@ class TestRerankScoreUpdate:
         hits = make_hits([0.99])
         mock_encoder.predict.return_value = [0.01]
 
-        with patch("lean.retrieval.reranker._get_reranker", return_value=mock_encoder):
+        with patch("lean.core.retrieval.reranker._get_reranker", return_value=mock_encoder):
             result = rerank(hits, "query", model="m", top_n=5, device="cpu")
 
         assert hits[0].chunk.score == pytest.approx(0.99)  # unchanged
@@ -141,7 +142,7 @@ class TestRerankEncoderInteraction:
         ]
         mock_encoder.predict.return_value = [0.8, 0.2]
 
-        with patch("lean.retrieval.reranker._get_reranker", return_value=mock_encoder):
+        with patch("lean.core.retrieval.reranker._get_reranker", return_value=mock_encoder):
             rerank(hits, "my query", model="m", top_n=2, device="cpu")
 
         pairs = mock_encoder.predict.call_args[0][0]
@@ -152,7 +153,9 @@ class TestRerankEncoderInteraction:
         mock_encoder.predict.return_value = [0.9]
 
         with (
-            patch("lean.retrieval.reranker._get_reranker", return_value=mock_encoder) as mock_get,
+            patch(
+                "lean.core.retrieval.reranker._get_reranker", return_value=mock_encoder
+            ) as mock_get,
         ):
             rerank(
                 hits, "query", model="cross-encoder-model", top_n=5, device="cpu", revision="abc123"
@@ -164,7 +167,9 @@ class TestRerankEncoderInteraction:
         hits = make_hits([0.5])
         mock_encoder.predict.return_value = [0.9]
 
-        with patch("lean.retrieval.reranker._get_reranker", return_value=mock_encoder) as mock_get:
+        with patch(
+            "lean.core.retrieval.reranker._get_reranker", return_value=mock_encoder
+        ) as mock_get:
             rerank(hits, "query", model="m", top_n=5, device="cpu")
 
         # Third positional arg (revision) defaults to ""

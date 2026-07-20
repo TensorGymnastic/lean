@@ -38,6 +38,12 @@ _MAX_PIL_PIXELS = 50_000_000
 _HTML_TAG_RE = __import__("re").compile(r"<[^>]+>")
 
 
+# Backward-compat aliases — tests + downstream code that imported these
+# before the unification still get a sensible type.
+MarkerNotInstalled = BackendUnavailable
+MarkerRemoteError = ExtractorUnavailable
+
+
 @dataclass
 class BlockMeta:
     """Per-block metadata from marker extraction — page number + bbox + text."""

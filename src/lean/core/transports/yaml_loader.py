@@ -12,69 +12,106 @@ from pathlib import Path
 from typing import Any
 
 from lean.core.config.domain_config import DomainConfig, ExtractorRef, VLMConfig
-from lean.core.config.settings import CoreSettings, get_settings
+from lean.core.config.settings import (
+    CoreSettings,
+    get_settings,
+    set_active_yaml_path,
+)
 from lean.core.extraction.base import Extractor, Pipeline, set_pipeline
 from lean.core.transports.builder import TransportBuilder
 
 logger = logging.getLogger(__name__)
 
 
+# The module path on any dotted-path field (extractors, vlm.parser,
+# metadata.extractor, tools.module) must start with one of these prefixes.
+# Anything else is rejected: user-controlled YAML must not be able to
+# import arbitrary Python modules (``subprocess``, ``os``, ``pickle``, …)
+# and instantiate them with attacker-supplied kwargs.
+ALLOWED_ADAPTER_PREFIXES: tuple[str, ...] = (
+    "lean.core.",
+    "lean.domains.",
+)
+
+
+def _is_allowed(module_path: str) -> bool:
+    return any(module_path.startswith(prefix) for prefix in ALLOWED_ADAPTER_PREFIXES)
+
+
 def _import_object(dotted: str) -> Any:
     """Import a Python object by dotted path.
 
     Example: ``lean.domains.pdf_lss.adapters.MarkerAdapter``.
+
+    The module path must start with one of ``ALLOWED_ADAPTER_PREFIXES``;
+    otherwise a ``ValueError`` is raised. Import errors are also wrapped
+    in ``ValueError`` so callers see an actionable message instead of a
+    Python traceback.
     """
     if ":" in dotted:
         module_path, attr = dotted.split(":", 1)
-        module = importlib.import_module(module_path)
-        return getattr(module, attr)
-    module_path, _, attr = dotted.rpartition(".")
-    if not module_path:
+    else:
+        module_path, _, attr = dotted.rpartition(".")
+    if not module_path or not attr:
         raise ValueError(f"invalid dotted path: {dotted!r}")
-    module = importlib.import_module(module_path)
-    return getattr(module, attr)
+    if not _is_allowed(module_path):
+        raise ValueError(f"adapter {dotted!r} not in allowed prefixes {ALLOWED_ADAPTER_PREFIXES}")
+    try:
+        module = importlib.import_module(module_path)
+        obj = getattr(module, attr)
+    except (ModuleNotFoundError, AttributeError) as e:
+        raise ValueError(f"could not import adapter {dotted!r}: {e}") from e
+    return obj
 
 
-def _load_extractor(ref: ExtractorRef) -> Extractor:
+def _merge_extractor_defaults(
+    adapter: str, config: dict[str, Any], settings: CoreSettings
+) -> dict[str, Any]:
+    """Overlay ``settings`` defaults onto ``config`` for known backends.
+
+    Settings is the single source of truth for marker/ocr tunables. If
+    the extractor config block has an empty string (or the field is
+    missing), the value from ``settings`` wins — so a YAML author can
+    declare ``settings.marker.remote_url`` once and have it apply to
+    every marker extractor in the chain.
+
+    Returns a new dict — does not mutate ``config``.
+    """
+    out = dict(config)
+    name = adapter.rsplit(".", 1)[-1]
+    if name in {"MarkerAdapter", "MarkerExtractor"}:
+        if not out.get("remote_url"):
+            out["remote_url"] = settings.marker_remote_url
+        if "force_ocr" not in out:
+            out["force_ocr"] = settings.marker_force_ocr
+    if name in {"UnlimitedOCRAdapter", "UnlimitedOCRExtractor"}:
+        if not out.get("base_url"):
+            out["base_url"] = settings.ocr_base_url
+        if not out.get("model"):
+            out["model"] = settings.ocr_model
+        if not out.get("dpi"):
+            out["dpi"] = settings.ocr_dpi
+        if not out.get("timeout"):
+            out["timeout"] = settings.ocr_timeout_s
+        if not out.get("max_tokens"):
+            out["max_tokens"] = settings.ocr_max_tokens
+        if not out.get("batch_size"):
+            out["batch_size"] = settings.ocr_batch_size
+    return out
+
+
+def _load_extractor(ref: ExtractorRef, settings: CoreSettings) -> Extractor:
     """Load an extractor adapter and instantiate it with its config."""
     obj_or_cls = _import_object(ref.adapter)
+    config = _merge_extractor_defaults(ref.adapter, ref.config, settings)
     if isinstance(obj_or_cls, type):
-        return obj_or_cls(**ref.config)  # type: ignore[no-any-return]
-    return obj_or_cls(ref.config)  # type: ignore[no-any-return]
+        return obj_or_cls(**config)  # type: ignore[no-any-return]
+    return obj_or_cls(config)  # type: ignore[no-any-return]
 
 
-def _build_pipeline(domain_config: DomainConfig) -> Pipeline:
-    extractors = [_load_extractor(ref) for ref in domain_config.extractors]
+def _build_pipeline(domain_config: DomainConfig, settings: CoreSettings) -> Pipeline:
+    extractors = [_load_extractor(ref, settings) for ref in domain_config.extractors]
     return Pipeline(extractors)
-
-
-def _apply_settings_overrides(settings: CoreSettings, overrides: dict[str, Any]) -> CoreSettings:
-    """Apply domain YAML settings to a CoreSettings instance.
-
-    Keys that match a Settings field are set directly. Nested dicts
-    are tried as composite ``section_key`` (e.g. ``embedding.model``).
-    Unknown keys go to ``settings.domain_config`` for the domain.
-    """
-    fields = settings.model_fields
-    for section, sub in overrides.items():
-        if not isinstance(sub, dict):
-            if section in fields:
-                setattr(settings, section, sub)
-            else:
-                settings.domain_config[section] = sub
-            continue
-        for key, value in sub.items():
-            if key in fields:
-                setattr(settings, key, value)
-                continue
-            composite = f"{section}_{key}"
-            if composite in fields:
-                setattr(settings, composite, value)
-                continue
-            bucket = settings.domain_config.setdefault(section, {})
-            if isinstance(bucket, dict):
-                bucket[key] = value
-    return settings
 
 
 def _install_vlm_hooks(domain_config: DomainConfig) -> None:
@@ -199,10 +236,10 @@ def build_from_yaml(yaml_path: Path) -> TransportBuilder:
     domain_config = DomainConfig.from_yaml(yaml_path)
     object.__setattr__(domain_config, "_yaml_path", yaml_path)
 
+    set_active_yaml_path(yaml_path)
     settings = get_settings()
-    _apply_settings_overrides(settings, domain_config.settings)
 
-    pipeline = _build_pipeline(domain_config)
+    pipeline = _build_pipeline(domain_config, settings)
     set_pipeline(pipeline)
 
     _install_vlm_hooks(domain_config)

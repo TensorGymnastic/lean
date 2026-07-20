@@ -3,13 +3,15 @@
 Uses asymmetric prompts: ``prompt_name="query"`` for queries,
 ``"document"`` for passages. Returns normalized 1024-dim vectors so
 dot product equals cosine similarity.
+
+``sentence_transformers`` is an optional dependency (``uv sync --extra local-models``);
+the import is deferred to ``__init__`` so the package remains importable
+without it.
 """
 
 from __future__ import annotations
 
 import logging
-
-from sentence_transformers import SentenceTransformer
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +33,13 @@ class LiquidLMFEmbedder:
         dim: int = 1024,
         revision: str,
     ) -> None:
+        try:
+            from sentence_transformers import SentenceTransformer
+        except ImportError as e:
+            raise ImportError(
+                "sentence-transformers is not installed; install with "
+                "`uv sync --extra local-models` to use LiquidLMFEmbedder"
+            ) from e
         logger.info("loading embedding model %s@%s on %s", model, revision[:8], device)
         self._model = SentenceTransformer(
             model,

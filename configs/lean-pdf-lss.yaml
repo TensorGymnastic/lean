@@ -37,10 +37,9 @@ settings:
     corpus_root: "data"
     max_pdf_mb: 200
   transport:
-    mcp_port: 8765
+    mcp_http_port: 8765
     api_port: 8766
   vlm:
-    enabled: false
     base_url: ""
     model: ""
     detail: high
@@ -50,18 +49,10 @@ settings:
 
 extractors:
   - adapter: lean.domains.pdf_lss.adapters.MarkerAdapter
-    config:
-      force_ocr: false
-      remote_url: ""
+    config: {}
   - adapter: lean.domains.pdf_lss.adapters.UnlimitedOCRAdapter
     config:
-      base_url: ""
       hf_token: ""
-      model: baidu/Unlimited-OCR
-      dpi: 300
-      timeout: 1800.0
-      max_tokens: 32768
-      batch_size: 20
   - adapter: lean.domains.pdf_lss.adapters.MarkitdownAdapter
     config: {}
 

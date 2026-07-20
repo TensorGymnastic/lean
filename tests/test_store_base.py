@@ -9,13 +9,13 @@ _VALID_KEY = "x" * 32
 
 def test_store_connection_context_manager(monkeypatch):
     monkeypatch.setenv("LEAN_MCP_API_KEY", _VALID_KEY)
-    from lean.store.base import StoreConnection
+    from lean.core.store.base import StoreConnection
 
     mock_conn = MagicMock()
     with (
-        patch("lean.store.base.psycopg.connect", return_value=mock_conn),
-        patch("lean.store.base.register_vector"),
-        patch("lean.store.base.get_settings") as mock_settings,
+        patch("lean.core.store.base.psycopg.connect", return_value=mock_conn),
+        patch("lean.core.store.base.register_vector"),
+        patch("lean.core.store.base.get_settings") as mock_settings,
     ):
         mock_settings.return_value = MagicMock(supabase_db_url="postgresql://localhost/postgres")
         store = StoreConnection("postgresql://localhost/postgres")
@@ -27,12 +27,12 @@ def test_store_connection_context_manager(monkeypatch):
 
 def test_store_connection_close(monkeypatch):
     monkeypatch.setenv("LEAN_MCP_API_KEY", _VALID_KEY)
-    from lean.store.base import StoreConnection
+    from lean.core.store.base import StoreConnection
 
     mock_conn = MagicMock()
     with (
-        patch("lean.store.base.psycopg.connect", return_value=mock_conn),
-        patch("lean.store.base.register_vector"),
+        patch("lean.core.store.base.psycopg.connect", return_value=mock_conn),
+        patch("lean.core.store.base.register_vector"),
     ):
         store = StoreConnection("postgresql://localhost/postgres")
         store.close()
@@ -41,13 +41,13 @@ def test_store_connection_close(monkeypatch):
 
 def test_store_connection_from_env(monkeypatch):
     monkeypatch.setenv("LEAN_MCP_API_KEY", _VALID_KEY)
-    from lean.store.base import StoreConnection
+    from lean.core.store.base import StoreConnection
 
     mock_conn = MagicMock()
     with (
-        patch("lean.store.base.psycopg.connect", return_value=mock_conn),
-        patch("lean.store.base.register_vector"),
-        patch("lean.store.base.get_settings") as mock_settings,
+        patch("lean.core.store.base.psycopg.connect", return_value=mock_conn),
+        patch("lean.core.store.base.register_vector"),
+        patch("lean.core.store.base.get_settings") as mock_settings,
     ):
         mock_settings.return_value = MagicMock(supabase_db_url="postgresql://localhost/postgres")
         store = StoreConnection.from_env()

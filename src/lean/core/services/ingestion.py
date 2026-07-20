@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import sys as _sys
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -41,6 +42,11 @@ if TYPE_CHECKING:
     pass
 
 logger = logging.getLogger(__name__)
+
+# Self-reference for the VLM hook (yaml_loader sets `_domain_describe_one`
+# on this module after build_from_yaml; the ingestion pipeline looks it up
+# at call time so domains can inject their VLM prompt + parser).
+_ingestion_module = _sys.modules[__name__]
 
 _SHA256_CHUNK_SIZE = 1 << 20
 
@@ -214,7 +220,11 @@ async def ingest_pdf(path: str) -> IngestResult:
     chunk_results, warnings = await _maybe_contextualize(
         chunk_results, sections, settings, warnings
     )
-    image_descriptions, image_warnings = await describe_images(result.images, settings)
+    image_descriptions, image_warnings = await describe_images(
+        result.images,
+        settings,
+        describe_one=getattr(_ingestion_module, "_domain_describe_one", None),
+    )
     warnings.extend(image_warnings)
     embeddings = await _embed_chunks(chunk_results, image_descriptions)
     pdf_meta = await anyio.to_thread.run_sync(lambda: extract_metadata(pdf_path))

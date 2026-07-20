@@ -1,10 +1,10 @@
-"""Tests for lean.models.schemas."""
+"""Tests for lean.core.models.schemas."""
 
 from __future__ import annotations
 
 from datetime import datetime
 
-from lean.models.schemas import (
+from lean.core.models.schemas import (
     CHUNK_TYPE_IMAGE,
     CHUNK_TYPE_TEXT,
     Chunk,

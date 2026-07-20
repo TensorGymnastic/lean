@@ -22,7 +22,7 @@ def _mock_conn_with_cursor(fetchone_return=None, fetchall_return=None):
 
 def test_log_query(monkeypatch):
     monkeypatch.setenv("LEAN_MCP_API_KEY", _VALID_KEY)
-    from lean.store.analytics import AnalyticsRepo
+    from lean.core.store.analytics import AnalyticsRepo
 
     conn, cursor = _mock_conn_with_cursor()
     repo = AnalyticsRepo(conn)
@@ -40,7 +40,7 @@ def test_log_query(monkeypatch):
 
 def test_save_eval_run(monkeypatch):
     monkeypatch.setenv("LEAN_MCP_API_KEY", _VALID_KEY)
-    from lean.store.analytics import AnalyticsRepo
+    from lean.core.store.analytics import AnalyticsRepo
 
     conn, cursor = _mock_conn_with_cursor()
     repo = AnalyticsRepo(conn)
@@ -60,7 +60,7 @@ def test_save_eval_run(monkeypatch):
 
 def test_count_documents(monkeypatch):
     monkeypatch.setenv("LEAN_MCP_API_KEY", _VALID_KEY)
-    from lean.store.analytics import AnalyticsRepo
+    from lean.core.store.analytics import AnalyticsRepo
 
     conn, cursor = _mock_conn_with_cursor(fetchone_return=(10,))
     repo = AnalyticsRepo(conn)
@@ -69,7 +69,7 @@ def test_count_documents(monkeypatch):
 
 def test_count_documents_no_row(monkeypatch):
     monkeypatch.setenv("LEAN_MCP_API_KEY", _VALID_KEY)
-    from lean.store.analytics import AnalyticsRepo
+    from lean.core.store.analytics import AnalyticsRepo
 
     conn, cursor = _mock_conn_with_cursor(fetchone_return=None)
     repo = AnalyticsRepo(conn)
@@ -79,7 +79,7 @@ def test_count_documents_no_row(monkeypatch):
 
 def test_corpus_stats(monkeypatch):
     monkeypatch.setenv("LEAN_MCP_API_KEY", _VALID_KEY)
-    from lean.store.analytics import AnalyticsRepo
+    from lean.core.store.analytics import AnalyticsRepo
 
     conn = MagicMock()
     cursor = MagicMock()
@@ -110,7 +110,7 @@ def test_corpus_stats(monkeypatch):
 def test_corpus_stats_raises_when_chunks_count_missing(monkeypatch):
     """count(*) returning None on the chunks query triggers a RuntimeError."""
     monkeypatch.setenv("LEAN_MCP_API_KEY", _VALID_KEY)
-    from lean.store.analytics import AnalyticsRepo
+    from lean.core.store.analytics import AnalyticsRepo
 
     conn = MagicMock()
     cursor = MagicMock()
@@ -128,7 +128,7 @@ def test_corpus_stats_raises_when_chunks_count_missing(monkeypatch):
 def test_corpus_stats_raises_when_total_tokens_missing(monkeypatch):
     """sum(token_count) returning None triggers a RuntimeError."""
     monkeypatch.setenv("LEAN_MCP_API_KEY", _VALID_KEY)
-    from lean.store.analytics import AnalyticsRepo
+    from lean.core.store.analytics import AnalyticsRepo
 
     conn = MagicMock()
     cursor = MagicMock()
@@ -147,7 +147,7 @@ def test_corpus_stats_includes_last_ingested_timestamp(monkeypatch):
     """When a max(ingested_at) row exists, last_ingested_at is set on the response."""
     from datetime import datetime
 
-    from lean.store.analytics import AnalyticsRepo
+    from lean.core.store.analytics import AnalyticsRepo
 
     conn = MagicMock()
     cursor = MagicMock()
@@ -171,7 +171,7 @@ def test_corpus_stats_includes_last_ingested_timestamp(monkeypatch):
 def test_count_documents_uses_int_cast(monkeypatch):
     """count_documents returns int(row[0]) — guard against Decimal types from psycopg."""
     monkeypatch.setenv("LEAN_MCP_API_KEY", _VALID_KEY)
-    from lean.store.analytics import AnalyticsRepo
+    from lean.core.store.analytics import AnalyticsRepo
 
     conn = MagicMock()
     cursor = MagicMock()

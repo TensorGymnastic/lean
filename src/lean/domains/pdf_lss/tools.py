@@ -369,5 +369,4 @@ def register_cli(app: typer.Typer) -> None:
     register_cli_tools(app, sys.modules[__name__])
 
 
-
 __all__ = ["register_mcp", "register_api", "register_cli"]

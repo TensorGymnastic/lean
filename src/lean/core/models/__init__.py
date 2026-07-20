@@ -1,4 +1,4 @@
-"""Pydantic schemas shared across lean-core. Domains extend with their
+"""Pydantic schemas shared across lean. Domains extend with their
 own typed fields.
 """
 

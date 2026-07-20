@@ -1,7 +1,7 @@
 # Evaluation
 
 `lean eval` computes hit_rate@k, MRR@k, NDCG@k, and Recall@k against the
-ingested corpus. The implementation is in `src/lean/eval/runner.py`. This
+ingested corpus. The implementation is in `src/lean/core/eval/runner.py`. This
 document describes what it actually measures — and what it **doesn't**
 measure that is easy to misread from the metrics.
 
@@ -27,7 +27,7 @@ There are two modes:
 **Curated (`--dataset <path>`):**
 
 ```bash
-lean eval --dataset data/curated_eval_dataset.json --k 5
+lean --config configs/lean-pdf-lss.yaml eval --dataset data/curated_eval_dataset.json --k 5
 ```
 
 1. **Load** the JSON list of `{"query": str, "expected_chunk_id": str}`
@@ -135,7 +135,7 @@ query = f"{heading}: {content_preview}"
 
 ## For production eval
 
-The module docstring (`src/lean/eval/runner.py:6-9`) is explicit:
+The module docstring (`src/lean/core/eval/runner.py:6-9`) is explicit:
 
 > The eval dataset is built by sampling chunks from the corpus and using
 > their heading text + content as pseudo-queries. **For production eval,

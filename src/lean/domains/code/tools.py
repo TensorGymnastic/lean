@@ -2,7 +2,7 @@
 
 Auto-discoverable MCP tools, REST routes, and CLI commands for the
 code/markdown-file corpus. Reuses the universal services from
-lean-core (corpus_stats, list_documents, get_chunk, etc.) and adds
+lean (corpus_stats, list_documents, get_chunk, etc.) and adds
 domain-specific entry points (ingest_directory, ingest_git_repo).
 """
 
@@ -309,7 +309,6 @@ def register_cli(app: typer.Typer) -> None:
     from lean.core.adapters import register_cli_tools
 
     register_cli_tools(app, sys.modules[__name__])
-
 
 
 __all__ = ["register_mcp", "register_api", "register_cli"]

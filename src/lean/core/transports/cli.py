@@ -5,7 +5,7 @@ api-serve, serve) and lets the domain register its own commands via
 ``register_fn(app, services, settings)``.
 
 The shared commands work the same regardless of domain — they're the
-universal "operators" every lean-core deployment needs.
+universal "operators" every lean deployment needs.
 """
 
 from __future__ import annotations
@@ -47,7 +47,7 @@ def _add_universal_commands(
     """Add the universal operator commands (health, db-init, mcp-serve, api-serve).
 
     These commands are not domain-specific — they're the boot surface
-    every lean-core deployment needs.
+    every lean deployment needs.
     """
 
     @app.callback()
@@ -141,6 +141,47 @@ def _add_universal_commands(
                 typer.echo(f"{label} {name}: {status}")
         if any(info.get("status") == "error" for info in results.values()):
             raise typer.Exit(1)
+
+    @app.command(name="eval")
+    def eval_cmd(
+        sample_size: int = typer.Option(50, "--sample-size", help="Pseudo-query sample size"),
+        k: int = typer.Option(5, "--k", help="Top-k for hit/metric computation"),
+        dataset: Path | None = typer.Option(None, "--dataset", help="Curated JSON dataset path"),
+        json_output: bool = typer.Option(False, "--json"),
+    ) -> None:
+        """Run retrieval evaluation: hit_rate@k, MRR@k, NDCG@k, Recall@k.
+
+        If ``--dataset`` is given, the curated JSON is used; otherwise a
+        pseudo-dataset is built from random sampled chunks. The full search
+        pipeline is NOT exercised — see docs/evaluation.md for caveats.
+        """
+        from lean.core.eval import evaluate as eval_run
+        from lean.core.eval import load_curated_dataset
+        from lean.core.eval.runner import build_eval_dataset
+        from lean.core.store.base import StoreConnection
+
+        settings = settings_factory()
+        db_url = settings.db_url
+        if dataset is not None:
+            samples = load_curated_dataset(dataset)
+        else:
+            with StoreConnection(db_url) as conn:
+                samples = build_eval_dataset(conn, sample_size=sample_size, seed=settings.eval_seed)
+
+        with StoreConnection(db_url) as conn:
+            result = eval_run(conn, samples, k=k)
+
+        if json_output:
+            typer.echo(json.dumps(result.__dict__, indent=2))
+        else:
+            typer.echo(
+                f"hit_rate@{k}={result.hit_rate:.3f}  "
+                f"MRR@{k}={result.mrr:.3f}  "
+                f"NDCG@{k}={result.ndcg:.3f}  "
+                f"Recall@{k}={result.recall:.3f}  "
+                f"latency={result.mean_latency_ms:.0f}ms  "
+                f"n={result.sample_count}"
+            )
 
 
 def build_cli(

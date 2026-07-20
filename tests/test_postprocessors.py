@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from lean.models.schemas import Chunk
-from lean.store.search import SearchHit
+from lean.core.models.schemas import Chunk
+from lean.core.store.search import SearchHit
 
 
 def _hit(score: float, content: str = "x") -> SearchHit:
@@ -22,7 +22,7 @@ def _hit(score: float, content: str = "x") -> SearchHit:
 
 
 def test_similarity_filter_removes_below_threshold():
-    from lean.retrieval.postprocessors import similarity_filter
+    from lean.core.retrieval.postprocessors import similarity_filter
 
     hits = [_hit(0.9), _hit(0.5), _hit(0.3)]
     result = similarity_filter(hits, min_score=0.5)
@@ -31,7 +31,7 @@ def test_similarity_filter_removes_below_threshold():
 
 
 def test_similarity_filter_keeps_all_when_threshold_low():
-    from lean.retrieval.postprocessors import similarity_filter
+    from lean.core.retrieval.postprocessors import similarity_filter
 
     hits = [_hit(0.1), _hit(0.2)]
     result = similarity_filter(hits, min_score=0.0)
@@ -39,13 +39,13 @@ def test_similarity_filter_keeps_all_when_threshold_low():
 
 
 def test_similarity_filter_empty_list():
-    from lean.retrieval.postprocessors import similarity_filter
+    from lean.core.retrieval.postprocessors import similarity_filter
 
     assert similarity_filter([], min_score=0.5) == []
 
 
 def test_long_context_reorder_single_hit():
-    from lean.retrieval.postprocessors import long_context_reorder
+    from lean.core.retrieval.postprocessors import long_context_reorder
 
     hits = [_hit(0.9)]
     result = long_context_reorder(hits)
@@ -53,13 +53,13 @@ def test_long_context_reorder_single_hit():
 
 
 def test_long_context_reorder_empty():
-    from lean.retrieval.postprocessors import long_context_reorder
+    from lean.core.retrieval.postprocessors import long_context_reorder
 
     assert long_context_reorder([]) == []
 
 
 def test_long_context_reorder_interleaves():
-    from lean.retrieval.postprocessors import long_context_reorder
+    from lean.core.retrieval.postprocessors import long_context_reorder
 
     hits = [_hit(0.1), _hit(0.5), _hit(0.3), _hit(0.9)]
     result = long_context_reorder(hits)
@@ -69,7 +69,7 @@ def test_long_context_reorder_interleaves():
 
 
 def test_long_context_reorder_two_hits():
-    from lean.retrieval.postprocessors import long_context_reorder
+    from lean.core.retrieval.postprocessors import long_context_reorder
 
     hits = [_hit(0.3), _hit(0.9)]
     result = long_context_reorder(hits)

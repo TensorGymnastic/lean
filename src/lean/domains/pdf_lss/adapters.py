@@ -1,6 +1,6 @@
 """PDF extraction backend adapters for the pdf_lss domain.
 
-Each class is a thin wrapper around a lean-core ``Extractor`` with
+Each class is a thin wrapper around a lean ``Extractor`` with
 the LSS-specific defaults (model names, timeouts, etc.) pre-baked.
 The YAML manifest references these by dotted path.
 """

@@ -40,7 +40,11 @@ health:
 	uv run lean --config $(CONFIG) health
 
 ingest-all:
-	uv run lean --config $(CONFIG) ingest-directory --dir data --pattern "*.pdf"
+	@for pdf in data/*.pdf; do \
+		[ -f "$$pdf" ] || continue; \
+		echo "=== ingesting $$pdf ==="; \
+		uv run lean --config $(CONFIG) ingest "$$pdf"; \
+	done
 
 ingest-one:
 	@test -n "$(FILE)" || (echo "Usage: make ingest-one FILE=path/to.pdf" && exit 1)

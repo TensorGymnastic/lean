@@ -18,7 +18,7 @@ def test_minimax_generate_success() -> None:
         )
     )
 
-    from lean.llm.openai_compatible import OpenAICompatibleLLM
+    from lean.core.llm.openai_compatible import OpenAICompatibleLLM
 
     llm = OpenAICompatibleLLM(
         base_url="https://api.minimax.io",
@@ -41,7 +41,7 @@ def test_ollama_generate_success() -> None:
         )
     )
 
-    from lean.llm.openai_compatible import OpenAICompatibleLLM
+    from lean.core.llm.openai_compatible import OpenAICompatibleLLM
 
     llm = OpenAICompatibleLLM(
         base_url="http://gpu-host:11434",
@@ -61,7 +61,7 @@ def test_generate_with_system_prompt() -> None:
         )
     )
 
-    from lean.llm.openai_compatible import OpenAICompatibleLLM
+    from lean.core.llm.openai_compatible import OpenAICompatibleLLM
 
     llm = OpenAICompatibleLLM(base_url="https://api.test.io", model="test-model")
     llm.generate("Hello", system="You are a robot")
@@ -78,7 +78,7 @@ def test_generate_raises_on_error() -> None:
         return_value=httpx.Response(500, text="Internal Server Error")
     )
 
-    from lean.llm.openai_compatible import OpenAICompatibleLLM
+    from lean.core.llm.openai_compatible import OpenAICompatibleLLM
 
     llm = OpenAICompatibleLLM(base_url="https://api.test.io", model="test-model")
     try:

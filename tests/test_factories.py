@@ -12,10 +12,10 @@ from unittest.mock import MagicMock, patch
 
 def test_get_embedder_remote_ollama(monkeypatch_env):
     """Remote URL set: RemoteOllamaEmbedder constructed with all 6 kwargs."""
-    from lean.infrastructure.embedder import get_embedder
+    from lean.core.infrastructure.embedder import get_embedder
 
     get_embedder.cache_clear()
-    with patch("lean.infrastructure.embedder.get_settings") as mock_settings:
+    with patch("lean.core.infrastructure.embedder.get_settings") as mock_settings:
         s = MagicMock()
         s.embedding_remote_url = "http://gpu:11434"
         s.embedding_remote_model = "lfm2.5-embed-32k"
@@ -24,7 +24,7 @@ def test_get_embedder_remote_ollama(monkeypatch_env):
         s.embedding_http_timeout = 30.0
         s.embedding_max_retries = 3
         mock_settings.return_value = s
-        with patch("lean.embeddings.remote_ollama.RemoteOllamaEmbedder") as mock_cls:
+        with patch("lean.core.embeddings.remote_ollama.RemoteOllamaEmbedder") as mock_cls:
             mock_cls.return_value = MagicMock(dim=1024)
             get_embedder()
 
@@ -41,10 +41,10 @@ def test_get_embedder_remote_ollama(monkeypatch_env):
 
 def test_get_embedder_local_cpu(monkeypatch_env):
     """When remote_url is empty, LiquidLMFEmbedder is constructed with all 5 kwargs."""
-    from lean.infrastructure.embedder import get_embedder
+    from lean.core.infrastructure.embedder import get_embedder
 
     get_embedder.cache_clear()
-    with patch("lean.infrastructure.embedder.get_settings") as mock_settings:
+    with patch("lean.core.infrastructure.embedder.get_settings") as mock_settings:
         s = MagicMock()
         s.embedding_remote_url = ""
         s.embedding_remote_model = ""
@@ -54,7 +54,7 @@ def test_get_embedder_local_cpu(monkeypatch_env):
         s.embedding_dim = 1024
         s.embedding_model_revision = "f35ae2c9"
         mock_settings.return_value = s
-        with patch("lean.embeddings.liquid_lmf.LiquidLMFEmbedder") as mock_cls:
+        with patch("lean.core.embeddings.liquid_lmf.LiquidLMFEmbedder") as mock_cls:
             mock_cls.return_value = MagicMock(dim=1024)
             get_embedder()
 
@@ -70,44 +70,41 @@ def test_get_embedder_local_cpu(monkeypatch_env):
 
 def test_get_llm_minimax(monkeypatch_env):
     """When minimax_api_key is set, OpenAICompatibleLLM is constructed with MiniMax config."""
-    from lean.llm.base import get_llm
+    from lean.core.llm.base import get_llm
 
-    get_llm.cache_clear()
-    with patch("lean.llm.base.get_settings") as mock_settings:
+    with patch("lean.core.llm.base.get_settings") as mock_settings:
         s = MagicMock()
-        s.minimax_api_key = "minimax-key-12345"
-        s.llm_minimax_base_url = "https://api.minimax.io"
-        s.llm_minimax_model = "MiniMax-Text-01"
+        s.llm_api_key = "llm-test-key-1234567890"
+        s.llm_base_url = "https://api.minimax.io"
+        s.llm_model = "MiniMax-Text-01"
         s.llm_timeout_s = 60.0
         s.llm_ollama_url = ""
         s.llm_ollama_model = ""
         mock_settings.return_value = s
-        with patch("lean.llm.openai_compatible.OpenAICompatibleLLM") as mock_cls:
+        with patch("lean.core.llm.openai_compatible.OpenAICompatibleLLM") as mock_cls:
             mock_cls.return_value = MagicMock()
             get_llm()
 
     mock_cls.assert_called_once_with(
         base_url="https://api.minimax.io",
         model="MiniMax-Text-01",
-        api_key="minimax-key-12345",
+        api_key="llm-test-key-1234567890",
         timeout=60.0,
     )
-    get_llm.cache_clear()
 
 
 def test_get_llm_ollama(monkeypatch_env):
     """Ollama URL set (no minimax key): OpenAICompatibleLLM with Ollama config."""
-    from lean.llm.base import get_llm
+    from lean.core.llm.base import get_llm
 
-    get_llm.cache_clear()
-    with patch("lean.llm.base.get_settings") as mock_settings:
+    with patch("lean.core.llm.base.get_settings") as mock_settings:
         s = MagicMock()
-        s.minimax_api_key = ""
+        s.llm_api_key = ""
         s.llm_ollama_url = "http://gpu:11434"
         s.llm_ollama_model = "qwen3.5:9b"
         s.llm_timeout_s = 60.0
         mock_settings.return_value = s
-        with patch("lean.llm.openai_compatible.OpenAICompatibleLLM") as mock_cls:
+        with patch("lean.core.llm.openai_compatible.OpenAICompatibleLLM") as mock_cls:
             mock_cls.return_value = MagicMock()
             get_llm()
 
@@ -117,40 +114,36 @@ def test_get_llm_ollama(monkeypatch_env):
         api_key="",
         timeout=60.0,
     )
-    get_llm.cache_clear()
 
 
 def test_get_llm_none_when_unconfigured(monkeypatch_env):
     """When neither minimax nor ollama is configured, get_llm returns None."""
-    from lean.llm.base import get_llm
+    from lean.core.llm.base import get_llm
 
-    get_llm.cache_clear()
-    with patch("lean.llm.base.get_settings") as mock_settings:
+    with patch("lean.core.llm.base.get_settings") as mock_settings:
         s = MagicMock()
-        s.minimax_api_key = ""
+        s.llm_api_key = ""
         s.llm_ollama_url = ""
         mock_settings.return_value = s
         result = get_llm()
 
     assert result is None
-    get_llm.cache_clear()
 
 
 def test_get_llm_minimax_takes_precedence_over_ollama(monkeypatch_env):
     """When both minimax and ollama are configured, MiniMax wins (checked first)."""
-    from lean.llm.base import get_llm
+    from lean.core.llm.base import get_llm
 
-    get_llm.cache_clear()
-    with patch("lean.llm.base.get_settings") as mock_settings:
+    with patch("lean.core.llm.base.get_settings") as mock_settings:
         s = MagicMock()
-        s.minimax_api_key = "minimax-key"
-        s.llm_minimax_base_url = "https://api.minimax.io"
-        s.llm_minimax_model = "MiniMax-Text-01"
+        s.llm_api_key = "minimax-key"
+        s.llm_base_url = "https://api.minimax.io"
+        s.llm_model = "MiniMax-Text-01"
         s.llm_timeout_s = 60.0
         s.llm_ollama_url = "http://gpu:11434"
         s.llm_ollama_model = "qwen3.5:9b"
         mock_settings.return_value = s
-        with patch("lean.llm.openai_compatible.OpenAICompatibleLLM") as mock_cls:
+        with patch("lean.core.llm.openai_compatible.OpenAICompatibleLLM") as mock_cls:
             mock_cls.return_value = MagicMock()
             get_llm()
 
@@ -161,4 +154,3 @@ def test_get_llm_minimax_takes_precedence_over_ollama(monkeypatch_env):
         api_key="minimax-key",
         timeout=60.0,
     )
-    get_llm.cache_clear()

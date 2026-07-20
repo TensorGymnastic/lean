@@ -1,4 +1,4 @@
-"""Universal PDF metadata extractor — fits in lean-core, free of domain heuristics.
+"""Universal PDF metadata extractor — fits in lean, free of domain heuristics.
 
 Returns the document title / authors / year from the PDF's embedded
 ``/Info`` dict (via PyMuPDF). Domain-specific enrichment (e.g.

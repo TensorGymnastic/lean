@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lean.extraction.ocr_postprocess import clean_ocr_output
+from lean.core.extraction.ocr_postprocess import clean_ocr_output
 
 
 def test_strips_det_annotations() -> None:

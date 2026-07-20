@@ -4,119 +4,319 @@
 
 Repository-local guidance for agents working in `lean`.
 
-`lean` is a dockerized MCP server for Lean Six Sigma PDF corpus ingestion.
-It extracts markdown from PDFs (marker-pdf primary, Unlimited-OCR secondary,
-markitdown fallback), optionally enriches charts/images with a Vision-Language
-Model (MiniMax M3 or local Ollama), chunks section-aware, embeds with
-Liquid LMF2.5-Embedding-350M, stores in Supabase pgvector with full provenance
-metadata, and exposes the corpus via fastmcp tools/resources/prompts.
+`lean` is a dockerized MCP server for corpus ingestion driven by YAML
+domain manifests. The package is a single Python project, not a monorepo;
+domains ship in-tree under `src/lean/domains/`. Built-in domains:
 
-## Architecture
+- `pdf_lss` — Lean Six Sigma PDF corpus (marker-pdf primary, OCR
+  secondary, markitdown fallback, optional VLM image enrichment).
+- `code` — Markdown / source-file corpus (direct file read).
+- `web` — URL corpus (trafilatura + httpx).
 
-**Layering (enforced):** transport (mcp_server / api / cli) → services → store → infrastructure.
+Adding a fourth domain = drop a YAML in `configs/` + maybe 1-2 adapter
+files + a `tools.py` module that registers MCP / REST / CLI commands.
+
+## Agent skill library
+
+The agent has access to four skill/tool systems. **Invoke skills
+BEFORE writing code, scaffolding, or making commits** — they enforce
+discipline that catches most costly mistakes.
+
+### 1. Superpowers
+
+The active meta-system that hooks every response. Calls itself
+automatically when a task fits a skill; you can also invoke any skill
+explicitly with the `skill` tool.
+
+Core skills (installed at `~/.cache/opencode/packages/superpowers`):
+
+- **brainstorming** — Socratic design refinement. Run before any
+  creative work (new features, components, behavior changes). HARD
+  GATE: no code until design is presented and approved. Specs land
+  in `docs/superpowers/specs/YYYY-MM-DD-<slug>-design.md`.
+- **writing-plans** — Turn an approved design into a task checklist
+  for a junior engineer. Comes after `brainstorming`.
+- **test-driven-development** — Red-green-refactor for any logic
+  change. Write the failing test first, commit it, watch it fail,
+  implement, watch it pass, refactor.
+- **systematic-debugging** — Hypothesis-driven debugging loop for
+  test failures and unexpected behavior. Reproduce → minimize →
+  hypothesize → instrument → fix → regression-test.
+- **code-review-and-quality** — Multi-axis review (correctness,
+  readability, architecture, security, performance) before merge.
+- **verification-before-completion** — Run the actual command,
+  confirm the actual output, then claim completion. Never assert
+  "passes" without the green test run.
+- **requesting-code-review** / **receiving-code-review** — When to
+  ask for review; how to respond to feedback without sycophancy.
+- **dispatching-parallel-agents** — For 2+ independent tasks, fan
+  out as parallel `task` calls instead of serializing.
+- **incremental-implementation** — Deliver changes incrementally when
+  the change touches more than one file.
+
+### 2. Matt Pocock's skill library
+
+User-invoked orchestration skills for engineering workflows. Install
+via `npx skills@latest add mattpocock/skills`. The repo-local
+configuration files written by `/setup-matt-pocock-skills` live in
+`docs/agents/`.
+
+| Skill | Use when |
+|---|---|
+| `/setup-matt-pocock-skills` | **Run once per repo** before any other Matt Pocock skill. Configures issue tracker, triage labels, domain doc layout. |
+| `/ask-matt` | "Which skill fits my situation?" router. |
+| `/grill-me`, `/grill-with-docs` | Relentless interview about a plan or design. `grill-with-docs` also writes ADR/controlled-vocabulary updates inline. |
+| `/tdd` | TDD discipline with red-green-refactor emphasis. |
+| `/to-spec` | Turn the current conversation into a spec. Synthesizes what's already been discussed (no interview). |
+| `/to-tickets` | Break a spec/plan/conversation into tracer-bullet tickets with explicit blocking edges. |
+| `/implement` | Build the work described by a spec or tickets, calling `/tdd` and `/code-review` at seams. |
+| `/code-review` | Two-axis review (Standards + Spec), run as parallel sub-agents. |
+| `/triage` | Move GitHub issues through needs-triage → needs-info → ready-for-agent → ready-for-human → wontfix. |
+| `/improve-codebase-architecture` | Scan for deepening opportunities, present a visual HTML report, then grill through one. Run weekly. |
+| `/prototype` | Throwaway prototype to answer a design question. |
+| `/diagnosing-bugs` | Disciplined bug-fix loop. |
+| `/research` | Investigate a question against primary sources, write cited Markdown. |
+| `/domain-modeling` | Sharpen terminology, update `CONTEXT.md` and the glossary. |
+| `/codebase-design` | Shared vocabulary for designing deep modules. |
+| `/resolving-merge-conflicts` | Resolve by intent to each side's primary source; never `--abort`. |
+
+Skills split on **who can invoke** them. *User-invoked* (above)
+require you to type the slash command. *Model-invoked* skills
+(brainstorming, TDD, debugging, etc.) can also be reached for
+automatically when the task fits.
+
+### 3. Oh-My-OpenCode (the `task` tool categories)
+
+The plugin adds pre-tuned sub-agents you dispatch via `task` with a
+`category`. Configure in `.opencode/oh-my-opencode.json` (project) or
+`~/.config/opencode/oh-my-opencode.json` (user).
+
+| Category | Default model | Use for |
+|---|---|---|
+| `quick` | `claude-haiku-4-5` | Trivial: typo fixes, one-line changes, single-file edits |
+| `unspecified-low` | `claude-sonnet-4-6` | General tasks, low effort |
+| `unspecified-high` | `claude-opus-4-6` | General tasks, high effort, complex reasoning |
+| `visual-engineering` | `gemini-3-pro` | Frontend, UI/UX, design, animation |
+| `ultrabrain` | `gpt-5.3-codex` (xhigh) | Deep logical reasoning, complex architecture |
+| `deep` | `gpt-5.3-codex` (medium) | Autonomous problem-solving, thorough research |
+| `artistry` | `gemini-3-pro` | Creative/unconventional approaches |
+| `writing` | `kimi-for-coding/k2p5` | Documentation, prose, technical writing |
+
+Specialist agents (dispatched explicitly by name):
+
+- **explore** — fast codebase navigation (grep/find/ripgrep).
+- **librarian** — reads external docs, fetches upstream sources.
+- **multimodal-looker** — reads images / screenshots / diagrams.
+- **oracle** — architecture and debugging consultation.
+- **Prometheus (planner)** — produces implementation plans.
+- **Atlas (plan executor)** — runs the plan step-by-step.
+
+**Rule of thumb:** use `category="unspecified-high"` for anything
+non-trivial and let the runtime pick the model. Use named agents
+(`explore`, `librarian`) when you specifically need their role.
+
+### 4. Workspace skills (`/home/sl/dev`)
+
+Local skills in `.github/skills/` and `.opencode/skills/` cover
+domain-specific workflows:
+
+- `.opencode/skills/memory-management` — persist context across
+  sessions via OpenMemory MCP.
+- `.opencode/skills/git-commit-standards` — atomic-commit message
+  format; consult before every commit.
+- `.opencode/skills/github-issues-integration` — fetch / comment /
+  update / attach to GitHub issues.
+- `.opencode/skills/pure-cli-exploration` — `rg`, `fdfind`, `ast-grep`
+  cheat sheet for codebase searches.
+- `.opencode/skills/documentation` — when and where to write docs.
+- `.github/skills/browser-navigation`, `navigation-crawl-maintenance` —
+  UI automation + crawl replay.
+- `.github/skills/repository-platform-assessment` — audit a repo's
+  platform integration.
+
+Plus the workspace-level docs at `/home/sl/dev/_ai/docs/` for
+durable cross-project knowledge.
+
+## OpenSpec workflow (spec-driven change management)
+
+Spec-driven development for AI coding assistants. Install with
+`npm install -g @fission-ai/openspec@latest`. The lean repo **does
+not yet have an `openspec/` directory** — sibling repos
+(`repos/quanti/web-document-ingestor/`, `repos/storefront/`) use it.
+
+**Use for any change that:** touches public API or schema, is
+expensive to reverse (months of work), would be second-guessed
+without context, or has multiple viable approaches worth recording.
+**Skip for:** typo fixes, single-line edits, config tweaks.
+
+Default loop (run in the AI assistant chat):
+
+```text
+/opsx-explore <idea>          → optional: think it through first
+/opsx-propose <change-name>   → AI drafts proposal, specs, design, tasks
+/opsx-apply                   → AI builds it, checking off tasks
+/opsx-archive                 → specs updated, change filed away
+```
+
+Folder layout:
+
+```text
+openspec/
+├── specs/                  # source of truth (system behavior)
+│   └── <domain>/spec.md    #   organized by domain
+└── changes/                # proposed updates (one folder per change)
+    └── <change-name>/
+        ├── proposal.md     #   the "why" and "what"
+        ├── design.md       #   the "how"
+        ├── tasks.md        #   implementation checklist
+        └── specs/          #   delta specs (ADDED / MODIFIED / REMOVED)
+```
+
+Commands are sourced from `.opencode/commands/opsx-*.md` (see
+`repos/storefront/.opencode/commands/` for the canonical templates).
+The archive step merges deltas into `specs/`.
+
+For the lean repo, the natural domain breakdown is:
+
+- `openspec/specs/extraction/` — pipeline + backend contracts
+- `openspec/specs/transport/` — MCP / REST / CLI surface
+- `openspec/specs/storage/` — pgvector + chunk schemas
+- `openspec/specs/retrieval/` — search + rerank
+
+## Recommended workflow for typical tasks
+
+| Task type | Workflow |
+|---|---|
+| New feature or behavior change | `brainstorming` → `writing-plans` → `test-driven-development` → `code-review-and-quality` |
+| Bug in existing behavior | `systematic-debugging` → fix → `test-driven-development` → `code-review-and-quality` |
+| Refactor / cleanup | `improving-codebase-architecture` (or `code-simplification`) → `test-driven-development` → `code-review-and-quality` |
+| External library / API research | `research` skill (writes cited Markdown to repo) |
+| Multi-file change touching >3 modules | OpenSpec: `/opsx-explore` → `/opsx-propose` → `/opsx-apply` → `/opsx-archive` |
+| Configuration / YAML / .env changes | Direct edit + `make verify`; use OpenSpec if the change introduces new settings keys |
+| Architecture audit | `code-review-and-quality` with the full multi-axis template |
+| Skill/workflow question | `/ask-matt` |
+| Visual question (mockup, diagram) | Ask Gemini via `task(category="visual-engineering")` |
+
+For multi-task problems, dispatch **parallel `task` calls** instead
+of serializing (see `dispatching-parallel-agents`).
+
+## Architecture (project facts)
+
+**Layering (enforced):** transport (mcp / api / cli) → services → store → infrastructure.
 No business logic in transports. Each store repo is CRUD-narrow.
 
-- `src/lean/config/settings.py` — pydantic-settings: `.env` (secrets) + `config.yaml` (app config)
-- `src/lean/models/schemas.py` — Pydantic types shared across modules
-- `src/lean/extraction/` — PDF→markdown (`pipeline.py` orchestrator with 3-stage fallback):
-  - `marker_converter.py` — **primary**: `datalab-to/marker` (surya OCR + texify), local CPU or remote GPU via HTTP
-  - `unlimited_ocr.py` — **secondary**: `baidu/Unlimited-OCR` via remote transformers server (returns page images, no figures)
-  - `markitdown_converter.py` — **tertiary**: pure-python fallback when both above unavailable
-  - `metadata.py` — filename → `{title, authors, year, doi}` parser
-  - `contextual.py` — optional LLM-based contextual retrieval augmentation
-- `src/lean/vlm/` — Vision-Language Model client for chart/image description
-  - `client.py` — httpx-based, OpenAI-compatible (`/v1/chat/completions`), provider-agnostic transport
-  - `prompts.py` — `CHART_EXTRACTION_PROMPT` + `parse_description` JSON parser with markdown-fence handling
-- `src/lean/chunker/` — `markdown_ast.py` (mistune section parser) + `recursive.py` (tiktoken splitter)
-- `src/lean/embeddings/` — `liquid_lmf.py` (local CPU) + `remote_ollama.py` (remote GPU, retries 3×)
-- `src/lean/infrastructure/embedder.py` — singleton factory: remote Ollama when configured, else local CPU
-- `src/lean/store/` — focused repos: `base`, `documents`, `chunks`, `search`, `analytics`
-- `src/lean/retrieval/` — cross-encoder reranker (`ms-marco-MiniLM-L-6-v2`) + postprocessors
-- `src/lean/llm/` — OpenAI-compatible LLM client (MiniMax/Ollama), optional sidecar for HyDE/multi-query/contextual retrieval
-- `src/lean/services/` — business logic: `ingestion` (extract+VLM+embed+store), `search` (hybrid+rerank), `corpus` (CRUD)
-- `src/lean/mcp_server/` — 8 tools, 4 resources, 3 prompts, stdio/http entrypoint
-- `src/lean/api/routes.py` — FastAPI mirror (bearer-authed REST, 7 MCP-mirroring endpoints + `/health`; `reingest` is intentionally CLI-only)
-- `src/lean/auth/bearer.py` — ASGI middleware, `hmac.compare_digest` token check
-- `src/lean/cli.py` — Typer CLI (full parity with MCP tools)
-- `src/lean/eval/` — retrieval evaluation harness (hit_rate@k, MRR@k, NDCG@k, Recall@k)
-- `db/schemas/` — SQL migrations (001-012). Key migrations:
-  - `010_add_chunk_types.sql` — `chunk_type` (`text`/`image`) + `image_meta` JSONB
-  - `011_add_provenance_metadata.sql` — `bbox`, `image_hash`, `provenance_model`, `embedding_model`, `embedding_dim`
-  - `012_add_chunk_type_check.sql` — CHECK constraint enforcing `chunk_type IN ('text','image')`
-- `scripts/` — `canonical-queries.json` (eval fixture), `docs_lint.py` (drift detector)
-- `docs/` — reference docs (configuration, operations, architecture, evaluation, limitations, decisions)
+- `src/lean/core/config/settings.py` — pydantic-settings: `.env` (secrets) + YAML overlay via `CoreSettings.from_yaml(path)`. Singleton via `get_settings()`.
+- `src/lean/core/config/domain_config.py` — `DomainConfig` pydantic model loaded from a YAML manifest.
+- `src/lean/core/transports/yaml_loader.py` — `build_from_yaml(path)` is the canonical wiring entry point.
+- `src/lean/core/extraction/` — universal pipeline (`base.Pipeline` + `base.Extractor` Protocol): marker / OCR / markitdown / metadata / pipeline_helpers.
+- `src/lean/core/vlm/` — `OpenAICompatibleVLM` (httpx, `/v1/chat/completions`); chart-extraction prompts in `vlm/prompts.py`.
+- `src/lean/core/chunker/` — `markdown_ast.py` (mistune) + `recursive.py` (tiktoken).
+- `src/lean/core/embeddings/` — `liquid_lmf.py` (local CPU) + `remote_ollama.py` (GPU); factory in `infrastructure/embedder.py`.
+- `src/lean/core/store/` — `base`, `documents`, `chunks`, `search`, `analytics`.
+- `src/lean/core/retrieval/` — cross-encoder reranker + postprocessors.
+- `src/lean/core/llm/` — OpenAI-compatible client; optional sidecar for HyDE/multi-query/contextual retrieval.
+- `src/lean/core/services/` — `ingestion.py` (extract→VLM→embed→store), `search.py` (hybrid→rerank), `corpus.py` (CRUD).
+- `src/lean/core/transports/` — `mcp.py` (FastMCP), `api.py` (FastAPI), `cli.py` (Typer), `yaml_loader.py`, `health.py`, `builder.py`, `registration.py`.
+- `src/lean/core/auth/` — bearer-token middleware.
+- `src/lean/core/eval/` — retrieval evaluation harness.
+- `src/lean/core/adapters.py` — shared `@mcp_tool` / `@rest_route` / `@cli_command` decorators.
+- `src/lean/domains/` — built-in domain adapters (`pdf_lss/`, `code/`, `web/`).
+- `src/lean/cli.py` — universal entry point: `lean --config <yaml> <command>`.
+- `configs/` — three example YAML manifests.
+- `db/schemas/` — SQL migrations.
+- `scripts/` — `marker_server.py`, `build_eval_dataset.py`, `canonical-queries.json`.
 
-## Engineering Rules
+### Universal CLI surface
+
+Every domain exposes the 5 universal commands + domain-specific ones:
+
+- `lean --config <yaml> db-init` — apply SQL migrations
+- `lean --config <yaml> health` — check DB + embedder + optional VLM/LLM
+- `lean --config <yaml> mcp-serve` — start MCP server
+- `lean --config <yaml> api-serve` — start FastAPI REST API
+- `lean --config <yaml> eval` — run retrieval evaluation
+
+## Engineering rules
 
 - Python 3.12+, uv-managed
 - Strict mypy, ruff (line-length 100, includes `S` bandit rules)
-- TDD: write test first, watch it fail, implement, watch it pass
+- **TDD:** write test first → watch fail → implement → watch pass → refactor
 - Coverage gate: `fail_under = 80` enforced in pyproject.toml
 - `from __future__ import annotations` in all modules
-- Each module has one responsibility and is independently testable
-- **File-size ceiling ~500 LOC, function-size ceiling ~50 LOC** — split when approaching
-- Heavy operations (DB, extraction, embedding, VLM) run via `anyio.to_thread.run_sync`
-  so the MCP event loop stays responsive
-- All singletons use `@lru_cache` (`get_settings`, `get_embedder`, `get_llm`,
-  `_get_reranker`) — thread-safe, no mutable module globals
-- Config validation at startup via pydantic `field_validator` + `model_validator`
-  (API key min 16 chars, ports 1–65535, `chunk_hard_cap > chunk_target_max`)
-- Model revisions pinned to SHA hashes in `config.yaml` for `trust_remote_code`
-  safety (`embedding.model_revision`, `retrieval.rerank.model_revision`)
-- Ingest paths confined to `settings.corpus_root` (default: `data/`) — prevents
-  path traversal via authenticated API/MCP clients
-- Optional ML deps isolated via `uv sync --extra`:
-  - `--extra local-models` — torch/transformers/sentence-transformers (local CPU embeddings + reranker)
-  - `--extra marker` — marker-pdf + surya (high-quality extraction)
+- One responsibility per module, independently testable
+- **File-size ceiling ~500 LOC, function-size ceiling ~50 LOC**
+- Heavy operations run via `anyio.to_thread.run_sync` (event loop)
+- Singletons: `@lru_cache` (`get_embedder`, `_get_reranker`); manual `_settings_cache` dict for `get_settings` / `get_llm`
+- Validation at startup: API key min 16 chars, ports 1–65535, `chunk_hard_cap > chunk_target_max`
+- Model revisions pinned to SHA hashes (`embedding_model_revision`, `rerank_model_revision`)
+- Ingest paths confined to `settings.corpus_root` (default `data/`)
+- Optional ML deps isolated: `--extra local-models` / `--extra marker` / `--extra web`
 
-## Design Discipline (KISS / YAGNI / DRY / SOLID)
+## Design discipline (KISS / YAGNI / DRY / SOLID)
 
-- **KISS** — prefer a 30-line function over a 300-line "flexible" one. Don't add config knobs for hypothetical future needs.
-- **YAGNI** — every column, config field, and parameter must have a reader within 1 commit of being written. Documented exception: `bbox` (wiring pending).
-- **DRY** — shared helpers live in one place (`_build_metadata_filters`, `infrastructure/embedder.py`). No copy-paste between `vector_search` and `bm25_search`.
-- **SOLID-S** — services own one orchestration concern; stores own CRUD; transports own I/O. `ingest_pdf` currently violates this (extraction+VLM+embed+store in one function) — split is on the roadmap.
-- **SOLID-O** — extraction backends are pluggable via `pipeline.py`. VLM is provider-agnostic at the transport layer (any OpenAI-compatible endpoint).
-- **SOLID-D** — embedder uses Protocol + factory. VLM is currently concrete (`VLMClient`); add a Protocol when a second provider shape lands.
+- **KISS** — 30-line function > 300-line "flexible" one.
+- **YAGNI** — every column / config field must have a reader within 1 commit.
+- **DRY** — shared helpers in one place: `lean.core.adapters` for decorators, `lean.core.extraction` for pipeline primitives.
+- **SOLID-S** — services own orchestration, stores own CRUD, transports own I/O.
+- **SOLID-O** — extraction backends pluggable via `Extractor` Protocol; VLM provider-agnostic via `VLMClient` Protocol.
+- **SOLID-D** — embedder + VLM use Protocol + factory.
+
+## Single-declaration rule (settings)
+
+- `CoreSettings` is the canonical source of truth for app config.
+- Env vars take precedence over Python defaults.
+- The YAML overlay flows through a single helper, `_apply_overlay_to_kwargs` (in `settings.py`), reused by `yaml_loader._apply_settings_overrides`.
+- Marker/OCR tunables live in `CoreSettings` (`marker_remote_url`, `marker_force_ocr`, `ocr_model`, `ocr_dpi`, `ocr_timeout_s`, `ocr_max_tokens`, `ocr_batch_size`) and are projected onto each extractor adapter by `_merge_extractor_defaults`. Declare them once in `settings.marker.*` / `settings.ocr.*`.
+- `vlm.enabled` lives **only** at the top level of the YAML (`vlm.enabled: true|false`). `settings.vlm.*` holds transport-level fields only (`base_url`, `model`, `api_key`, `detail`, `timeout_s`, `max_concurrency`, `max_tokens`, `disable_thinking`).
 
 ## Validation
 
-- `make verify` — ruff + mypy + pytest (unit only, excludes integration/slow/e2e)
-  + coverage gate at 80%. Current: 338 unit passed, 59 deselected, 91.82% coverage.
-- `make verify-all` — all tests
-- `uv run python scripts/docs_lint.py` — detects drift between
-  `config.yaml` / CLI commands / MCP tools and `docs/` + `README.md`
-- Integration tests need `SUPABASE_DB_URL` env var set
+- `make verify` — ruff + mypy + pytest (unit only) + coverage ≥ 80%
+- `make verify-all` — all tests including integration/e2e
+- Integration tests need `SUPABASE_DB_URL` env var
 - E2E tests need full stack running (Supabase + GPU servers)
-- CI: 3 jobs (verify matrix Python 3.12+3.13, security pip-audit+trivy+CodeQL,
-  integration with Postgres service container)
+- CI: 3 jobs (verify matrix Python 3.12+3.13, security pip-audit+trivy+CodeQL, integration with Postgres)
 
 ## Documentation
 
 - `README.md` — onboarding entry point
-- `docs/configuration.md` — every `Settings` field, defaults, validators
-- `docs/operations.md` — Docker, healthcheck, post-ingest reindex, reingest semantics
-- `docs/architecture.md` — pipeline + directory layout + transport tier pattern
+- `docs/configuration.md` — every `CoreSettings` field, defaults, validators
+- `docs/operations.md` — Docker, healthcheck, post-ingest reindex
+- `docs/architecture.md` — pipeline + directory layout
 - `docs/evaluation.md` — `lean eval` methodology + caveats
-- `docs/limitations.md` — known caveats (page fields NULL, eval pseudo-queries, etc.)
+- `docs/limitations.md` — known caveats + closed backlog items
 - `docs/decisions/` — ADR scaffolding (write new ADRs here when needed)
+- `/home/sl/dev/_ai/docs/` — workspace-level durable knowledge
 
-**Rule:** if you add a field to `config.yaml`, a CLI command, or an MCP
-tool, update the corresponding doc page in the same commit. Run
-`scripts/docs_lint.py` before pushing to catch drift.
+**Rule:** when you add a field to `CoreSettings`, a CLI command, or an
+MCP tool, update the corresponding doc page in the same commit.
+Verify with `make verify`.
 
-## Key Decisions
+## Key decisions (load-bearing)
 
-- **Extraction fallback chain**: marker-pdf (local CPU or remote GPU via HTTP) → Unlimited-OCR (remote transformers) → markitdown (pure Python). Marker returns figures; OCR/markitdown do not.
-- **Remote GPU marker server** — pure-Python HTTP wrapper around marker's `PdfConverter` (singleton in GPU memory). 44× faster than local CPU (14s vs 626s for a 29-page PDF). Configured via `marker.remote_url` in `config.yaml`. Server script vendored at `scripts/marker_server.py`.
-- **VLM enrichment (default: MiniMax M3)** — chart/image descriptions structured as `{title, chart_type, axis_labels, key_data_points, description, source_text}`. MiniMax M3 via API (~3.5s/image, ~$0.004/image, `disable_thinking: true` for clean JSON). Local Ollama Qwen3.5 fallback documented in `config.yaml` comments. **Compliance:** VLM sends chart images to a third-party (Shanghai) — disable for corpora with PII/trade-secret concerns; see `docs/limitations.md`.
-- **Provenance metadata** — migration 011 added `bbox`, `image_hash`, `provenance_model`, `embedding_model`, `embedding_dim`. `image_hash` is surfaced via `corpus_stats` (`find_duplicate_image_hashes`). `embedding_model` mismatch warning is on the roadmap. `bbox` is always NULL (marker block-level polygon wiring pending).
-- **Chunk types** — `text` (default) and `image` (VLM-described). Search supports `chunk_type` filter end-to-end (MCP/API/CLI → service → store). CHECK constraint enforced by migration 012.
-- **LiquidAI/LFM2.5-Embedding-350M** (1024-dim), remote Ollama when configured, local CPU fallback. Pinned to SHA `f35ae2c91d687658dbf1f2b449382f0b019b9808`.
-- Local Supabase via Docker (zero cloud cost)
-- fastmcp v3.4.4 standalone
-- Bearer token auth on HTTP transport (`hmac.compare_digest`); stdio is local-trusted
-- Multi-stage Docker build with non-root user (uid=1000), `.dockerignore` excludes
-  `.git/`, `.venv/`, caches, PDFs
-- `lean db-init` uses `PGPASSWORD` env (not argv) — Makefile delegates to CLI
+- **Extraction fallback chain:** marker-pdf → Unlimited-OCR → markitdown. Marker returns figures; OCR/markitdown do not.
+- **Marker remote GPU:** pure-Python HTTP wrapper around `PdfConverter` (44× faster). Server vendored at `scripts/marker_server.py`. Configure via `settings.marker.remote_url`.
+- **VLM default:** MiniMax M3 via API. `disable_thinking: true` for clean JSON. Local Ollama Qwen3.5 fallback supported. Send images to a third-party — disable for PII corpora.
+- **Transport ports (M5):** `mcp_http_port` and `api_port` have **no Python defaults**. Source: `settings.transport` in YAML or `MCP_HTTP_PORT` / `API_PORT` env.
+- **LLM key alias (C-3):** `Settings.llm_api_key` reads `MINIMAX_API_KEY` (the name `.env.example` uses). Without this alias, every LLM feature silently no-ops.
+- **Chunk types:** `text` (default) and `image` (VLM-described). `CHUNK_TYPE_TEXT` / `CHUNK_TYPE_IMAGE` constants in `lean.core.models.schemas`; `VALID_CHUNK_TYPES` is derived.
+- **Provenance metadata:** every chunk tracks `embedding_dim`; image chunks track `image_hash` and `provenance_model`.
+- **LiquidAI/LFM2.5-Embedding-350M** (1024-dim), remote Ollama → local CPU fallback. Pinned to SHA.
+- **Bearer token auth** on HTTP transport (`hmac.compare_digest`); stdio is local-trusted.
+- **Multi-stage Docker build** with non-root user (uid=1000).
 
 See `docs/limitations.md` for runtime caveats.
+
+## Quick verification checklist
+
+Before claiming any task complete:
+
+```bash
+uv run ruff format --check .
+uv run ruff check .
+uv run mypy src/lean
+uv run pytest -m 'not integration and not e2e and not slow' --cov=lean
+```
+
+If any check cannot run, state the gap explicitly in the report
+(per `verification-before-completion` and the doc-update rule above).

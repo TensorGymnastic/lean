@@ -23,7 +23,7 @@ class MarkitdownExtractor:
     """``Extractor`` Protocol implementation: Microsoft MarkItDown.
 
     Pure-Python fallback. Always available when ``markitdown[pdf]`` is
-    installed (declared as a ``lean-core`` core dependency).
+    installed (declared as a ``lean`` core dependency).
     """
 
     method = ExtractionMethod.MARKITDOWN

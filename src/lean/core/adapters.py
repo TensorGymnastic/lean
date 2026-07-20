@@ -33,10 +33,12 @@ def mcp_tool[F: Callable[..., Any]](
         fn.__lean_tool_kind__ = "mcp"  # type: ignore[attr-defined]
         fn.__lean_tool_name__ = name or fn.__name__  # type: ignore[attr-defined]
         return fn
+
     def deco(f: F) -> F:
         f.__lean_tool_kind__ = "mcp"  # type: ignore[attr-defined]
         f.__lean_tool_name__ = name or f.__name__  # type: ignore[attr-defined]
         return f
+
     return deco
 
 
@@ -68,10 +70,12 @@ def cli_command[F: Callable[..., Any]](
         fn.__lean_tool_kind__ = "cli"  # type: ignore[attr-defined]
         fn.__lean_command_name__ = name or fn.__name__  # type: ignore[attr-defined]
         return fn
+
     def deco(f: F) -> F:
         f.__lean_tool_kind__ = "cli"  # type: ignore[attr-defined]
         f.__lean_command_name__ = name or f.__name__  # type: ignore[attr-defined]
         return f
+
     return deco
 
 
@@ -86,16 +90,34 @@ def discover_tools(module: object) -> dict[str, Callable[..., Any]]:
     skip: set[str] = set()
     skip.update(
         {
-            "asyncio", "fnmatch", "json", "Path", "Any", "typer",
-            "discover_tools", "register_mcp", "register_api", "register_cli",
-            "tools", "sys", "mod",
+            "asyncio",
+            "fnmatch",
+            "json",
+            "Path",
+            "Any",
+            "typer",
+            "discover_tools",
+            "register_mcp",
+            "register_api",
+            "register_cli",
+            "tools",
+            "sys",
+            "mod",
         }
     )
     skip.update(
         {
-            "Chunk", "CorpusStats", "DocumentSummary", "IngestResult",
-            "_ingest_pdf", "_search", "_get_chunk", "_list_documents",
-            "_corpus_stats", "_delete_document", "_get_markdown",
+            "Chunk",
+            "CorpusStats",
+            "DocumentSummary",
+            "IngestResult",
+            "_ingest_pdf",
+            "_search",
+            "_get_chunk",
+            "_list_documents",
+            "_corpus_stats",
+            "_delete_document",
+            "_get_markdown",
             "_output",
         }
     )
@@ -146,10 +168,7 @@ def output(data: object, json_mode: bool) -> None:
         if json_mode:
             typer.echo(
                 json.dumps(
-                    [
-                        d.model_dump(mode="json") if hasattr(d, "model_dump") else d
-                        for d in data
-                    ],
+                    [d.model_dump(mode="json") if hasattr(d, "model_dump") else d for d in data],
                     indent=2,
                     default=str,
                 )

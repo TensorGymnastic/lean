@@ -2,23 +2,21 @@
 
 Usage from a domain's CLI/API/MCP entrypoint:
 
-    from lean_lss import LssDomain
     from lean.core.transports import TransportBuilder
+    from lean.core.transports.yaml_loader import build_from_yaml
 
     if __name__ == "__main__":
-        TransportBuilder(LssDomain()).cli().run()
+        builder = build_from_yaml(Path("configs/lean-pdf-lss.yaml"))
+        builder.cli().run()
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from lean.core.config.settings import CoreSettings
 from lean.core.extraction.base import set_pipeline
 from lean.core.transports.registration import DomainRegistration
-
-if TYPE_CHECKING:
-    pass
 
 
 class TransportBuilder:

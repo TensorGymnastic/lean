@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from lean.chunker.markdown_ast import Section
-from lean.chunker.recursive import chunk_sections
+from lean.core.chunker.markdown_ast import Section
+from lean.core.chunker.recursive import chunk_sections
 
 
 def test_chunk_short_section_is_one_chunk() -> None:

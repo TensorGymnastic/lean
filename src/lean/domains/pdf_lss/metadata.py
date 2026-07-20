@@ -76,7 +76,7 @@ def _guess_publisher(title: object, authors: list[str]) -> str | None:
 
 def extract(pdf_path: Path) -> dict[str, object]:
     """Extract metadata from a PDF. Returns a dict (not a dataclass) so
-    lean-core's ingestion service can pass it through to the document row.
+    lean's ingestion service can pass it through to the document row.
     """
     doc = fitz.open(str(pdf_path))
     try:

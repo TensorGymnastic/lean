@@ -36,7 +36,7 @@ pytestmark = [
 
 def test_corpus_has_documents() -> None:
     """Corpus has at least 1 document with chunks."""
-    from lean.mcp_server.tools import corpus_stats
+    from lean.core.transports.mcp import corpus_stats
 
     stats = asyncio.run(corpus_stats())
     assert stats.document_count >= 1, "no documents ingested"
@@ -46,7 +46,7 @@ def test_corpus_has_documents() -> None:
 
 def test_canonical_queries_return_results() -> None:
     """Each canonical Lean Six Sigma query returns at least 1 result."""
-    from lean.mcp_server.tools import search
+    from lean.core.transports.mcp import search
 
     queries_file = Path(__file__).parent.parent / "scripts" / "canonical-queries.json"
     if not queries_file.exists():
@@ -60,7 +60,7 @@ def test_canonical_queries_return_results() -> None:
 
 def test_list_documents_works() -> None:
     """list_documents returns all ingested documents."""
-    from lean.mcp_server.tools import list_documents
+    from lean.core.transports.mcp import list_documents
 
     docs = asyncio.run(list_documents())
     assert len(docs) >= 1
@@ -71,7 +71,7 @@ def test_list_documents_works() -> None:
 
 def test_corpus_stats_fields_all_populated() -> None:
     """corpus_stats returns every documented field with sensible types."""
-    from lean.mcp_server.tools import corpus_stats
+    from lean.core.transports.mcp import corpus_stats
 
     stats = asyncio.run(corpus_stats())
     assert stats.embedding_dim == 1024
@@ -86,7 +86,7 @@ def test_corpus_stats_fields_all_populated() -> None:
 
 def test_get_chunk_returns_full_chunk_for_known_id() -> None:
     """Looking up a known chunk by ID returns its content + embedding metadata."""
-    from lean.mcp_server.tools import get_chunk, search
+    from lean.core.transports.mcp import get_chunk, search
 
     results = asyncio.run(search("DMAIC", k=1))
     assert len(results) >= 1
@@ -102,7 +102,7 @@ def test_get_chunk_returns_full_chunk_for_known_id() -> None:
 
 def test_search_respects_k_limit() -> None:
     """Search with k=5 returns at most 5 hits."""
-    from lean.mcp_server.tools import search
+    from lean.core.transports.mcp import search
 
     results = asyncio.run(search("Lean Six Sigma", k=5))
     assert len(results) <= 5
@@ -110,7 +110,7 @@ def test_search_respects_k_limit() -> None:
 
 def test_search_with_chunk_type_text_filter() -> None:
     """chunk_type='text' returns only text chunks (or empty list if corpus has none)."""
-    from lean.mcp_server.tools import search
+    from lean.core.transports.mcp import search
 
     results = asyncio.run(search("Lean Six Sigma", k=10, chunk_type="text"))
     for r in results:
@@ -119,7 +119,7 @@ def test_search_with_chunk_type_text_filter() -> None:
 
 def test_search_with_chunk_type_image_filter() -> None:
     """chunk_type='image' returns only image chunks (or empty list if corpus has none)."""
-    from lean.mcp_server.tools import search
+    from lean.core.transports.mcp import search
 
     results = asyncio.run(search("Lean Six Sigma", k=10, chunk_type="image"))
     for r in results:
@@ -128,7 +128,7 @@ def test_search_with_chunk_type_image_filter() -> None:
 
 def test_search_with_section_filter() -> None:
     """Filtering by section_substring narrows results to chunks in that section."""
-    from lean.mcp_server.tools import search
+    from lean.core.transports.mcp import search
 
     partial = asyncio.run(search("DMAIC", k=10, section="Measure"))
     for r in partial:
@@ -137,7 +137,7 @@ def test_search_with_section_filter() -> None:
 
 def test_search_rejects_invalid_chunk_type() -> None:
     """Passing chunk_type='foo' raises ValueError via the service layer."""
-    from lean.services.search import search as _search
+    from lean.core.services.search import search as _search
 
     with pytest.raises(ValueError, match="chunk_type must be one of"):
         asyncio.run(_search("Lean Six Sigma", chunk_type="foo"))
@@ -145,7 +145,7 @@ def test_search_rejects_invalid_chunk_type() -> None:
 
 def test_search_rejects_empty_query() -> None:
     """An empty/whitespace query raises ValueError."""
-    from lean.services.search import search as _search
+    from lean.core.services.search import search as _search
 
     with pytest.raises(ValueError, match="query must not be empty"):
         asyncio.run(_search("   "))
@@ -153,7 +153,7 @@ def test_search_rejects_empty_query() -> None:
 
 def test_search_rejects_overlong_query() -> None:
     """Query strings beyond settings.search_max_query_len raise ValueError."""
-    from lean.services.search import search as _search
+    from lean.core.services.search import search as _search
 
     long_query = "x" * 5000
     with pytest.raises(ValueError, match="exceeds max length"):
@@ -162,7 +162,7 @@ def test_search_rejects_overlong_query() -> None:
 
 def test_get_document_markdown_returns_text() -> None:
     """get_document_markdown returns the joined markdown of stored chunks."""
-    from lean.mcp_server.tools import get_document_markdown, list_documents
+    from lean.core.transports.mcp import get_document_markdown, list_documents
 
     docs = asyncio.run(list_documents())
     assert len(docs) >= 1
@@ -174,7 +174,7 @@ def test_get_document_markdown_returns_text() -> None:
 
 def test_list_documents_chunk_counts_match_corpus_stats() -> None:
     """Sum of per-document chunk_count equals corpus_stats.chunk_count."""
-    from lean.mcp_server.tools import corpus_stats, list_documents
+    from lean.core.transports.mcp import corpus_stats, list_documents
 
     docs = asyncio.run(list_documents())
     stats = asyncio.run(corpus_stats())
@@ -183,7 +183,7 @@ def test_list_documents_chunk_counts_match_corpus_stats() -> None:
 
 def test_search_results_have_populated_metadata() -> None:
     """Search hits carry section_path, heading_text, chunk_index metadata."""
-    from lean.mcp_server.tools import search
+    from lean.core.transports.mcp import search
 
     results = asyncio.run(search("DMAIC", k=3))
     for r in results:
@@ -194,7 +194,7 @@ def test_search_results_have_populated_metadata() -> None:
 
 def test_search_with_high_min_score_filters_results() -> None:
     """min_score near 1.0 returns at most a subset of unrestricted results."""
-    from lean.mcp_server.tools import search
+    from lean.core.transports.mcp import search
 
     unrestricted = asyncio.run(search("DMAIC", k=10))
     if not unrestricted:

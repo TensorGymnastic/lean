@@ -72,7 +72,7 @@ See [`evaluation.md`](evaluation.md) for the full methodology.
 
 `build_eval_dataset` fetches eligible chunks via SQL, then samples in
 Python using `random.Random(seed).sample(rows, n)` (see
-`src/lean/eval/runner.py:71`). Python's Mersenne Twister is stable
+`src/lean/core/eval/runner.py:71`). Python's Mersenne Twister is stable
 across versions and platforms, so the same `seed` always selects the
 same chunks. Two consecutive runs on the same corpus with the same seed
 produce identical hit_rate / MRR / NDCG / Recall numbers.
@@ -147,7 +147,7 @@ as a CLI flag.
 
 ### Ingest streams the PDF for SHA-256
 
-`_sha256_streaming` (`src/lean/services/ingestion.py:39-45`) reads the
+`_sha256_streaming` (`src/lean/core/services/ingestion.py:39-45`) reads the
 PDF in 1 MiB blocks. Memory footprint during hashing is bounded by the
 block size, not the file size. The earlier "loads full PDF twice"
 behavior was replaced by streaming; `max_pdf_mb` is now a size guard

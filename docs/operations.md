@@ -29,7 +29,7 @@ The `lean-app` service bind-mounts (read-only):
 | Host path | Container path | Purpose |
 |---|---|---|
 | `./data` | `/app/data` | Source PDFs (must be inside `storage.corpus_root`) |
-| `./src/lean/config/config.yaml` | `/app/src/lean/config/config.yaml` | App config (no hot-reload) |
+| `./configs/lean-pdf-lss.yaml` | `/app/configs/lean-pdf-lss.yaml` | App config (no hot-reload) |
 
 **New PDFs added to host `data/` after `docker compose up` require a container
 restart** to be visible, because the mount is read-only and not auto-refreshed
@@ -62,7 +62,7 @@ deadlock, exhausted DB pool) still passes.
 `make health` (alias: `make smoke`) runs `lean health`, which checks
 OCR server, database, and Ollama. It prints `[OK]` / `[--]` / `[FAIL]`
 per component and **exits with code 1** if any component reports
-`status: "error"` (see `src/lean/cli.py` `health` command). Safe to use
+`status: "error"` (see `lean --config <yaml> <command>` (or see `src/lean/core/transports/cli.py` for the universal CLI) `health` command). Safe to use
 as a CI gate or Docker `HEALTHCHECK` precondition.
 
 Note: the per-component check only verifies connectivity/HTTP 200, not
@@ -107,7 +107,7 @@ Ingest dedups by SHA-256 of the source PDF bytes. The behavior:
 images across the corpus (a diagnostic for cleanup prioritization), use
 `lean corpus-stats` — the response includes `duplicate_image_hashes`.
 
-This is intentional (per `src/lean/store/documents.py:upsert_document`).
+This is intentional (per `src/lean/core/store/documents.py:upsert_document`).
 Content-addressable dedup is the source of truth; the path is incidental.
 
 ---

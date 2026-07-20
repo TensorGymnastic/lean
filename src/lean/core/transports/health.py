@@ -15,7 +15,7 @@ from lean.core.config.settings import CoreSettings
 logger = logging.getLogger(__name__)
 
 
-def _probe(name: str, url: str, path: str, timeout: float) -> dict[str, object]:
+def _probe(url: str, path: str, timeout: float) -> dict[str, object]:
     if not url:
         return {"status": "not_configured"}
     try:
@@ -41,22 +41,23 @@ def _check_database(settings: CoreSettings) -> dict[str, object]:
         return {"status": "error", "error": str(exc)}
 
 
+def _check_ocr(settings: CoreSettings) -> dict[str, object]:
+    """Probe the configured OCR backend (returns ``not_configured`` if no URL set)."""
+    return _probe(settings.ocr_base_url, "/health", settings.health_http_timeout)
+
+
+def _check_ollama(settings: CoreSettings) -> dict[str, object]:
+    """Probe the configured Ollama endpoint (returns ``not_configured`` if no URL set)."""
+    return _probe(settings.embedding_remote_url, "/api/tags", settings.health_http_timeout)
+
+
 def check_health(settings: CoreSettings) -> dict[str, dict[str, object]]:
     """Run all built-in health checks and return a dict."""
     return {
-        "ocr": _probe(
-            "ocr",
-            settings.domain_config.get("ocr", {}).get("base_url", "")
-            if settings.domain_config
-            else "",
-            "/health",
-            settings.health_http_timeout,
-        ),
+        "ocr": _check_ocr(settings),
         "database": _check_database(settings),
-        "ollama": _probe(
-            "ollama", settings.embedding_remote_url, "/api/tags", settings.health_http_timeout
-        ),
+        "ollama": _check_ollama(settings),
     }
 
 
-__all__ = ["check_health"]
+__all__ = ["check_health", "_check_database", "_check_ocr", "_check_ollama"]

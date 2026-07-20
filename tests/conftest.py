@@ -55,24 +55,28 @@ def _clear_lru_singletons() -> Generator[None, None, None]:
     yield
     # Import inside the fixture body so module-level import errors in optional
     # deps (torch, sentence-transformers) don't break collection.
-    from lean.config.settings import get_settings
+    from lean.core.config.settings import clear_settings_cache
 
-    get_settings.cache_clear()
+    clear_settings_cache()
 
-    from lean.infrastructure.embedder import get_embedder
+    from lean.core.infrastructure.embedder import get_embedder
+    from lean.core.retrieval.reranker import _get_reranker
 
     get_embedder.cache_clear()
-
-    from lean.llm.base import get_llm
-
-    get_llm.cache_clear()
-
-    from lean.retrieval.reranker import _get_reranker
-
     _get_reranker.cache_clear()
+    # get_llm is a manual cache (no @lru_cache); re-importing the module
+    # resets it. Skip explicit clearing since the test fixtures that mutate
+    # settings also clear_settings_cache() beforehand.
 
 
 # --- Environment setup --------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _default_transport_ports(monkeypatch: pytest.MonkeyPatch) -> None:
+    """M5: ports have no Python default; supply sensible values for tests."""
+    monkeypatch.setenv("MCP_HTTP_PORT", "8765")
+    monkeypatch.setenv("API_PORT", "8766")
 
 
 @pytest.fixture
@@ -81,6 +85,8 @@ def monkeypatch_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("SUPABASE_DB_URL", "postgresql://localhost/postgres")
     monkeypatch.setenv("HF_TOKEN", "test-token")
     monkeypatch.setenv("LEAN_MCP_API_KEY", VALID_API_KEY)
+    monkeypatch.setenv("MCP_HTTP_PORT", "8765")
+    monkeypatch.setenv("API_PORT", "8766")
 
 
 # --- Factory fixtures ---------------------------------------------------------
@@ -109,7 +115,7 @@ def make_chunk() -> Callable[..., object]:
         content: str = "DMAIC is a structured methodology.",
         score: float | None = None,
     ) -> object:
-        from lean.models.schemas import Chunk
+        from lean.core.models.schemas import Chunk
 
         return Chunk(
             id=id,
@@ -142,7 +148,7 @@ def make_doc() -> Callable[..., object]:
         chunk_count: int = 10,
         ingested_at: datetime = FIXED_DATE,
     ) -> object:
-        from lean.models.schemas import DocumentSummary, ExtractionMethod
+        from lean.core.models.schemas import DocumentSummary, ExtractionMethod
 
         return DocumentSummary(
             id=id,
@@ -173,7 +179,7 @@ def make_search_hit(make_chunk: Callable[..., object]) -> Callable[..., object]:
         chunk: object | None = None,
         score: float = 0.85,
     ) -> object:
-        from lean.store.search import SearchHit
+        from lean.core.store.search import SearchHit
 
         return SearchHit(
             chunk=chunk or make_chunk(score=score),

@@ -1,4 +1,4 @@
-"""Unit tests for ``_find_best_block_match`` in services/ingestion.py.
+"""Unit tests for ``find_best_block_match`` in services/ingestion.py.
 
 This is the Jaccard-like word-overlap matcher that drives ``bbox`` and
 ``page_start``/``page_end`` enrichment. It has no DB or marker dependency —
@@ -7,8 +7,8 @@ pure string matching — so it can be unit-tested directly.
 
 from __future__ import annotations
 
-from lean.extraction.marker_converter import BlockMeta
-from lean.services.ingestion import _find_best_block_match
+from lean.core.extraction.marker import BlockMeta
+from lean.core.extraction.pipeline_helpers import find_best_block_match
 
 
 def test_exact_text_match_returns_block_page_and_bbox():
@@ -22,7 +22,7 @@ def test_exact_text_match_returns_block_page_and_bbox():
         )
     ]
 
-    page, bbox = _find_best_block_match(content, blocks)
+    page, bbox = find_best_block_match(content, blocks)
 
     assert page == 7
     assert bbox == {"x0": 10.0, "y0": 20.0, "x1": 30.0, "y1": 40.0}
@@ -33,7 +33,7 @@ def test_no_overlap_returns_none_tuple():
     content = "alpha beta gamma"
     blocks = [BlockMeta(page=1, bbox=[1.0, 2.0, 3.0, 4.0], text="delta epsilon zeta")]
 
-    page, bbox = _find_best_block_match(content, blocks)
+    page, bbox = find_best_block_match(content, blocks)
 
     assert page is None
     assert bbox is None
@@ -45,7 +45,7 @@ def test_below_threshold_overlap_returns_none_tuple():
     content = "a b c d e f g"
     blocks = [BlockMeta(page=2, bbox=[1.0, 2.0, 3.0, 4.0], text="a z y x w v u")]
 
-    page, bbox = _find_best_block_match(content, blocks)
+    page, bbox = find_best_block_match(content, blocks)
 
     assert page is None
     assert bbox is None
@@ -62,7 +62,7 @@ def test_bbox_with_wrong_arity_returns_page_without_bbox():
         )
     ]
 
-    page, bbox = _find_best_block_match(content, blocks)
+    page, bbox = find_best_block_match(content, blocks)
 
     assert page == 5
     assert bbox is None
@@ -72,7 +72,7 @@ def test_empty_content_returns_none_tuple():
     """Empty or whitespace-only content short-circuits before scanning blocks."""
     blocks = [BlockMeta(page=1, bbox=[1.0, 2.0, 3.0, 4.0], text="anything")]
 
-    page, bbox = _find_best_block_match("", blocks)
+    page, bbox = find_best_block_match("", blocks)
 
     assert page is None
     assert bbox is None
@@ -86,7 +86,7 @@ def test_empty_block_text_is_skipped_not_crashing():
         BlockMeta(page=3, bbox=[5.0, 6.0, 7.0, 8.0], text=content),  # exact match
     ]
 
-    page, bbox = _find_best_block_match(content, blocks)
+    page, bbox = find_best_block_match(content, blocks)
 
     # The empty block at page 99 was skipped; the exact-match block at page 3 wins.
     assert page == 3
@@ -95,7 +95,7 @@ def test_empty_block_text_is_skipped_not_crashing():
 
 def test_empty_blocks_list_returns_none_tuple():
     """No blocks to match against → (None, None), no crash."""
-    page, bbox = _find_best_block_match("anything", [])
+    page, bbox = find_best_block_match("anything", [])
 
     assert page is None
     assert bbox is None
@@ -106,7 +106,7 @@ def test_none_bbox_on_best_block_returns_page_without_bbox():
     content = "the quick brown fox jumps over the lazy dog"
     blocks = [BlockMeta(page=4, bbox=None, text=content)]
 
-    page, bbox = _find_best_block_match(content, blocks)
+    page, bbox = find_best_block_match(content, blocks)
 
     assert page == 4
     assert bbox is None
@@ -121,7 +121,7 @@ def test_highest_scoring_block_wins_when_multiple_match():
         BlockMeta(page=3, bbox=[3.0, 3.0, 3.0, 3.0], text="zzz yyy www"),  # 0
     ]
 
-    page, bbox = _find_best_block_match(content, blocks)
+    page, bbox = find_best_block_match(content, blocks)
 
     assert page == 2
     assert bbox == {"x0": 2.0, "y0": 2.0, "x1": 2.0, "y1": 2.0}
@@ -139,9 +139,9 @@ def test_min_overlap_param_rejects_partial_match():
         BlockMeta(page=2, bbox=[2.0, 2.0, 2.0, 2.0], text="alpha beta yyy"),
     ]
 
-    page_strict, _ = _find_best_block_match(content, blocks, min_overlap=0.9)
+    page_strict, _ = find_best_block_match(content, blocks, min_overlap=0.9)
     assert page_strict is None
 
-    page_lenient, bbox_lenient = _find_best_block_match(content, blocks, min_overlap=0.5)
+    page_lenient, bbox_lenient = find_best_block_match(content, blocks, min_overlap=0.5)
     assert page_lenient == 2
     assert bbox_lenient == {"x0": 2.0, "y0": 2.0, "x1": 2.0, "y1": 2.0}

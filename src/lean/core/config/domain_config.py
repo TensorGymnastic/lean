@@ -23,8 +23,7 @@ class ExtractorRef(BaseModel):
 
     adapter: str = Field(
         description=(
-            "Dotted path to an Extractor class "
-            "(e.g. lean.domains.pdf_lss.adapters.MarkerAdapter)"
+            "Dotted path to an Extractor class (e.g. lean.domains.pdf_lss.adapters.MarkerAdapter)"
         )
     )
     config: dict[str, Any] = Field(
@@ -105,10 +104,18 @@ class DomainConfig(BaseModel):
         Top-level YAML keys that aren't part of DomainConfig are stored
         under ``settings`` so the domain can still consume them via
         ``CoreSettings.domain_config``.
+
+        Raises ``ValueError`` for malformed YAML or non-mapping top-level
+        values (instead of leaking ``yaml.YAMLError`` / a raw ``{}``).
         """
-        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        try:
+            data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        except yaml.YAMLError as e:
+            raise ValueError(f"invalid YAML in {path}: {e}") from e
         if not isinstance(data, dict):
-            raise ValueError(f"domain YAML must be a mapping, got {type(data).__name__}")
+            raise ValueError(
+                f"domain YAML must be a mapping, got {type(data).__name__} (in {path})"
+            )
         known = {f.alias or name for name, f in cls.model_fields.items()}
         extras = {k: v for k, v in data.items() if k not in known}
         if extras:

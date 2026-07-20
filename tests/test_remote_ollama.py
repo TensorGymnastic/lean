@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from lean.embeddings.remote_ollama import RemoteOllamaEmbedder
+from lean.core.embeddings.remote_ollama import RemoteOllamaEmbedder
 
 
-@patch("lean.embeddings.remote_ollama.httpx.Client")
+@patch("lean.core.embeddings.remote_ollama.httpx.Client")
 def test_embed_query_calls_ollama_api(MockClient: MagicMock) -> None:
     mock_client = MockClient.return_value
     mock_resp = MagicMock()
@@ -30,7 +30,7 @@ def test_embed_query_calls_ollama_api(MockClient: MagicMock) -> None:
     assert kwargs["json"]["prompt"] == "hello"
 
 
-@patch("lean.embeddings.remote_ollama.httpx.Client")
+@patch("lean.core.embeddings.remote_ollama.httpx.Client")
 def test_embed_documents_sequential(MockClient: MagicMock) -> None:
     mock_client = MockClient.return_value
     mock_resp = MagicMock()
@@ -51,7 +51,7 @@ def test_embed_documents_sequential(MockClient: MagicMock) -> None:
 
 
 def test_dim_property() -> None:
-    with patch("lean.embeddings.remote_ollama.httpx.Client"):
+    with patch("lean.core.embeddings.remote_ollama.httpx.Client"):
         embedder = RemoteOllamaEmbedder(
             base_url="http://test:11434",
             model="m",
@@ -60,9 +60,9 @@ def test_dim_property() -> None:
         assert embedder.dim == 768
 
 
-@patch("lean.embeddings.remote_ollama.httpx.Client")
+@patch("lean.core.embeddings.remote_ollama.httpx.Client")
 def test_empty_documents_returns_empty(MockClient: MagicMock) -> None:
-    with patch("lean.embeddings.remote_ollama.httpx.Client"):
+    with patch("lean.core.embeddings.remote_ollama.httpx.Client"):
         embedder = RemoteOllamaEmbedder(
             base_url="http://test:11434",
             model="m",

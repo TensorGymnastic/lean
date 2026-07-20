@@ -20,7 +20,7 @@ def db_url() -> str:
 
 @pytest.fixture()
 def conn(db_url: str):
-    from lean.store.base import StoreConnection
+    from lean.core.store.base import StoreConnection
 
     c = StoreConnection(db_url)
     yield c
@@ -29,7 +29,7 @@ def conn(db_url: str):
 
 def _make_doc(conn, sha: str = "test-sha-256") -> uuid.UUID:
     """Insert a test document and return its UUID. Cleans up via test isolation."""
-    from lean.store.documents import DocumentRepo
+    from lean.core.store.documents import DocumentRepo
 
     return DocumentRepo(conn).upsert_document(
         source_path=f"test-{sha}.pdf",
@@ -44,9 +44,9 @@ def _make_doc(conn, sha: str = "test-sha-256") -> uuid.UUID:
 
 def test_upsert_and_search(conn) -> None:
     """Insert document + chunks, search by embedding, verify results."""
-    from lean.store.chunks import ChunkRepo, ChunkRow
-    from lean.store.documents import DocumentRepo
-    from lean.store.search import SearchEngine
+    from lean.core.store.chunks import ChunkRepo, ChunkRow
+    from lean.core.store.documents import DocumentRepo
+    from lean.core.store.search import SearchEngine
 
     doc_id = _make_doc(conn, "upsert-search-test")
 
@@ -88,9 +88,9 @@ def test_upsert_and_search(conn) -> None:
 
 def test_search_with_section_filter(conn) -> None:
     """section_substring filter narrows results."""
-    from lean.store.chunks import ChunkRepo, ChunkRow
-    from lean.store.documents import DocumentRepo
-    from lean.store.search import SearchEngine
+    from lean.core.store.chunks import ChunkRepo, ChunkRow
+    from lean.core.store.documents import DocumentRepo
+    from lean.core.store.search import SearchEngine
 
     doc_id = _make_doc(conn, "section-filter-test")
     chunks = [
@@ -122,9 +122,9 @@ def test_search_with_section_filter(conn) -> None:
 
 def test_replace_chunks_is_replacement(conn) -> None:
     """replace_chunks deletes old chunks before inserting new ones."""
-    from lean.store.chunks import ChunkRepo, ChunkRow
-    from lean.store.documents import DocumentRepo
-    from lean.store.search import SearchEngine
+    from lean.core.store.chunks import ChunkRepo, ChunkRow
+    from lean.core.store.documents import DocumentRepo
+    from lean.core.store.search import SearchEngine
 
     doc_id = _make_doc(conn, "replace-test")
 
@@ -176,8 +176,8 @@ def test_replace_chunks_is_replacement(conn) -> None:
 
 def test_upsert_document_dedup(conn) -> None:
     """Re-upserting the same source_sha256 updates rather than duplicating."""
-    from lean.store.analytics import AnalyticsRepo
-    from lean.store.documents import DocumentRepo
+    from lean.core.store.analytics import AnalyticsRepo
+    from lean.core.store.documents import DocumentRepo
 
     doc_id_1 = _make_doc(conn, "dedup-test")
     doc_id_2 = DocumentRepo(conn).upsert_document(
@@ -196,9 +196,9 @@ def test_upsert_document_dedup(conn) -> None:
 
 def test_get_chunk(conn) -> None:
     """get_chunk returns the chunk by ID, or None."""
-    from lean.store.chunks import ChunkRepo, ChunkRow
-    from lean.store.documents import DocumentRepo
-    from lean.store.search import SearchEngine
+    from lean.core.store.chunks import ChunkRepo, ChunkRow
+    from lean.core.store.documents import DocumentRepo
+    from lean.core.store.search import SearchEngine
 
     doc_id = _make_doc(conn, "get-chunk-test")
     ChunkRepo(conn).replace_chunks(
@@ -233,9 +233,9 @@ def test_get_chunk(conn) -> None:
 
 def test_bm25_search_filters_by_section(conn) -> None:
     """BM25 full-text search with section_substring narrows results to matching chunks."""
-    from lean.store.chunks import ChunkRepo, ChunkRow
-    from lean.store.documents import DocumentRepo
-    from lean.store.search import SearchEngine
+    from lean.core.store.chunks import ChunkRepo, ChunkRow
+    from lean.core.store.documents import DocumentRepo
+    from lean.core.store.search import SearchEngine
 
     doc_id = _make_doc(conn, "bm25-section-test")
     chunks = [
@@ -279,9 +279,9 @@ def test_bm25_search_filters_by_section(conn) -> None:
 
 def test_chunk_type_filter_at_db_level(conn) -> None:
     """chunk_type=image SQL filter (line 60-62) returns only image chunks."""
-    from lean.store.chunks import ChunkRepo, ChunkRow
-    from lean.store.documents import DocumentRepo
-    from lean.store.search import SearchEngine
+    from lean.core.store.chunks import ChunkRepo, ChunkRow
+    from lean.core.store.documents import DocumentRepo
+    from lean.core.store.search import SearchEngine
 
     doc_id = _make_doc(conn, "chunk-type-db-test")
     chunks = [
@@ -334,9 +334,9 @@ def test_chunk_type_filter_at_db_level(conn) -> None:
 
 def test_min_score_filter_at_db_level(conn) -> None:
     """min_score SQL filter restricts hits to those above the cosine threshold."""
-    from lean.store.chunks import ChunkRepo, ChunkRow
-    from lean.store.documents import DocumentRepo
-    from lean.store.search import SearchEngine
+    from lean.core.store.chunks import ChunkRepo, ChunkRow
+    from lean.core.store.documents import DocumentRepo
+    from lean.core.store.search import SearchEngine
 
     doc_id = _make_doc(conn, "min-score-db-test")
     chunks = [
@@ -376,9 +376,9 @@ def test_min_score_filter_at_db_level(conn) -> None:
 
 def test_hybrid_search_rrf_orders_overlapping_hits_first(conn) -> None:
     """vector_search + bm25_search + rrf together promote chunks in both lists."""
-    from lean.store.chunks import ChunkRepo, ChunkRow
-    from lean.store.documents import DocumentRepo
-    from lean.store.search import SearchEngine
+    from lean.core.store.chunks import ChunkRepo, ChunkRow
+    from lean.core.store.documents import DocumentRepo
+    from lean.core.store.search import SearchEngine
 
     doc_id = _make_doc(conn, "rrf-hybrid-test")
     chunks = [
@@ -432,8 +432,8 @@ def test_hybrid_search_rrf_orders_overlapping_hits_first(conn) -> None:
 
 def test_find_duplicate_image_hashes_returns_real_duplicates(conn) -> None:
     """find_duplicate_image_hashes surfaces DB rows where image_hash is repeated."""
-    from lean.store.chunks import ChunkRepo, ChunkRow
-    from lean.store.documents import DocumentRepo
+    from lean.core.store.chunks import ChunkRepo, ChunkRow
+    from lean.core.store.documents import DocumentRepo
 
     doc_id = _make_doc(conn, "duplicate-image-hashes-test")
     dup_hash = "f" * 64
@@ -493,8 +493,9 @@ def test_find_duplicate_image_hashes_returns_real_duplicates(conn) -> None:
 
 def test_log_query_persists_filter_payload(conn) -> None:
     """log_query writes the row with the JSONB filter payload preserved."""
-    from lean.store.analytics import AnalyticsRepo
     from psycopg.rows import dict_row
+
+    from lean.core.store.analytics import AnalyticsRepo
 
     repo = AnalyticsRepo(conn)
     repo.log_query(
@@ -528,8 +529,9 @@ def test_log_query_persists_filter_payload(conn) -> None:
 def test_reingested_at_updates_on_upsert(conn) -> None:
     """The upsert_document() ON CONFLICT clause sets reingested_at = now() on re-upsert."""
 
-    from lean.store.documents import DocumentRepo
     from psycopg.rows import dict_row
+
+    from lean.core.store.documents import DocumentRepo
 
     sha = "reingested-at-test"
     doc_id_1 = _make_doc(conn, sha)
@@ -569,8 +571,9 @@ def test_reingested_at_updates_on_upsert(conn) -> None:
 def test_replace_chunks_atomic_on_failure(conn) -> None:
     """If a chunk insert fails mid-replace, rollback leaves the table unchanged."""
     import psycopg
-    from lean.store.chunks import ChunkRepo, ChunkRow
-    from lean.store.documents import DocumentRepo
+
+    from lean.core.store.chunks import ChunkRepo, ChunkRow
+    from lean.core.store.documents import DocumentRepo
 
     doc_id = _make_doc(conn, "atomic-rollback-test")
 
@@ -643,8 +646,9 @@ def test_replace_chunks_atomic_on_failure(conn) -> None:
 
 def test_save_eval_run_persists_metrics(conn) -> None:
     """save_eval_run writes a row that round-trips through the eval_runs table."""
-    from lean.store.analytics import AnalyticsRepo
     from psycopg.rows import dict_row
+
+    from lean.core.store.analytics import AnalyticsRepo
 
     repo = AnalyticsRepo(conn)
     repo.save_eval_run(
@@ -681,7 +685,7 @@ def test_save_eval_run_persists_metrics(conn) -> None:
 
 def test_corpus_stats_breakdown_sums_to_document_count(conn) -> None:
     """extraction_method_breakdown values sum to document_count (invariant)."""
-    from lean.store.analytics import AnalyticsRepo
+    from lean.core.store.analytics import AnalyticsRepo
 
     stats = AnalyticsRepo(conn).corpus_stats(embedding_dim=1024, embedding_model="integration-test")
     assert sum(stats.extraction_method_breakdown.values()) == stats.document_count

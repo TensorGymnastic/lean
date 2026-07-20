@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lean.chunker.markdown_ast import build_sections
+from lean.core.chunker.markdown_ast import build_sections
 
 
 def test_build_sections_simple_markdown() -> None:

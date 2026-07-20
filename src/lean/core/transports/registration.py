@@ -1,4 +1,4 @@
-"""Domain registration protocol — the seam between lean-core and any domain.
+"""Domain registration protocol — the seam between lean and any domain.
 
 A domain (e.g. lean-lss) subclasses ``DomainRegistration`` and
 implements the hook methods to inject its extraction pipeline, VLM
