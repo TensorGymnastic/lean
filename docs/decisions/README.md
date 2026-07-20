@@ -7,21 +7,35 @@ architectural decision — for *existing* behavior, document it in
 
 ## Index
 
-_No formal ADRs yet. The choices documented below currently live in their
-relevant guide pages — use them as reference, not as authoritative decisions._
+| ADR | Status | Decision |
+|---|---|---|
+| [0001](0001-extraction-fallback-chain.md) | Accepted | PDF extraction fallback chain (marker → Unlimited-OCR → markitdown) |
+| [0002](0002-port-no-python-defaults.md) | Accepted | `mcp_http_port` / `api_port` have no Python defaults (env or YAML required) |
+| [0003](0003-minimax-api-key-alias.md) | Accepted | `Settings.llm_api_key` reads `MINIMAX_API_KEY` via validation_alias |
+| [0004](0004-vlm-single-enabled-flag.md) | Accepted | `vlm.enabled` lives only at top-level YAML — single source of truth |
+| [0005](0005-dedup-by-sha256.md) | Accepted | Document dedup is by `source_sha256`, not by path |
 
-| Decision | Where it lives |
-|---|---|
-| LFM2.5-Embedding-350M + asymmetric prompts | [`configuration.md` §embedding](../configuration.md#embedding) |
-| Unlimited-OCR via transformers (NOT vLLM) | [`ocr-server-deployment.md`](../ocr-server-deployment.md) |
-| Rerank enabled in this repo's config | [`configuration.md` §retrieval](../configuration.md#retrieval) |
-| `ivfflat` post-bulk-ingest `REINDEX` | [`operations.md` §post-ingest-reindex](../operations.md#post-ingest-reindex) |
-| Contextual Retrieval irreversibility | [`limitations.md` §contextual-retrieval-is-irreversible](../limitations.md#contextual-retrieval-is-irreversible) |
-| Pseudo-eval methodology | [`evaluation.md`](../evaluation.md) |
-| REST API as near-full mirror (7/8) | [`limitations.md` §rest-api-now-mirrors-7-of-8-mcp-tools](../limitations.md#rest-api-now-mirrors-7-of-8-mcp-tools-near-full-parity) |
-| Dedup by SHA-256 | [`operations.md` §reingest-semantics](../operations.md#reingest-semantics) + [`limitations.md` §dedup](../limitations.md#dedup-is-by-sha-256-not-by-path) |
+Pending / not-yet-decided:
 
-If a future decision is **expensive to reverse**, write it as an ADR below
+- LFM2.5-Embedding-350M + asymmetric prompts → still in `configuration.md`
+  §embedding (also a candidate for ADR; promote when a second embedder
+  arrives).
+- Unlimited-OCR via transformers (NOT vLLM) → still in
+  `ocr-server-deployment.md` (vendor-pinned contract; revisit when
+  GPU memory pressure becomes user-visible).
+- Rerank enabled in `lean-pdf-lss.yaml` config, disabled in `code` /
+  `web` → stays in `configuration.md` (per-domain config, not a
+  cross-cutting decision).
+- `ivfflat` post-bulk-ingest `REINDEX` → stays in `operations.md`
+  (operational runbook, not architectural).
+- Contextual Retrieval irreversibility → stays in `limitations.md`
+  (known-cost disclosure, not a decision to reconsider).
+- Pseudo-eval methodology → stays in `evaluation.md` (the doc IS the
+  decision; an ADR would duplicate).
+- REST API as near-full mirror (7/8) → stays in `limitations.md`
+  (audit disclosure, not a design choice worth reaffirming).
+
+If a future decision is **expensive to reverse**, write it as an ADR
 rather than burying it in a guide.
 
 ---

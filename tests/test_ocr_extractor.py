@@ -193,7 +193,6 @@ def test_ocr_extractor_pdf_to_base64_rejects_page_bomb(tmp_path: Path) -> None:
     """
     from unittest.mock import MagicMock
 
-    from lean.core.extraction.ocr import MAX_PAGE_PIXELS
 
     pdf = tmp_path / "big.pdf"
     pdf.write_bytes(b"%PDF-1.4\n")
