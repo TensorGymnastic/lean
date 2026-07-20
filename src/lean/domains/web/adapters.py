@@ -35,11 +35,32 @@ class WebPageExtractor:
     def is_configured(self) -> bool:
         return True
 
+    @staticmethod
+    def _normalize_url(path_or_str: Path | str) -> str:
+        """Coerce the path arg back to a URL string without losing ``//``.
+
+        ``str(Path("https://example.com/"))`` returns ``"https:/example.com"``
+        because PosixPath collapses ``//``. Callers that pass a URL via
+        CLI string hit this when the framework wraps it in Path first.
+        Detect the scheme prefix and skip the round-trip.
+        """
+        if isinstance(path_or_str, Path):
+            as_str = str(path_or_str)
+            if as_str.startswith(("https:/", "http:/", "ftp:/")) and not as_str.startswith(
+                ("https://", "http://", "ftp://")
+            ):
+                return (
+                    as_str.replace("https:/", "https://", 1)
+                    .replace("http:/", "http://", 1)
+                    .replace("ftp:/", "ftp://", 1)
+                )
+        return str(path_or_str)
+
     def extract(self, pdf_path: Path) -> ExtractionResult:
         """Fetch URL ``pdf_path`` (str-like) and return markdown."""
         import httpx
 
-        url = str(pdf_path)
+        url = self._normalize_url(pdf_path)
         if not urlparse(url).scheme:
             raise ValueError(f"not a valid URL: {url}")
 
