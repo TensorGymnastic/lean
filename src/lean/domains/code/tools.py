@@ -3,7 +3,14 @@
 Auto-discoverable MCP tools, REST routes, and CLI commands for the
 code/markdown-file corpus. Reuses the universal services from
 lean (corpus_stats, list_documents, get_chunk, etc.) and adds
-domain-specific entry points (ingest_directory, ingest_git_repo).
+domain-specific entry points (ingest_directory).
+
+For git-repository ingestion, clone the repo locally and pass the
+checkout directory to ``lean --config configs/lean-code.yaml
+ingest-directory --dir <checkout> --pattern "*"``. A dedicated
+``ingest_git_repo`` command is intentionally not provided: it would
+either reimplement ``ingest_directory`` or duplicate git's checkout
+machinery; see ADR-0001's extension pattern for adding one.
 """
 
 from __future__ import annotations
