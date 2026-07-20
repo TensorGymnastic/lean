@@ -32,7 +32,7 @@ settings:
     dpi: 300
   marker:
     force_ocr: false
-    remote_url: "http://192.168.2.37:8000"
+    remote_url: ""
   storage:
     corpus_root: "data"
     max_pdf_mb: 200

@@ -30,7 +30,7 @@ settings:
 
 extractors:
   - adapter: lean.domains.pdf_lss.adapters.MarkerAdapter
-    config: { remote_url: "http://192.168.2.37:8000", force_ocr: false }
+    config: { remote_url: "", force_ocr: false }
   - adapter: lean.domains.pdf_lss.adapters.UnlimitedOCRAdapter
     config: { base_url: "http://gpu:8001", model: "baidu/Unlimited-OCR" }
   - adapter: lean.domains.pdf_lss.adapters.MarkitdownAdapter

@@ -37,6 +37,7 @@ and its gotchas.
 | `LEAN_MCP_API_KEY` | yes | `>= 16` chars; **rejects literal `"change-me"`** | Bearer token for MCP HTTP + REST transport. `change-me` is blocked even if it meets the length requirement. |
 | `MINIMAX_API_KEY` | no | — | Required only if `llm.contextual_retrieval`, `llm.multi_query`, or `llm.hyde` is true. Aliased to `Settings.llm_api_key`. |
 | `OCR_BASE_URL` | no | — | Optional override of `ocr.base_url` from YAML |
+| `MARKER_REMOTE_URL` | no | — | Optional override of `marker.remote_url` from YAML (empty = local CPU marker-pdf) |
 | `MCP_HTTP_PORT` | no | `1..65535` | Optional override of `transport.mcp_http_port` from YAML |
 | `API_PORT` | no | `1..65535` | Optional override of `transport.api_port` from YAML |
 | `VLM_API_KEY` | no | — | Aliased to `Settings.vlm_api_key` |

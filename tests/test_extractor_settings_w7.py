@@ -25,14 +25,21 @@ def _build() -> object:
     return build_from_yaml(Path("configs/lean-pdf-lss.yaml"))
 
 
-def test_marker_remote_url_from_settings_reaches_extractor() -> None:
-    """``settings.marker.remote_url`` is the source of truth — the extractor picks it up."""
+def test_marker_remote_url_from_env_reaches_extractor(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``MARKER_REMOTE_URL`` env var (or settings.marker.remote_url in YAML) is
+    the source of truth — the extractor picks it up."""
+    monkeypatch.setenv("MARKER_REMOTE_URL", "http://gpu-host.internal:8000")
+    from lean.core.config.settings import clear_settings_cache
     from lean.core.extraction.base import get_pipeline
 
+    clear_settings_cache()
     _build()
     pipeline = get_pipeline()
     marker = pipeline._extractors[0]
-    assert marker._remote_url == "http://192.168.2.37:8000"
+    assert marker._remote_url == "http://gpu-host.internal:8000"
+    clear_settings_cache()
 
 
 def test_marker_force_ocr_default_from_settings() -> None:
@@ -95,3 +102,28 @@ def test_ocr_timeout_validator_rejects_non_positive() -> None:
             api_port=8766,
             ocr_timeout_s=0,
         )
+
+
+def test_marker_remote_url_from_env_alias(monkeypatch: pytest.MonkeyPatch) -> None:
+    """``MARKER_REMOTE_URL`` env var fills ``settings.marker_remote_url``.
+
+    Removes the need to hardcode operator-specific IPs in the YAML. The
+    audit's O-1 finding left 192.168.2.37 in three files; this is the
+    prerequisite for moving them all to env-var-driven defaults.
+    """
+    monkeypatch.setenv("MARKER_REMOTE_URL", "http://gpu-host.internal:8000")
+    from lean.core.config.settings import CoreSettings, clear_settings_cache
+
+    clear_settings_cache()
+    settings = CoreSettings(mcp_http_port=8765, api_port=8766)
+    assert settings.marker_remote_url == "http://gpu-host.internal:8000"
+
+
+def test_marker_remote_url_default_is_empty(monkeypatch: pytest.MonkeyPatch) -> None:
+    """With no env var and no YAML, the marker URL is empty (= local CPU)."""
+    monkeypatch.delenv("MARKER_REMOTE_URL", raising=False)
+    from lean.core.config.settings import CoreSettings, clear_settings_cache
+
+    clear_settings_cache()
+    settings = CoreSettings(mcp_http_port=8765, api_port=8766)
+    assert settings.marker_remote_url == ""

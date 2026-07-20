@@ -5,7 +5,8 @@ Run with: uv run pytest -m integration tests/test_llm_integration.py -v
 
 Requirements:
   - MINIMAX_API_KEY in .env (or environment)
-  - Remote Ollama at http://192.168.2.37:11434 with LFM2.5-8B-A1B loaded
+  - OLLAMA_URL env var pointing to a remote Ollama with LFM2.5-8B-A1B loaded
+    (default: http://127.0.0.1:11434)
 """
 
 from __future__ import annotations
@@ -19,7 +20,7 @@ from lean.core.chunker.markdown_ast import Section
 from lean.core.chunker.recursive import ChunkResult
 
 MINIMAX_KEY = os.environ.get("MINIMAX_API_KEY", "")
-OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://192.168.2.37:11434")
+OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434")
 OLLAMA_MODEL = "hf.co/LiquidAI/LFM2.5-8B-A1B-GGUF:Q6_K"
 
 pytestmark = pytest.mark.integration

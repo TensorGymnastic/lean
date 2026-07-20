@@ -40,17 +40,29 @@ def _apply_overlay_to_kwargs(
     Same rules as ``_apply_settings_overrides``: flat keys, composite
     ``f"{section}_{key}"``, and unknown keys stashed under
     ``domain_config``. Returns a new dict — does not mutate ``kwargs``.
+
+    Empty-string values in the overlay are skipped (not used to clobber
+    a non-empty value already supplied by env vars): an operator who
+    leaves ``settings.marker.remote_url: ""`` in the YAML but sets
+    ``MARKER_REMOTE_URL=http://gpu:8000`` in the environment gets the
+    GPU server. Use a literal placeholder string if you really want
+    to clobber.
     """
     out = dict(kwargs)
     for section, sub in overrides.items():
         if not isinstance(sub, dict):
+            value = sub
+            if value in ("", None):
+                continue
             if section in field_names:
-                out[section] = sub
+                out[section] = value
                 continue
             bucket = out.setdefault("domain_config", {})
-            bucket[section] = sub
+            bucket[section] = value
             continue
         for key, value in sub.items():
+            if value in ("", None):
+                continue
             if key in field_names:
                 out[key] = value
                 continue
@@ -147,7 +159,11 @@ class CoreSettings(BaseSettings):
     embedding_http_timeout: float = 30.0
     embedding_max_retries: int = 3
 
-    marker_remote_url: str = ""
+    marker_remote_url: str = Field(
+        default="",
+        description="Remote marker server URL (empty = local CPU)",
+        validation_alias="MARKER_REMOTE_URL",
+    )
     marker_force_ocr: bool = False
 
     ocr_model: str = "baidu/Unlimited-OCR"
