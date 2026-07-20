@@ -1,0 +1,80 @@
+schema: spec-driven
+
+# Project context (optional)
+# This is shown to AI when creating artifacts.
+# Add your tech stack, conventions, style guides, domain knowledge, etc.
+# Example:
+#   context: |
+#     Tech stack: TypeScript, React, Node.js
+#     We use conventional commits
+#     Domain: e-commerce platform
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always include a "Non-goals" section
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
+
+# Lean-specific context: shown to AI when creating artifacts.
+# Helps the model produce code that matches the project's actual layout,
+# conventions, and constraints without needing to re-derive them each time.
+context: |
+  Lean is a dockerized MCP server for corpus ingestion, driven by YAML
+  domain manifests. Built-in domains: pdf_lss (marker → OCR → markitdown
+  fallback), code (markdown / source-file corpus), web (URL corpus).
+
+  Tech stack: Python 3.12+, uv-managed, pydantic-settings, FastMCP v3.4.4,
+  FastAPI, Typer, pgvector + tsvector, marker-pdf + trafilatura (optional),
+  httpx. Strict mypy + ruff (line-length 100, includes S bandit rules).
+  Tests under tests/ use respx + httpx + MagicMock + monkeypatch.
+
+  Layering: transport (mcp / api / cli) -> services -> store ->
+  infrastructure. No business logic in transports. Each store repo is
+  CRUD-narrow.
+
+  Conventions:
+  - from __future__ import annotations in every module
+  - pydantic-settings reads .env (secrets) + YAML overlay (app config)
+    via CoreSettings.from_yaml(path). Singleton via get_settings().
+  - Transport ports (mcp_http_port, api_port) have no Python defaults;
+    come from env vars or YAML. To inject env-supplied values when
+    YAML is empty, the overlay skip-on-empty-string rule applies.
+  - Settings.marker_remote_url and settings.ocr.* are the canonical
+    source; the yaml loader's _merge_extractor_defaults projects
+    them onto MarkerAdapter / UnlimitedOCRAdapter constructors.
+  - vlm.enabled lives only at the top-level YAML vlm: block.
+  - ADRs 0001-0005 cover the load-bearing choices; refer to them
+    rather than re-deriving the rationale.
+
+  Coverage gate: fail_under = 80 in pyproject.toml. Add a respx test
+  when adding HTTP paths. Add a YAML-loader test when adding
+  CoreSettings fields. Per-domain adapter changes deserve a
+  per-domain test file (test_code_domain.py, test_web_domain.py).
+
+  Existing decisions documented in docs/decisions/0001-0005.
+  Anything expensive-to-reverse goes here as an ADR.
+
+# Per-artifact rules — keep proposals short and rigorous.
+rules:
+  proposal:
+    - Include a "Why" section framed for a code reviewer, not a
+      stakeholder ("text X is duplicated across Y and Z" beats
+      "would be nice to consolidate").
+    - State the non-goals: what is explicitly OUT of scope for this
+      change, even if it sounds related.
+  design:
+    - Cite the file:line of every existing function being changed
+      or extended. Without an anchor, the next reader has to grep.
+    - When changing the public API of CoreSettings, note which
+      existing YAML manifests exercise the change.
+  tasks:
+    - Tasks should be independently shippable commits. Each task
+      ends with `make verify` GREEN before the next starts.
+    - For any behavior change, the task includes "write failing test
+      first" before "implement".
+    - For docs-only changes, the task references the doc-update rule
+      in AGENTS.md.
