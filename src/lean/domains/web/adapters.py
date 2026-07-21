@@ -42,18 +42,19 @@ class WebPageExtractor:
         ``str(Path("https://example.com/"))`` returns ``"https:/example.com"``
         because PosixPath collapses ``//``. Callers that pass a URL via
         CLI string hit this when the framework wraps it in Path first.
-        Detect the scheme prefix and skip the round-trip.
+        Detect the scheme prefix and re-expand.
         """
         if isinstance(path_or_str, Path):
-            as_str = str(path_or_str)
-            if as_str.startswith(("https:/", "http:/", "ftp:/")) and not as_str.startswith(
-                ("https://", "http://", "ftp://")
+            raw = str(path_or_str)
+            if not raw.startswith(("https:/", "http:/", "ftp:/")):
+                return raw
+            for single, double in (
+                ("https:/", "https://"),
+                ("http:/", "http://"),
+                ("ftp:/", "ftp://"),
             ):
-                return (
-                    as_str.replace("https:/", "https://", 1)
-                    .replace("http:/", "http://", 1)
-                    .replace("ftp:/", "ftp://", 1)
-                )
+                if raw.startswith(single):
+                    return double + raw[len(single) :]
         return str(path_or_str)
 
     def extract(self, pdf_path: Path) -> ExtractionResult:
