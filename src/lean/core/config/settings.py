@@ -33,13 +33,21 @@ def _load_yaml(config_path: Path | None) -> dict[str, Any]:
 
 
 def _apply_overlay_to_kwargs(
-    kwargs: dict[str, Any], field_names: set[str], overrides: dict[str, Any]
+    kwargs: dict[str, Any],
+    field_names: set[str],
+    alias_to_field: dict[str, str],
+    overrides: dict[str, Any],
 ) -> dict[str, Any]:
     """Overlay ``overrides`` onto a kwargs dict for ``cls(**kwargs)``.
 
     Same rules as ``_apply_settings_overrides``: flat keys, composite
     ``f"{section}_{key}"``, and unknown keys stashed under
     ``domain_config``. Returns a new dict — does not mutate ``kwargs``.
+
+    Flat keys are also accepted when they match a field's
+    ``validation_alias`` (e.g. ``MCP_HTTP_PORT: 9999`` in YAML sets
+    ``settings.mcp_http_port``) so that operators who learn the env-var
+    name from pydantic-settings can write the same name in YAML.
 
     Empty-string values in the overlay are skipped (not used to clobber
     a non-empty value already supplied by env vars): an operator who
@@ -57,6 +65,9 @@ def _apply_overlay_to_kwargs(
             if section in field_names:
                 out[section] = value
                 continue
+            if section in alias_to_field:
+                out[alias_to_field[section]] = value
+                continue
             bucket = out.setdefault("domain_config", {})
             bucket[section] = value
             continue
@@ -66,9 +77,15 @@ def _apply_overlay_to_kwargs(
             if key in field_names:
                 out[key] = value
                 continue
+            if key in alias_to_field:
+                out[alias_to_field[key]] = value
+                continue
             composite = f"{section}_{key}"
             if composite in field_names:
                 out[composite] = value
+                continue
+            if composite in alias_to_field:
+                out[alias_to_field[composite]] = value
                 continue
             bucket = out.setdefault("domain_config", {})
             bucket_section = bucket.setdefault(section, {})
@@ -337,8 +354,12 @@ class CoreSettings(BaseSettings):
         yaml_data = _load_yaml(config_path)
         env_kwargs = _read_env_kwargs(cls)
         field_names = set(cls.model_fields.keys())
+        alias_to_field: dict[str, str] = {}
+        for name, field in cls.model_fields.items():
+            if field.validation_alias:
+                alias_to_field[str(field.validation_alias)] = name
         settings_block = yaml_data.get("settings", {})
-        merged = _apply_overlay_to_kwargs(env_kwargs, field_names, settings_block)
+        merged = _apply_overlay_to_kwargs(env_kwargs, field_names, alias_to_field, settings_block)
         aliased: dict[str, Any] = {}
         for name, value in merged.items():
             field = cls.model_fields[name]

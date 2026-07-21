@@ -127,3 +127,23 @@ def test_marker_remote_url_default_is_empty(monkeypatch: pytest.MonkeyPatch) -> 
     clear_settings_cache()
     settings = CoreSettings(mcp_http_port=8765, api_port=8766)
     assert settings.marker_remote_url == ""
+
+
+def test_yaml_alias_form_sets_field(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """YAML keys that match a field's validation_alias (e.g. ``MCP_HTTP_PORT``)
+    populate the underlying field, matching the env-var contract. An operator
+    who learns the env-var name from pydantic-settings docs can write the
+    same name in YAML.
+    """
+    monkeypatch.delenv("MCP_HTTP_PORT", raising=False)
+    monkeypatch.delenv("API_PORT", raising=False)
+    yaml = tmp_path / "cfg.yaml"
+    yaml.write_text("settings:\n  MCP_HTTP_PORT: 9999\n  api_port: 8888\n")
+    from lean.core.config.settings import CoreSettings, clear_settings_cache
+
+    clear_settings_cache()
+    settings = CoreSettings.from_yaml(yaml)
+    assert settings.mcp_http_port == 9999
+    assert settings.api_port == 8888
