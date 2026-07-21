@@ -129,9 +129,7 @@ def test_marker_remote_url_default_is_empty(monkeypatch: pytest.MonkeyPatch) -> 
     assert settings.marker_remote_url == ""
 
 
-def test_yaml_alias_form_sets_field(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_yaml_alias_form_sets_field(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """YAML keys that match a field's validation_alias (e.g. ``MCP_HTTP_PORT``)
     populate the underlying field, matching the env-var contract. An operator
     who learns the env-var name from pydantic-settings docs can write the
