@@ -153,7 +153,10 @@ def _build_vlm_hooks(domain_config: DomainConfig, settings: CoreSettings) -> Dom
     def _heading_for_chunk(chunk: object) -> str:
         meta = getattr(chunk, "image_meta", None) or {}
         title = meta.get("title") if isinstance(meta, dict) else None
-        return str(title) if title else fmt.format(n=0)
+        if title:
+            return str(title)
+        result = fmt.format(n=0, title="")
+        return result if result.strip() else "text"
 
     return DomainHooks(describe_one=_describe_one, heading_for_chunk=_heading_for_chunk)
 
