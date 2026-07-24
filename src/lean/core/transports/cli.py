@@ -147,13 +147,19 @@ def _add_universal_commands(
         sample_size: int = typer.Option(50, "--sample-size", help="Pseudo-query sample size"),
         k: int = typer.Option(5, "--k", help="Top-k for hit/metric computation"),
         dataset: Path | None = typer.Option(None, "--dataset", help="Curated JSON dataset path"),
+        mode: str = typer.Option(
+            "pseudo",
+            "--mode",
+            help="pseudo (vector-only) or full (hybrid+rerank) search pipeline",
+        ),
         json_output: bool = typer.Option(False, "--json"),
     ) -> None:
         """Run retrieval evaluation: hit_rate@k, MRR@k, NDCG@k, Recall@k.
 
         If ``--dataset`` is given, the curated JSON is used; otherwise a
-        pseudo-dataset is built from random sampled chunks. The full search
-        pipeline is NOT exercised — see docs/evaluation.md for caveats.
+        pseudo-dataset is built from random sampled chunks. In ``pseudo``
+        mode (default) only vector_search is exercised; ``--mode full``
+        runs the full hybrid + rerank pipeline.
         """
         from lean.core.eval import evaluate as eval_run
         from lean.core.eval import load_curated_dataset
@@ -169,18 +175,22 @@ def _add_universal_commands(
                 samples = build_eval_dataset(conn, sample_size=sample_size, seed=settings.eval_seed)
 
         with StoreConnection(db_url) as conn:
-            result = eval_run(conn, samples, k=k)
+            result = eval_run(conn, samples, k=k, mode=mode)
 
         if json_output:
             typer.echo(json.dumps(result.__dict__, indent=2))
         else:
+            recall_label = "Recall"
+            if mode == "pseudo":
+                recall_label = "Recall (== hit_rate)"
             typer.echo(
                 f"hit_rate@{k}={result.hit_rate:.3f}  "
                 f"MRR@{k}={result.mrr:.3f}  "
                 f"NDCG@{k}={result.ndcg:.3f}  "
-                f"Recall@{k}={result.recall:.3f}  "
+                f"{recall_label}@{k}={result.recall:.3f}  "
                 f"latency={result.mean_latency_ms:.0f}ms  "
-                f"n={result.sample_count}"
+                f"n={result.sample_count}  "
+                f"mode={result.mode}"
             )
 
 

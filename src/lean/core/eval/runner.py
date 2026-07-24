@@ -45,6 +45,7 @@ class EvalResult:
     mean_latency_ms: float
     sample_count: int
     k: int
+    mode: str = "pseudo"
 
 
 def load_curated_dataset(path: Path) -> list[EvalSample]:
@@ -144,11 +145,15 @@ def evaluate(
     samples: list[EvalSample],
     *,
     k: int,
+    mode: str = "pseudo",
 ) -> EvalResult:
     """Run retrieval evaluation: compute hit_rate@k, MRR@k, NDCG@k, Recall@k.
 
-    For each sample, embed the query, search top-k, check if the expected
-    chunk appears in the results, and compute rank-aware metrics.
+    In ``pseudo`` mode (default), each query is embedded and searched via
+    ``SearchEngine.vector_search`` — vector similarity only, no BM25/RRF/rerank.
+
+    In ``full`` mode, each query is searched via ``services.search.search`` —
+    the full hybrid + rerank + postprocess pipeline that production uses.
     """
     embedder = get_embedder()
     engine = SearchEngine(store)
@@ -161,15 +166,22 @@ def evaluate(
 
     for sample in samples:
         start = time.monotonic()
-        query_vec = embedder.embed_query(sample.query)
 
-        results: list[SearchHit] = engine.vector_search(
-            query_embedding=query_vec,
-            k=k,
-        )
+        if mode == "full":
+            from lean.core.services.search import search as full_search
+
+            chunks = full_search(sample.query, k=k)
+            chunk_ids = [str(c.id) for c in chunks]
+        else:
+            query_vec = embedder.embed_query(sample.query)
+            results: list[SearchHit] = engine.vector_search(
+                query_embedding=query_vec,
+                k=k,
+            )
+            chunk_ids = [h.chunk.id for h in results]
+
         latencies.append(int((time.monotonic() - start) * 1000))
 
-        chunk_ids = [h.chunk.id for h in results]
         found_rank: int | None = None
         if sample.expected_chunk_id in chunk_ids:
             hits += 1
@@ -190,6 +202,7 @@ def evaluate(
         mean_latency_ms=sum(latencies) / n,
         sample_count=len(samples),
         k=k,
+        mode=mode,
     )
 
 

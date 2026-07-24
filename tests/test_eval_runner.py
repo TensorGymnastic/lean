@@ -123,6 +123,38 @@ def test_evaluate_zero_hit_rate(monkeypatch_env):
     assert result.recall == 0.0
 
 
+def test_evaluate_full_mode_calls_services_search_not_vector_search(monkeypatch_env):
+    """In mode='full', evaluate uses services.search.search, not vector_search."""
+    from lean.core.eval.runner import EvalSample, evaluate
+
+    samples = [EvalSample(query="test query", expected_chunk_id="chunk-1")]
+
+    from lean.core.models.schemas import Chunk
+
+    fake_chunk = Chunk(
+        id="chunk-1",
+        document_id="doc-1",
+        chunk_index=0,
+        section_path="Ch 1",
+        token_count=50,
+        content="content",
+    )
+
+    mock_engine = MagicMock()
+
+    with (
+        patch("lean.core.eval.runner.get_embedder"),
+        patch("lean.core.eval.runner.SearchEngine", return_value=mock_engine),
+        patch("lean.core.services.search.search", return_value=[fake_chunk]) as mock_search,
+    ):
+        result = evaluate(MagicMock(), samples, k=5, mode="full")
+
+    mock_search.assert_called_once_with("test query", k=5)
+    mock_engine.vector_search.assert_not_called()
+    assert result.mode == "full"
+    assert result.hit_rate == 1.0
+
+
 def test_evaluate_empty_samples(monkeypatch_env):
     from lean.core.eval.runner import evaluate
 

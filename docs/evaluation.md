@@ -43,6 +43,17 @@ It still calls `engine.vector_search` directly (not the full pipeline),
 but its numbers are **closer to real-world retrieval quality** because
 the query no longer matches the target chunk's own text.
 
+**Full pipeline (`--mode full`):**
+
+```bash
+lean --config configs/lean-pdf-lss.yaml eval --mode full --k 5
+```
+
+Uses `services.search.search()` instead of `engine.vector_search`,
+exercising the full hybrid (BM25 + vector + RRF) + rerank + postprocess
+pipeline that production `lean search` uses. Combine with `--dataset`
+for the most realistic evaluation.
+
 ---
 
 ## What the metrics actually measure
@@ -84,14 +95,18 @@ multiple graded-relevant chunks and upgrade `EvalSample` to carry them.
 embed → vector + BM25 → RRF fusion → rerank → similarity filter → reorder → truncate
 ```
 
-`evaluate()` calls only the first stage. **An eval improvement can mask a
-regression in fusion/rerank, and vice versa.**
+`evaluate()` (default `--mode pseudo`) calls only the first stage.
+**An eval improvement can mask a regression in fusion/rerank, and vice
+versa.**
 
-If you want to eval the full pipeline, you need to either:
+To eval the full pipeline, use `--mode full`:
 
-- Build a curated dataset (real queries + expected chunk IDs) and call
-  `services.search.search()` instead of `engine.vector_search`
-- Add a second eval mode that exercises the full pipeline
+```bash
+lean --config configs/lean-pdf-lss.yaml eval --mode full --k 5
+```
+
+This routes each query through `services.search.search()` instead of
+`engine.vector_search`.
 
 ---
 
