@@ -12,8 +12,10 @@ they return the original query unchanged.
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
-from lean.core.llm.base import LLMClient
+if TYPE_CHECKING:
+    from lean.core.llm.openai_compatible import OpenAICompatibleLLM
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +35,9 @@ _MULTI_QUERY_PROMPT = (
 )
 
 
-def hyde_transform(query: str, llm: LLMClient, *, max_tokens: int, temperature: float) -> str:
+def hyde_transform(
+    query: str, llm: OpenAICompatibleLLM, *, max_tokens: int, temperature: float
+) -> str:
     """Generate a hypothetical answer document for the query.
 
     The hypothetical doc is embedded instead of the raw query for the
@@ -57,7 +61,7 @@ def hyde_transform(query: str, llm: LLMClient, *, max_tokens: int, temperature: 
 
 def multi_query_transform(
     query: str,
-    llm: LLMClient,
+    llm: OpenAICompatibleLLM,
     *,
     num_queries: int,
     max_tokens: int,

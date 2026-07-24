@@ -197,32 +197,7 @@ def build_from_yaml(yaml_path: Path) -> TransportBuilder:
 
     tools_module = _load_tools_module(domain_config)
 
-    return _DomainBuilder(
-        config=domain_config,
-        settings=settings,
-        pipeline=pipeline,
-        tools_module=tools_module,
-    ).build()
-
-
-class _DomainBuilder:
-    """Wires the YAML config + tools module into a TransportBuilder."""
-
-    def __init__(
-        self,
-        *,
-        config: DomainConfig,
-        settings: CoreSettings,
-        pipeline: Pipeline,
-        tools_module: Any | None,
-    ) -> None:
-        self._config = config
-        self._settings = settings
-        self._pipeline = pipeline
-        self._tools_module = tools_module
-
-    def build(self) -> TransportBuilder:
-        return TransportBuilder(_YamlDomain(self._config, self._tools_module))
+    return TransportBuilder(_YamlDomain(domain_config, tools_module))
 
 
 class _YamlDomain(DomainRegistration[CoreSettings]):

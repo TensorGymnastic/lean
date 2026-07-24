@@ -14,7 +14,7 @@ from __future__ import annotations
 import base64
 import io
 import logging
-from typing import Any, Protocol, runtime_checkable
+from typing import Any
 
 import httpx
 
@@ -23,17 +23,6 @@ logger = logging.getLogger(__name__)
 
 class VLMError(RuntimeError):
     """Raised when a VLM request fails."""
-
-
-@runtime_checkable
-class VLMClient(Protocol):
-    """Universal VLM contract — domain code uses this type.
-
-    Implementations: ``OpenAICompatibleVLM`` (default), or domain-
-    supplied wrappers.
-    """
-
-    def describe_image(self, image: Any, *, prompt: str, max_tokens: int = 1000) -> str: ...
 
 
 class OpenAICompatibleVLM:
@@ -140,4 +129,4 @@ class OpenAICompatibleVLM:
         self._client.close()
 
 
-__all__ = ["VLMClient", "VLMError", "OpenAICompatibleVLM"]
+__all__ = ["VLMError", "OpenAICompatibleVLM"]

@@ -9,10 +9,13 @@ study. Requires an LLM client. No-op when no LLM is configured.
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 from lean.core.chunker.markdown_ast import Section
 from lean.core.chunker.recursive import ChunkResult
-from lean.core.llm.base import LLMClient
+
+if TYPE_CHECKING:
+    from lean.core.llm.openai_compatible import OpenAICompatibleLLM
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +34,7 @@ Answer only with the succinct context and nothing else."""
 def add_context_to_chunks(
     chunks: list[ChunkResult],
     sections: list[Section],
-    llm: LLMClient,
+    llm: OpenAICompatibleLLM,
     *,
     max_tokens: int,
     temperature: float,

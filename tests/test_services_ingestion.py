@@ -315,7 +315,7 @@ def test_ingest_vlm_disabled_skips_enrichment(monkeypatch_settings, fake_pdf):
             ),
         ),
         patch("lean.core.services.ingestion.ChunkRepo", return_value=MagicMock()),
-        patch("lean.core.vlm.client.VLMClient") as mock_vlm_cls,
+        patch("lean.core.vlm.client.OpenAICompatibleVLM") as mock_vlm_cls,
     ):
         mock_store_cls.from_env.return_value = MagicMock()
         result = asyncio.run(ingest_pdf(str(fake_pdf), pipeline=mock_pipeline))

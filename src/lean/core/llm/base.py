@@ -1,4 +1,4 @@
-"""LLM client interface and factory.
+"""LLM client factory.
 
 Supports any OpenAI-compatible API (MiniMax, Ollama, OpenAI, vLLM, etc.).
 The factory returns ``None`` when no LLM is configured, so all LLM-
@@ -12,27 +12,17 @@ the subclass to ``get_llm()``.
 from __future__ import annotations
 
 import logging
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING
 
 from lean.core.config.settings import CoreSettings, get_settings
+
+if TYPE_CHECKING:
+    from lean.core.llm.openai_compatible import OpenAICompatibleLLM
 
 logger = logging.getLogger(__name__)
 
 
-@runtime_checkable
-class LLMClient(Protocol):
-    """Interface for text generation LLMs."""
-
-    def generate(
-        self,
-        prompt: str,
-        *,
-        max_tokens: int = 500,
-        temperature: float = 0.0,
-    ) -> str: ...
-
-
-def get_llm(cls: type[CoreSettings] = CoreSettings) -> LLMClient | None:
+def get_llm(cls: type[CoreSettings] = CoreSettings) -> OpenAICompatibleLLM | None:
     """Build an LLM client for the given Settings subclass, or None.
 
     Reads the (already cached) ``CoreSettings`` for ``cls`` and returns
@@ -66,4 +56,4 @@ def get_llm(cls: type[CoreSettings] = CoreSettings) -> LLMClient | None:
     return None
 
 
-__all__ = ["LLMClient", "get_llm"]
+__all__ = ["get_llm"]

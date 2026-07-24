@@ -10,15 +10,19 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from lean.core.config.settings import CoreSettings, get_settings
 from lean.core.infrastructure.embedder import Embedder, get_embedder
-from lean.core.llm.base import LLMClient, get_llm
+from lean.core.llm.base import get_llm
 from lean.core.models import CHUNK_TYPE_IMAGE, CHUNK_TYPE_TEXT, Chunk
 from lean.core.store.analytics import AnalyticsRepo
 from lean.core.store.base import StoreConnection
 from lean.core.store.search import SearchEngine, SearchHit
+
+if TYPE_CHECKING:
+    from lean.core.llm.openai_compatible import OpenAICompatibleLLM
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +62,9 @@ def _validate_search_inputs(
     return query, max(1, min(k, settings.search_max_k)), chunk_type
 
 
-def _expand_queries(query: str, llm: LLMClient | None, settings: CoreSettings) -> list[str]:
+def _expand_queries(
+    query: str, llm: OpenAICompatibleLLM | None, settings: CoreSettings
+) -> list[str]:
     if not settings.llm_multi_query or not llm:
         return [query]
     from lean.core.retrieval.query_transform import multi_query_transform
@@ -125,7 +131,7 @@ def _hybrid_fetch(
 def _fetch_one_query(
     engine: SearchEngine,
     embedder: Embedder,
-    llm: LLMClient | None,
+    llm: OpenAICompatibleLLM | None,
     query_text: str,
     request: SearchRequest,
     settings: CoreSettings,
@@ -201,7 +207,7 @@ def _log_query_analytics(
     k: int,
     hits: list[SearchHit],
     settings: CoreSettings,
-    llm: LLMClient | None,
+    llm: OpenAICompatibleLLM | None,
     queries: list[str],
     latency_ms: int,
     filters: dict[str, object],
@@ -252,7 +258,7 @@ def _build_filters_log(
     year_max: int | None,
     min_score: float | None,
     settings: CoreSettings,
-    llm: LLMClient | None,
+    llm: OpenAICompatibleLLM | None,
     n_queries: int,
 ) -> dict[str, object]:
     return {
@@ -276,7 +282,7 @@ def _execute_search(
     request: SearchRequest,
     queries: list[str],
     embedder: Embedder,
-    llm: LLMClient | None,
+    llm: OpenAICompatibleLLM | None,
     min_score: float | None,
     settings: CoreSettings,
     conn: StoreConnection,
