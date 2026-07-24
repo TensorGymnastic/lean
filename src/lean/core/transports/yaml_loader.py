@@ -18,7 +18,7 @@ from lean.core.config.settings import (
     get_settings,
     set_active_yaml_path,
 )
-from lean.core.extraction.base import Extractor, Pipeline, set_pipeline
+from lean.core.extraction.base import DomainHooks, Extractor, Pipeline, set_pipeline
 from lean.core.transports.builder import TransportBuilder
 from lean.core.transports.registration import DomainRegistration
 
@@ -113,7 +113,8 @@ def _load_extractor(ref: ExtractorRef, settings: CoreSettings) -> Extractor:
 
 def _build_pipeline(domain_config: DomainConfig, settings: CoreSettings) -> Pipeline:
     extractors = [_load_extractor(ref, settings) for ref in domain_config.extractors]
-    return Pipeline(extractors)
+    hooks = _build_vlm_hooks(domain_config)
+    return Pipeline(extractors, hooks=hooks)
 
 
 @lru_cache(maxsize=1)
@@ -137,12 +138,10 @@ def _get_vlm_client(
     )
 
 
-def _install_vlm_hooks(domain_config: DomainConfig) -> None:
-    """Wire the VLM prompt + parser + image-heading format into the framework."""
+def _build_vlm_hooks(domain_config: DomainConfig) -> DomainHooks:
+    """Build DomainHooks for VLM enrichment (empty hooks if VLM disabled)."""
     if not domain_config.vlm.enabled:
-        return
-
-    from lean.core.extraction.pipeline_helpers import set_chunk_type_for
+        return DomainHooks()
 
     vlm = domain_config.vlm
     prompt = _resolve_prompt(vlm, domain_config)
@@ -178,10 +177,6 @@ def _install_vlm_hooks(domain_config: DomainConfig) -> None:
                 embed_text += "\n\nKey data: " + "; ".join(str(p) for p in points)
         return embed_text, parsed, hash_image(image)  # type: ignore[arg-type]
 
-    import lean.core.services.ingestion as ing
-
-    ing._domain_describe_one = _describe_one  # type: ignore[attr-defined]
-
     fmt = vlm.image_heading_format
 
     def _heading_for_chunk(chunk: object) -> str:
@@ -189,7 +184,7 @@ def _install_vlm_hooks(domain_config: DomainConfig) -> None:
         title = meta.get("title") if isinstance(meta, dict) else None
         return str(title) if title else fmt.format(n=0)
 
-    set_chunk_type_for(_heading_for_chunk)
+    return DomainHooks(describe_one=_describe_one, heading_for_chunk=_heading_for_chunk)
 
 
 def _resolve_prompt(vlm: VLMConfig, domain_config: DomainConfig) -> str:
@@ -204,16 +199,6 @@ def _resolve_prompt(vlm: VLMConfig, domain_config: DomainConfig) -> str:
                 path = Path(yaml_path).parent / path
         return path.read_text(encoding="utf-8")
     return "Describe this image in detail."
-
-
-def _install_metadata_extractor(domain_config: DomainConfig) -> None:
-    """Wire the domain's PDF metadata extractor if configured."""
-    if not domain_config.metadata.extractor:
-        return
-    extractor = _import_object(domain_config.metadata.extractor)
-    import lean.core.extraction.metadata as md_mod
-
-    md_mod._custom_extractor = extractor  # type: ignore[attr-defined]
 
 
 def _load_tools_module(domain_config: DomainConfig) -> Any | None:
@@ -239,8 +224,6 @@ def build_from_yaml(yaml_path: Path) -> TransportBuilder:
     pipeline = _build_pipeline(domain_config, settings)
     set_pipeline(pipeline)
 
-    _install_vlm_hooks(domain_config)
-    _install_metadata_extractor(domain_config)
     tools_module = _load_tools_module(domain_config)
 
     return _DomainBuilder(

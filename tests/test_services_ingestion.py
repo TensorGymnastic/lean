@@ -36,7 +36,6 @@ def fake_pdf(tmp_path):
 
 def _make_vlm_describe_one(mock_vlm):
     """Build a describe_one callable that wraps a mock VLM client."""
-    from lean.core.services.ingestion import _ingestion_module  # noqa
 
     async def describe_one(name, image, settings, prompt):
         mock_vlm.describe_image(image, prompt=prompt, max_tokens=settings.vlm_max_tokens)
@@ -227,7 +226,11 @@ def test_ingest_vlm_enrichment_creates_image_chunks(monkeypatch_settings, fake_p
                         images=fake_images,
                         block_metas=[],
                     )
-                )
+                ),
+                hooks=MagicMock(
+                    describe_one=_make_vlm_describe_one(mock_vlm),
+                    heading_for_chunk=None,
+                ),
             ),
         ),
         patch("lean.core.services.ingestion.build_sections", return_value=fake_sections),
@@ -240,11 +243,6 @@ def test_ingest_vlm_enrichment_creates_image_chunks(monkeypatch_settings, fake_p
         patch(
             "lean.core.vlm.client.OpenAICompatibleVLM",
             return_value=mock_vlm,
-        ),
-        patch(
-            "lean.core.services.ingestion._domain_describe_one",
-            create=True,
-            new=_make_vlm_describe_one(mock_vlm),
         ),
     ):
         mock_store_cls.from_env.return_value = mock_conn

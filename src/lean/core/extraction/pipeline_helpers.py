@@ -147,6 +147,8 @@ def build_chunk_rows(
     image_descriptions: list[ImageDescription],
     settings: CoreSettings,
     doc_id: UUID,
+    *,
+    chunk_type_for: Callable[[ChunkResult], str] | None = None,
 ) -> list[ChunkRow]:
     """Zip chunk results + image descriptions with their embeddings into ChunkRow instances.
 
@@ -154,6 +156,7 @@ def build_chunk_rows(
     embeddings come from the same ``embeddings`` list (text embeddings
     first, image embeddings after).
     """
+    classify = chunk_type_for or _default_chunk_type_for
     chunk_rows = [
         ChunkRow(
             document_id=doc_id,
@@ -165,7 +168,7 @@ def build_chunk_rows(
             token_count=c.token_count,
             content=c.content,
             embedding=emb,
-            chunk_type=chunk_type_for(c),
+            chunk_type=classify(c),
         )
         for global_idx, (c, emb) in enumerate(
             zip(chunk_results, embeddings[: len(chunk_results)], strict=True)
@@ -190,25 +193,10 @@ def build_chunk_rows(
     return chunk_rows
 
 
-def chunk_type_for(_chunk: ChunkResult) -> str:
-    """Domain override point: classify a chunk as 'text' or 'image'.
-
-    Default: all chunks are 'text'. Domains that produce image chunks
-    (e.g. lean-lss) register a different function via
-    ``ingestion.set_chunk_type_for(...)``.
-    """
+def _default_chunk_type_for(_chunk: ChunkResult) -> str:
     from lean.core.models import CHUNK_TYPE_TEXT
 
     return CHUNK_TYPE_TEXT
-
-
-_chunk_type_for: Callable[[ChunkResult], str] = chunk_type_for
-
-
-def set_chunk_type_for(fn: Callable[[ChunkResult], str]) -> None:
-    """Override the chunk-type classifier used by ``build_chunk_rows``."""
-    global _chunk_type_for
-    _chunk_type_for = fn
 
 
 def hash_image(pil_img: PILImage) -> str:
@@ -224,6 +212,5 @@ __all__ = [
     "find_best_block_match",
     "enrich_chunks_with_block_meta",
     "build_chunk_rows",
-    "set_chunk_type_for",
     "hash_image",
 ]

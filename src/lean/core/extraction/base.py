@@ -8,6 +8,8 @@ through on typed exceptions.
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
@@ -82,6 +84,14 @@ class Extractor(Protocol):
         ...
 
 
+@dataclass(frozen=True, slots=True)
+class DomainHooks:
+    """Optional domain behavior threaded through the ingestion pipeline."""
+
+    describe_one: Callable[..., Any] | None = None
+    heading_for_chunk: Callable[..., Any] | None = None
+
+
 class Pipeline:
     """Runs a sequence of extractors, falling through on typed exceptions.
 
@@ -90,10 +100,20 @@ class Pipeline:
     exception propagates.
     """
 
-    def __init__(self, extractors: list[Extractor]) -> None:
+    def __init__(
+        self,
+        extractors: list[Extractor],
+        *,
+        hooks: DomainHooks | None = None,
+    ) -> None:
         if not extractors:
             raise ValueError("Pipeline requires at least one extractor")
         self._extractors = list(extractors)
+        self._hooks = hooks or DomainHooks()
+
+    @property
+    def hooks(self) -> DomainHooks:
+        return self._hooks
 
     def extract(self, pdf_path: Path) -> ExtractionResult:
         """Try each configured extractor in order. Returns the first success."""
@@ -161,6 +181,7 @@ __all__ = [
     "ExtractorUnavailable",
     "ExtractionResult",
     "Extractor",
+    "DomainHooks",
     "Pipeline",
     "set_pipeline",
     "get_pipeline",
