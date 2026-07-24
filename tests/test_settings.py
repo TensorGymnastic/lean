@@ -261,7 +261,7 @@ def test_vlm_enabled_requires_base_url_and_model(monkeypatch) -> None:
     from lean.core.config.settings import Settings
 
     with pytest.raises(ValidationError, match="vlm.enabled"):
-        Settings(domain_config={"vlm": {"enabled": True}})
+        Settings(_env_file=None, domain_config={"vlm": {"enabled": True}})
 
 
 def test_rejects_invalid_vlm_detail(monkeypatch) -> None:

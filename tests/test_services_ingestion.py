@@ -361,10 +361,13 @@ def test_persist_rolls_back_when_replace_chunks_fails(monkeypatch_settings, fake
     mock_chunk_repo = MagicMock()
     mock_chunk_repo.replace_chunks.side_effect = _Boom("chunk insert failed")
 
+    mock_pipeline = MagicMock()
+
     with (
         patch("lean.core.services.ingestion.StoreConnection") as mock_store_cls,
         patch("lean.core.services.ingestion.DocumentRepo", return_value=mock_doc_repo),
         patch("lean.core.services.ingestion.ChunkRepo", return_value=mock_chunk_repo),
+        patch("lean.core.services.ingestion.get_pipeline", return_value=mock_pipeline),
     ):
         mock_store_cls.from_env.return_value = mock_conn
         with pytest.raises(_Boom, match="chunk insert failed"):

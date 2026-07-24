@@ -40,8 +40,7 @@ settings:
     mcp_http_port: 8765
     api_port: 8766
   vlm:
-    base_url: ""
-    model: ""
+    # base_url/model come from VLM_BASE_URL/VLM_MODEL env vars (.env)
     detail: high
     timeout_s: 120.0
     max_concurrency: 4
@@ -57,8 +56,8 @@ extractors:
     config: {}
 
 vlm:
-  enabled: false
-  prompt_file: lean/domains/pdf_lss/chart_extraction_prompt.txt
+  enabled: true
+  prompt_file: ../src/lean/domains/pdf_lss/chart_extraction_prompt.txt
   parser: lean.domains.pdf_lss.parser.parse
   image_heading_format: "{title}"
 
