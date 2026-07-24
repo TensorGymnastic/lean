@@ -12,6 +12,8 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+import anyio
+
 from lean.core.config.domain_config import DomainConfig, ExtractorRef, VLMConfig
 from lean.core.config.settings import (
     CoreSettings,
@@ -148,7 +150,7 @@ def _build_vlm_hooks(domain_config: DomainConfig) -> DomainHooks:
 
     from lean.core.extraction.pipeline_helpers import hash_image
 
-    def _describe_one(
+    async def _describe_one(
         name: str, image: object, settings: CoreSettings, _: str
     ) -> tuple[str, dict[str, object], str]:
         client = _get_vlm_client(
@@ -159,7 +161,9 @@ def _build_vlm_hooks(domain_config: DomainConfig) -> DomainHooks:
             detail=settings.vlm_detail,
             disable_thinking=settings.vlm_disable_thinking,
         )
-        raw = client.describe_image(image, prompt=prompt, max_tokens=settings.vlm_max_tokens)
+        raw = await anyio.to_thread.run_sync(
+            lambda: client.describe_image(image, prompt=prompt, max_tokens=settings.vlm_max_tokens)
+        )
 
         parsed: dict[str, object]
         if vlm.parser:
