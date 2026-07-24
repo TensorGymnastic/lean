@@ -140,8 +140,9 @@ durable cross-project knowledge.
 ## OpenSpec workflow (spec-driven change management)
 
 Spec-driven development for AI coding assistants. Install with
-`npm install -g @fission-ai/openspec@latest`. The lean repo **does
-not yet have an `openspec/` directory** — sibling repos
+`npm install -g @fission-ai/openspec@latest`. lean adopted OpenSpec on 2026-07-21
+(commit `5589542`); `openspec/` holds `config.yaml` only; no specs or
+changes have landed yet. Sibling repos
 (`repos/quanti/web-document-ingestor/`, `repos/storefront/`) use it.
 
 **Use for any change that:** touches public API or schema, is

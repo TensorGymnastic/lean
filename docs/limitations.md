@@ -177,10 +177,7 @@ These have been observed in the codebase and may resurface:
 
 ## Active backlog
 
-Known follow-up items that are owned in the workspace backlog but not
-yet addressed in the lean repo. See
-`/home/sl/dev/_ai/workspace/lean-backlog-2026-07-19/BACKLOG.md` for full
-context, effort, and acceptance criteria.
+Known follow-up items tracked in this section.
 
 - **BLG-002** — `cli.py` `_output()` consistency: four commands
   (`get_markdown`, `delete`, `reingest_all`, `health`) bypass the
