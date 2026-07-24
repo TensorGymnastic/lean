@@ -7,8 +7,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import sys
-from typing import Any
 
 import typer
 
@@ -200,24 +198,3 @@ def delete(doc_id: str, json_output: bool = typer.Option(False, "--json")) -> No
     """Delete an ingested URL and all its chunks."""
     result = _delete_document(doc_id)
     output(result, json_output)
-
-
-def register_mcp(mcp: Any) -> None:
-    from lean.core.adapters import register_mcp_tools
-
-    register_mcp_tools(mcp, sys.modules[__name__])
-
-
-def register_api(app: Any) -> None:
-    from lean.core.adapters import register_api_tools
-
-    register_api_tools(app, sys.modules[__name__])
-
-
-def register_cli(app: typer.Typer) -> None:
-    from lean.core.adapters import register_cli_tools
-
-    register_cli_tools(app, sys.modules[__name__])
-
-
-__all__ = ["register_mcp", "register_api", "register_cli"]

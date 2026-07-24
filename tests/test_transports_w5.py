@@ -268,3 +268,36 @@ def test_yaml_loader_top_level_unknown_keys_become_settings(tmp_path: Path) -> N
     ):
         # Should not raise — unknown key is silently absorbed
         build_from_yaml(cfg)
+
+
+# ---------- WP-5: register_* without module-level shims ----------
+
+
+def test_yaml_domain_registers_mcp_without_module_shim() -> None:
+    """_YamlDomain.register_mcp wires tools directly, no register_mcp shim needed."""
+    import sys
+    import types
+
+    from lean.core.adapters import mcp_tool
+    from lean.core.transports.yaml_loader import _YamlDomain
+
+    fake_mod = types.ModuleType("fake_tools")
+    sys.modules["fake_tools"] = fake_mod
+
+    @mcp_tool
+    def my_tool() -> int:
+        return 42
+
+    fake_mod.my_tool = my_tool
+
+    cfg = MagicMock()
+    cfg.domain.name = "x"
+    cfg.domain.version = "0.1.0"
+    cfg.domain.description = ""
+    domain = _YamlDomain(cfg, fake_mod)
+
+    mcp = MagicMock()
+    domain.register_mcp(mcp, {}, MagicMock())
+    mcp.tool.assert_called_once()
+
+    del sys.modules["fake_tools"]

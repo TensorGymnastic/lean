@@ -300,23 +300,23 @@ class _YamlDomain:
     def register_mcp(self, mcp: Any, services: dict[str, object], settings: CoreSettings) -> None:
         if self._tools_module is None:
             return
-        register_fn = getattr(self._tools_module, "register_mcp", None)
-        if register_fn is not None:
-            register_fn(mcp)
+        from lean.core.adapters import register_mcp_tools
+
+        register_mcp_tools(mcp, self._tools_module)
 
     def register_api(self, app: Any, services: dict[str, object], settings: CoreSettings) -> None:
         if self._tools_module is None:
             return
-        register_fn = getattr(self._tools_module, "register_api", None)
-        if register_fn is not None:
-            register_fn(app)
+        from lean.core.adapters import register_api_tools
+
+        register_api_tools(app, self._tools_module)
 
     def register_cli(self, app: Any, services: dict[str, object], settings: CoreSettings) -> None:
         if self._tools_module is None:
             return
-        register_fn = getattr(self._tools_module, "register_cli", None)
-        if register_fn is not None:
-            register_fn(app)
+        from lean.core.adapters import register_cli_tools
+
+        register_cli_tools(app, self._tools_module)
 
 
 def get_pipeline() -> Pipeline:
