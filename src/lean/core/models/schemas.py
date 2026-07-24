@@ -31,6 +31,8 @@ class ExtractionMethod(StrEnum):
     MARKER = "marker"
     UNLIMITED_OCR = "unlimited_ocr"
     MARKITDOWN = "markitdown"
+    TEXT_FILE = "text_file"
+    WEB_URL = "web_url"
 
 
 class DocumentSummary(BaseModel):

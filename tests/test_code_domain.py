@@ -21,11 +21,11 @@ def _default_transport_ports(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("API_PORT", "8766")
 
 
-def test_markdown_extractor_method_is_markitdown() -> None:
-    """No extraction backend needed for plain text — uses markitdown analog."""
+def test_markdown_extractor_method_is_text_file() -> None:
+    """No extraction backend needed for plain text — uses text_file method."""
     from lean.domains.code.adapters import MarkdownFileExtractor
 
-    assert MarkdownFileExtractor().method == ExtractionMethod.MARKITDOWN
+    assert MarkdownFileExtractor().method == ExtractionMethod.TEXT_FILE
 
 
 def test_markdown_extractor_is_always_configured() -> None:

@@ -26,11 +26,11 @@ def _default_transport_ports(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("API_PORT", "8766")
 
 
-def test_web_extractor_method_is_markitdown() -> None:
-    """Web pages run through the markitdown-style adapter slot."""
+def test_web_extractor_method_is_web_url() -> None:
+    """Web pages use the web_url extraction method."""
     from lean.domains.web.adapters import WebPageExtractor
 
-    assert WebPageExtractor().method == ExtractionMethod.MARKITDOWN
+    assert WebPageExtractor().method == ExtractionMethod.WEB_URL
 
 
 def test_web_extractor_is_always_configured() -> None:

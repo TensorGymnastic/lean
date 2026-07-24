@@ -27,7 +27,7 @@ class WebPageExtractor:
       timeout_s: HTTP request timeout
     """
 
-    method = ExtractionMethod.MARKITDOWN
+    method = ExtractionMethod.WEB_URL
 
     def __init__(self, *, timeout_s: float = 30.0) -> None:
         self._timeout = timeout_s

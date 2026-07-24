@@ -30,7 +30,7 @@ class MarkdownFileExtractor:
     produces markdown for chunking.
     """
 
-    method = ExtractionMethod.MARKITDOWN  # closest analog in the enum
+    method = ExtractionMethod.TEXT_FILE
 
     def is_configured(self) -> bool:
         return True
