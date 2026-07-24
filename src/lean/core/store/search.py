@@ -11,6 +11,14 @@ from psycopg.rows import dict_row
 from lean.core.models.schemas import Chunk
 from lean.core.store.base import StoreConnection
 
+_SELECT_COLUMNS = """
+    c.id, c.document_id, c.chunk_index, c.section_path,
+    c.heading_text, c.page_start, c.page_end, c.token_count,
+    c.content, c.chunk_type, c.image_meta,
+    c.bbox, c.image_hash, c.provenance_model,
+    c.embedding_model, c.embedding_dim
+"""
+
 
 @dataclass
 class SearchHit:
@@ -63,6 +71,49 @@ class SearchEngine:
 
         return join_clause, conditions, params
 
+    def _search(
+        self,
+        *,
+        score_sql: str,
+        score_params: list[object],
+        order_sql: str,
+        order_params: list[object],
+        extra_where: list[str] | None = None,
+        extra_params: list[object] | None = None,
+        doc_id: UUID | None = None,
+        section_substring: str | None = None,
+        author: str | None = None,
+        year_min: int | None = None,
+        year_max: int | None = None,
+        chunk_type: str | None = None,
+        k: int = 5,
+    ) -> list[SearchHit]:
+        join_clause, conditions, params = self._build_metadata_filters(
+            doc_id=doc_id,
+            section_substring=section_substring,
+            author=author,
+            year_min=year_min,
+            year_max=year_max,
+            chunk_type=chunk_type,
+        )
+        if extra_where:
+            conditions[:0] = extra_where
+            params[:0] = extra_params or []
+
+        where_clause = " and ".join(conditions)
+        sql = f"""
+            select {_SELECT_COLUMNS}, {score_sql}
+            from public.chunks c{join_clause}
+            where {where_clause}
+            order by {order_sql}
+            limit %s
+        """
+        params_final = score_params + params + order_params + [k]
+        with self._conn.conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(sql, tuple(params_final))
+            rows = cur.fetchall()
+        return self._rows_to_hits(rows)
+
     def vector_search(
         self,
         *,
@@ -77,36 +128,26 @@ class SearchEngine:
         chunk_type: str | None = None,
     ) -> list[SearchHit]:
         """Cosine similarity search over chunks with metadata filters."""
-        join_clause, conditions, params = self._build_metadata_filters(
+        extra_where: list[str] = []
+        extra_params: list[object] = []
+        if min_score is not None:
+            extra_where.append("1 - (c.embedding <=> %s::vector) >= %s")
+            extra_params.extend([query_embedding, min_score])
+        return self._search(
+            score_sql="1 - (c.embedding <=> %s::vector) as score",
+            score_params=[query_embedding],
+            order_sql="c.embedding <=> %s::vector",
+            order_params=[query_embedding],
+            extra_where=extra_where or None,
+            extra_params=extra_params or None,
             doc_id=doc_id,
             section_substring=section_substring,
             author=author,
             year_min=year_min,
             year_max=year_max,
             chunk_type=chunk_type,
+            k=k,
         )
-        if min_score is not None:
-            conditions.append("1 - (c.embedding <=> %s::vector) >= %s")
-            params.extend([query_embedding, min_score])
-
-        where_clause = " and ".join(conditions)
-        query = f"""
-            select c.id, c.document_id, c.chunk_index, c.section_path,
-                   c.heading_text, c.page_start, c.page_end, c.token_count,
-                   c.content, c.chunk_type, c.image_meta,
-                   c.bbox, c.image_hash, c.provenance_model,
-                   c.embedding_model, c.embedding_dim,
-                   1 - (c.embedding <=> %s::vector) as score
-            from public.chunks c{join_clause}
-            where {where_clause}
-            order by c.embedding <=> %s::vector
-            limit %s
-        """
-        params_final = [query_embedding] + params + [query_embedding, k]
-        with self._conn.conn.cursor(row_factory=dict_row) as cur:
-            cur.execute(query, tuple(params_final))
-            rows = cur.fetchall()
-        return self._rows_to_hits(rows)
 
     def bm25_search(
         self,
@@ -121,35 +162,21 @@ class SearchEngine:
         chunk_type: str | None = None,
     ) -> list[SearchHit]:
         """Full-text search via tsvector + ts_rank (BM25-style ranking)."""
-        join_clause, conditions, params = self._build_metadata_filters(
+        return self._search(
+            score_sql="ts_rank(c.tsv, plainto_tsquery('english', %s)) as score",
+            score_params=[query_text],
+            order_sql="score desc",
+            order_params=[],
+            extra_where=["c.tsv @@ plainto_tsquery('english', %s)"],
+            extra_params=[query_text],
             doc_id=doc_id,
             section_substring=section_substring,
             author=author,
             year_min=year_min,
             year_max=year_max,
             chunk_type=chunk_type,
+            k=k,
         )
-        conditions.insert(0, "c.tsv @@ plainto_tsquery('english', %s)")
-        params.insert(0, query_text)
-
-        where_clause = " and ".join(conditions)
-        sql = f"""
-            select c.id, c.document_id, c.chunk_index, c.section_path,
-                   c.heading_text, c.page_start, c.page_end, c.token_count,
-                   c.content, c.chunk_type, c.image_meta,
-                   c.bbox, c.image_hash, c.provenance_model,
-                   c.embedding_model, c.embedding_dim,
-                   ts_rank(c.tsv, plainto_tsquery('english', %s)) as score
-            from public.chunks c{join_clause}
-            where {where_clause}
-            order by score desc
-            limit %s
-        """
-        params_final = [query_text] + params + [k]
-        with self._conn.conn.cursor(row_factory=dict_row) as cur:
-            cur.execute(sql, tuple(params_final))
-            rows = cur.fetchall()
-        return self._rows_to_hits(rows)
 
     @staticmethod
     def _rows_to_hits(rows: list[dict[str, Any]]) -> list[SearchHit]:
