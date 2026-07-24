@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import importlib
 import logging
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -114,6 +115,27 @@ def _build_pipeline(domain_config: DomainConfig, settings: CoreSettings) -> Pipe
     return Pipeline(extractors)
 
 
+@lru_cache(maxsize=1)
+def _get_vlm_client(
+    base_url: str,
+    model: str,
+    api_key: str,
+    timeout: float,
+    detail: str,
+    disable_thinking: bool,
+) -> Any:
+    from lean.core.vlm import OpenAICompatibleVLM
+
+    return OpenAICompatibleVLM(
+        base_url=base_url,
+        model=model,
+        api_key=api_key,
+        timeout=timeout,
+        detail=detail,
+        disable_thinking=disable_thinking,
+    )
+
+
 def _install_vlm_hooks(domain_config: DomainConfig) -> None:
     """Wire the VLM prompt + parser + image-heading format into the framework."""
     if not domain_config.vlm.enabled:
@@ -125,12 +147,11 @@ def _install_vlm_hooks(domain_config: DomainConfig) -> None:
     prompt = _resolve_prompt(vlm, domain_config)
 
     from lean.core.extraction.pipeline_helpers import hash_image
-    from lean.core.vlm import OpenAICompatibleVLM, VLMError
 
     def _describe_one(
         name: str, image: object, settings: CoreSettings, _: str
     ) -> tuple[str, dict[str, object], str]:
-        client = OpenAICompatibleVLM(
+        client = _get_vlm_client(
             base_url=settings.vlm_base_url,
             model=settings.vlm_model,
             api_key=settings.vlm_api_key,
@@ -138,12 +159,7 @@ def _install_vlm_hooks(domain_config: DomainConfig) -> None:
             detail=settings.vlm_detail,
             disable_thinking=settings.vlm_disable_thinking,
         )
-        try:
-            raw = client.describe_image(image, prompt=prompt, max_tokens=settings.vlm_max_tokens)
-        except VLMError:
-            raise
-        finally:
-            client.close()
+        raw = client.describe_image(image, prompt=prompt, max_tokens=settings.vlm_max_tokens)
 
         parsed: dict[str, object]
         if vlm.parser:
