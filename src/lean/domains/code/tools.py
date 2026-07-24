@@ -14,6 +14,7 @@ from pathlib import Path
 import typer
 
 from lean.core.adapters import cli_command, mcp_tool, output, rest_route
+from lean.core.extraction.base import get_pipeline
 from lean.core.models import Chunk, IngestResult
 from lean.core.services.ingestion import ingest_pdf as _ingest_pdf
 from lean.core.services.search import search as _search
@@ -23,7 +24,7 @@ from lean.core.tools.universal import *  # noqa: F403, F405
 @mcp_tool
 async def ingest_file(path: str) -> IngestResult:
     """Ingest a single file (markdown, txt, source code, …)."""
-    return await _ingest_pdf(path)
+    return await _ingest_pdf(path, pipeline=get_pipeline())
 
 
 @mcp_tool
@@ -87,14 +88,14 @@ async def ingest_rest(payload: dict[str, object]) -> dict[str, object]:
     path = str(payload.get("path", ""))
     if not path:
         raise HTTPException(status_code=400, detail="missing 'path' in payload")
-    result = await _ingest_pdf(path)
+    result = await _ingest_pdf(path, pipeline=get_pipeline())
     return result.model_dump(mode="json")
 
 
 @cli_command(name="ingest")
 def ingest_cli(path: str, json_output: bool = typer.Option(False, "--json")) -> None:
     """Ingest a single file."""
-    result = asyncio.run(_ingest_pdf(path))
+    result = asyncio.run(_ingest_pdf(path, pipeline=get_pipeline()))
     output(result, json_output)
 
 
@@ -118,7 +119,7 @@ def ingest_directory_cli(
     success = failed = 0
     for path in matches:
         try:
-            res = asyncio.run(_ingest_pdf(str(path)))
+            res = asyncio.run(_ingest_pdf(str(path), pipeline=get_pipeline()))
             success += 1
             typer.echo(f"OK    {path} ({res.chunk_count} chunks, {res.elapsed_seconds:.1f}s)")
         except Exception as exc:

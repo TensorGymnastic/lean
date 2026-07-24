@@ -60,7 +60,7 @@ def test_ingest_rejects_path_outside_corpus_root(monkeypatch_settings, tmp_path)
     outside = tmp_path.parent / "outside.pdf"
     outside.write_bytes(b"%PDF-1.4 fake")
     with pytest.raises(PermissionError, match="outside corpus root"):
-        asyncio.run(ingest_pdf(str(outside)))
+        asyncio.run(ingest_pdf(str(outside), pipeline=MagicMock()))
 
 
 def test_ingest_rejects_nonexistent_file(monkeypatch_settings, tmp_path):
@@ -68,7 +68,7 @@ def test_ingest_rejects_nonexistent_file(monkeypatch_settings, tmp_path):
     from lean.core.services.ingestion import ingest_pdf
 
     with pytest.raises(FileNotFoundError, match="PDF not found"):
-        asyncio.run(ingest_pdf(str(tmp_path / "nonexistent.pdf")))
+        asyncio.run(ingest_pdf(str(tmp_path / "nonexistent.pdf"), pipeline=MagicMock()))
 
 
 def test_ingest_rejects_oversized_pdf(monkeypatch_settings, tmp_path):
@@ -81,7 +81,7 @@ def test_ingest_rejects_oversized_pdf(monkeypatch_settings, tmp_path):
     big_pdf.write_bytes(b"%PDF-1.4\n" + b"x" * (2 * 1024 * 1024))  # 2 MB
 
     with pytest.raises(ValueError, match="PDF too large"):
-        asyncio.run(ingest_pdf(str(big_pdf)))
+        asyncio.run(ingest_pdf(str(big_pdf), pipeline=MagicMock()))
 
 
 def test_ingest_permission_error_does_not_leak_corpus_root_path(monkeypatch_settings, tmp_path):
@@ -93,7 +93,7 @@ def test_ingest_permission_error_does_not_leak_corpus_root_path(monkeypatch_sett
     outside.write_bytes(b"%PDF-1.4 fake")
 
     with pytest.raises(PermissionError) as exc_info:
-        asyncio.run(ingest_pdf(str(outside)))
+        asyncio.run(ingest_pdf(str(outside), pipeline=MagicMock()))
 
     msg = str(exc_info.value)
     assert "outside corpus root" in msg
@@ -131,21 +131,19 @@ def test_ingest_pipeline_success(monkeypatch_settings, fake_pdf):
 
     fake_meta = PdfMetadata(title="Test Book", authors=["Author"], year=2024)
 
+    mock_pipeline = MagicMock(
+        extract=MagicMock(
+            return_value=ExtractionResult(
+                markdown="# DMAIC",
+                page_count=1,
+                method=ExtractionMethod.MARKITDOWN,
+                images={},
+                block_metas=[],
+            )
+        )
+    )
+
     with (
-        patch(
-            "lean.core.services.ingestion.get_pipeline",
-            return_value=MagicMock(
-                extract=MagicMock(
-                    return_value=ExtractionResult(
-                        markdown="# DMAIC",
-                        page_count=1,
-                        method=ExtractionMethod.MARKITDOWN,
-                        images={},
-                        block_metas=[],
-                    )
-                )
-            ),
-        ),
         patch("lean.core.services.ingestion.build_sections", return_value=fake_sections),
         patch("lean.core.services.ingestion.chunk_sections", return_value=fake_chunks),
         patch("lean.core.services.ingestion.get_embedder", return_value=mock_embedder),
@@ -155,7 +153,7 @@ def test_ingest_pipeline_success(monkeypatch_settings, fake_pdf):
         patch("lean.core.services.ingestion.ChunkRepo", return_value=mock_chunk_repo),
     ):
         mock_store_cls.from_env.return_value = mock_conn
-        result = asyncio.run(ingest_pdf(str(fake_pdf)))
+        result = asyncio.run(ingest_pdf(str(fake_pdf), pipeline=mock_pipeline))
 
     assert result.chunk_count == 1
     assert result.page_count == 1
@@ -215,26 +213,23 @@ def test_ingest_vlm_enrichment_creates_image_chunks(monkeypatch_settings, fake_p
         '"description": "Bar chart showing Q1-Q4 revenue.", '
         '"key_data_points": ["Q1: $1M", "Q4: $4M"]}'
     )
+    mock_pipeline = MagicMock(
+        extract=MagicMock(
+            return_value=ExtractionResult(
+                markdown="# DMAIC",
+                page_count=1,
+                method=ExtractionMethod.MARKER,
+                images=fake_images,
+                block_metas=[],
+            )
+        ),
+        hooks=MagicMock(
+            describe_one=_make_vlm_describe_one(mock_vlm),
+            heading_for_chunk=None,
+        ),
+    )
 
     with (
-        patch(
-            "lean.core.services.ingestion.get_pipeline",
-            return_value=MagicMock(
-                extract=MagicMock(
-                    return_value=ExtractionResult(
-                        markdown="# DMAIC",
-                        page_count=1,
-                        method=ExtractionMethod.MARKER,
-                        images=fake_images,
-                        block_metas=[],
-                    )
-                ),
-                hooks=MagicMock(
-                    describe_one=_make_vlm_describe_one(mock_vlm),
-                    heading_for_chunk=None,
-                ),
-            ),
-        ),
         patch("lean.core.services.ingestion.build_sections", return_value=fake_sections),
         patch("lean.core.services.ingestion.chunk_sections", return_value=fake_chunks),
         patch("lean.core.services.ingestion.get_embedder", return_value=mock_embedder),
@@ -248,7 +243,7 @@ def test_ingest_vlm_enrichment_creates_image_chunks(monkeypatch_settings, fake_p
         ),
     ):
         mock_store_cls.from_env.return_value = mock_conn
-        result = asyncio.run(ingest_pdf(str(fake_pdf)))
+        result = asyncio.run(ingest_pdf(str(fake_pdf), pipeline=mock_pipeline))
 
     assert result.chunk_count == 2
     assert result.extraction_method == ExtractionMethod.MARKER
@@ -290,22 +285,19 @@ def test_ingest_vlm_disabled_skips_enrichment(monkeypatch_settings, fake_pdf):
 
     mock_embedder = MagicMock()
     mock_embedder.embed_documents.return_value = [[0.1] * 1024]
+    mock_pipeline = MagicMock(
+        extract=MagicMock(
+            return_value=ExtractionResult(
+                markdown="# Test",
+                page_count=1,
+                method=ExtractionMethod.MARKER,
+                images=fake_images,
+                block_metas=[],
+            )
+        )
+    )
 
     with (
-        patch(
-            "lean.core.services.ingestion.get_pipeline",
-            return_value=MagicMock(
-                extract=MagicMock(
-                    return_value=ExtractionResult(
-                        markdown="# Test",
-                        page_count=1,
-                        method=ExtractionMethod.MARKER,
-                        images=fake_images,
-                        block_metas=[],
-                    )
-                )
-            ),
-        ),
         patch("lean.core.services.ingestion.build_sections", return_value=fake_sections),
         patch("lean.core.services.ingestion.chunk_sections", return_value=fake_chunks),
         patch("lean.core.services.ingestion.get_embedder", return_value=mock_embedder),
@@ -326,7 +318,7 @@ def test_ingest_vlm_disabled_skips_enrichment(monkeypatch_settings, fake_pdf):
         patch("lean.core.vlm.client.VLMClient") as mock_vlm_cls,
     ):
         mock_store_cls.from_env.return_value = MagicMock()
-        result = asyncio.run(ingest_pdf(str(fake_pdf)))
+        result = asyncio.run(ingest_pdf(str(fake_pdf), pipeline=mock_pipeline))
 
     assert result.chunk_count == 1
     mock_vlm_cls.assert_not_called()
@@ -363,14 +355,12 @@ def test_persist_rolls_back_when_replace_chunks_fails(monkeypatch_settings, fake
     mock_doc_repo.upsert_document.return_value = __import__("uuid").uuid4()
     mock_chunk_repo = MagicMock()
     mock_chunk_repo.replace_chunks.side_effect = _Boom("chunk insert failed")
-
     mock_pipeline = MagicMock()
 
     with (
         patch("lean.core.services.ingestion.StoreConnection") as mock_store_cls,
         patch("lean.core.services.ingestion.DocumentRepo", return_value=mock_doc_repo),
         patch("lean.core.services.ingestion.ChunkRepo", return_value=mock_chunk_repo),
-        patch("lean.core.services.ingestion.get_pipeline", return_value=mock_pipeline),
     ):
         mock_store_cls.from_env.return_value = mock_conn
         with pytest.raises(_Boom, match="chunk insert failed"):
@@ -385,6 +375,7 @@ def test_persist_rolls_back_when_replace_chunks_fails(monkeypatch_settings, fake
                     [[0.1] * 1024],
                     [],
                     monkeypatch_settings,
+                    pipeline=mock_pipeline,
                 )
             )
 
@@ -426,22 +417,19 @@ def test_persist_rolls_back_on_chunk_replace_failure_via_ingest(monkeypatch_sett
     fake_meta = __import__("lean.core.extraction.metadata", fromlist=["PdfMetadata"]).PdfMetadata(
         title="x"
     )
+    mock_pipeline = MagicMock(
+        extract=MagicMock(
+            return_value=ExtractionResult(
+                markdown="# x",
+                page_count=1,
+                method=ExtractionMethod.MARKITDOWN,
+                images={},
+                block_metas=[],
+            )
+        )
+    )
 
     with (
-        patch(
-            "lean.core.services.ingestion.get_pipeline",
-            return_value=MagicMock(
-                extract=MagicMock(
-                    return_value=ExtractionResult(
-                        markdown="# x",
-                        page_count=1,
-                        method=ExtractionMethod.MARKITDOWN,
-                        images={},
-                        block_metas=[],
-                    )
-                )
-            ),
-        ),
         patch("lean.core.services.ingestion.build_sections", return_value=fake_sections),
         patch("lean.core.services.ingestion.chunk_sections", return_value=fake_chunks),
         patch("lean.core.services.ingestion.get_embedder", return_value=mock_embedder),
@@ -452,7 +440,7 @@ def test_persist_rolls_back_on_chunk_replace_failure_via_ingest(monkeypatch_sett
     ):
         mock_store_cls.from_env.return_value = mock_conn
         with pytest.raises(_Boom, match="simulated DB failure"):
-            asyncio.run(ingest_pdf(str(fake_pdf)))
+            asyncio.run(ingest_pdf(str(fake_pdf), pipeline=mock_pipeline))
 
     mock_conn.conn.rollback.assert_called_once()
 
@@ -471,7 +459,7 @@ def test_reingest_raises_keyerror_when_document_not_found(monkeypatch_settings):
     ):
         mock_store_cls.from_env.return_value = MagicMock()
         with pytest.raises(KeyError, match="not found"):
-            asyncio.run(reingest("00000000-0000-0000-0000-000000000000"))
+            asyncio.run(reingest("00000000-0000-0000-0000-000000000000", pipeline=MagicMock()))
 
 
 def test_ingest_uses_markitdown_fallback_when_marker_unavailable(monkeypatch_settings, fake_pdf):
@@ -499,22 +487,19 @@ def test_ingest_uses_markitdown_fallback_when_marker_unavailable(monkeypatch_set
     fake_meta = __import__("lean.core.extraction.metadata", fromlist=["PdfMetadata"]).PdfMetadata(
         title="x"
     )
+    mock_pipeline = MagicMock(
+        extract=MagicMock(
+            return_value=ExtractionResult(
+                markdown="# x",
+                page_count=1,
+                method=ExtractionMethod.MARKITDOWN,
+                images={},
+                block_metas=[],
+            )
+        )
+    )
 
     with (
-        patch(
-            "lean.core.services.ingestion.get_pipeline",
-            return_value=MagicMock(
-                extract=MagicMock(
-                    return_value=ExtractionResult(
-                        markdown="# x",
-                        page_count=1,
-                        method=ExtractionMethod.MARKITDOWN,
-                        images={},
-                        block_metas=[],
-                    )
-                )
-            ),
-        ),
         patch("lean.core.services.ingestion.build_sections", return_value=fake_sections),
         patch("lean.core.services.ingestion.chunk_sections", return_value=fake_chunks),
         patch("lean.core.services.ingestion.get_embedder", return_value=mock_embedder),
@@ -524,7 +509,7 @@ def test_ingest_uses_markitdown_fallback_when_marker_unavailable(monkeypatch_set
         patch("lean.core.services.ingestion.ChunkRepo", return_value=MagicMock()),
     ):
         mock_store_cls.from_env.return_value = MagicMock()
-        result = asyncio.run(ingest_pdf(str(fake_pdf)))
+        result = asyncio.run(ingest_pdf(str(fake_pdf), pipeline=mock_pipeline))
 
     assert result.extraction_method == ExtractionMethod.MARKITDOWN
 
@@ -556,23 +541,20 @@ def test_ingest_appends_warning_when_contextual_retrieval_enabled_without_llm(
     fake_meta = __import__("lean.core.extraction.metadata", fromlist=["PdfMetadata"]).PdfMetadata(
         title="x"
     )
+    mock_pipeline = MagicMock(
+        extract=MagicMock(
+            return_value=ExtractionResult(
+                markdown="# x",
+                page_count=1,
+                method=ExtractionMethod.MARKITDOWN,
+                images={},
+                block_metas=[],
+            )
+        )
+    )
 
     with (
         patch("lean.core.llm.base.get_llm", return_value=None),
-        patch(
-            "lean.core.services.ingestion.get_pipeline",
-            return_value=MagicMock(
-                extract=MagicMock(
-                    return_value=ExtractionResult(
-                        markdown="# x",
-                        page_count=1,
-                        method=ExtractionMethod.MARKITDOWN,
-                        images={},
-                        block_metas=[],
-                    )
-                )
-            ),
-        ),
         patch("lean.core.services.ingestion.build_sections", return_value=fake_sections),
         patch("lean.core.services.ingestion.chunk_sections", return_value=fake_chunks),
         patch("lean.core.services.ingestion.get_embedder", return_value=mock_embedder),
@@ -587,7 +569,7 @@ def test_ingest_appends_warning_when_contextual_retrieval_enabled_without_llm(
         patch("lean.core.services.ingestion.ChunkRepo", return_value=MagicMock()),
     ):
         mock_store_cls.from_env.return_value = MagicMock()
-        result = asyncio.run(ingest_pdf(str(fake_pdf)))
+        result = asyncio.run(ingest_pdf(str(fake_pdf), pipeline=mock_pipeline))
 
     assert any("contextual_retrieval enabled but no LLM configured" in w for w in result.warnings)
 

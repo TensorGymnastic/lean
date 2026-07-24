@@ -23,8 +23,8 @@ from lean.core.extraction import (
     ExtractionMethod,
     ExtractionResult,
     PdfMetadata,
+    Pipeline,
     extract_metadata,
-    get_pipeline,
 )
 from lean.core.extraction.pipeline_helpers import (
     build_chunk_rows,
@@ -74,9 +74,9 @@ async def _validate_pdf_path(path: str, settings: CoreSettings) -> tuple[Path, s
     return resolved, _sha256_streaming(pdf_path)
 
 
-async def _run_extraction(pdf_path: Path) -> ExtractionResult:
-    """Run the registered extraction pipeline."""
-    return await anyio.to_thread.run_sync(lambda: get_pipeline().extract(pdf_path))
+async def _run_extraction(pdf_path: Path, pipeline: Pipeline) -> ExtractionResult:
+    """Run the extraction pipeline."""
+    return await anyio.to_thread.run_sync(lambda: pipeline.extract(pdf_path))
 
 
 async def _chunk_markdown(
@@ -156,6 +156,8 @@ async def _persist_ingest(
     embeddings: list[list[float]],
     image_descriptions: list[tuple[str, dict[str, object], str]],
     settings: CoreSettings,
+    *,
+    pipeline: Pipeline,
 ) -> tuple[UUID, int]:
     with StoreConnection.from_env() as conn:
         documents = DocumentRepo(conn)
@@ -181,7 +183,7 @@ async def _persist_ingest(
             image_descriptions,
             settings,
             doc_id,
-            chunk_type_for=get_pipeline().hooks.heading_for_chunk,
+            chunk_type_for=pipeline.hooks.heading_for_chunk,
         )
         try:
             chunks_repo.replace_chunks(doc_id, chunk_rows, commit=False)
@@ -192,12 +194,12 @@ async def _persist_ingest(
         return doc_id, len(chunk_rows)
 
 
-async def ingest_pdf(path: str) -> IngestResult:
+async def ingest_pdf(path: str, *, pipeline: Pipeline) -> IngestResult:
     """PDF → extract → chunk → optional context → optional VLM → embed → persist.
 
     Pipeline:
     1. Validate path + corpus-root + size + SHA-256.
-    2. Run the registered extraction pipeline.
+    2. Run the extraction pipeline.
     3. Build sections + chunks, attach block-metas for provenance.
     4. Optional contextual retrieval (LLM-side).
     5. Optional image enrichment (VLM-side; configurable by domain).
@@ -207,7 +209,7 @@ async def ingest_pdf(path: str) -> IngestResult:
     start = time.monotonic()
     settings = get_settings()
     pdf_path, source_sha256 = await _validate_pdf_path(path, settings)
-    result = await _run_extraction(pdf_path)
+    result = await _run_extraction(pdf_path, pipeline)
     sections, chunk_results, warnings = await _chunk_markdown(
         result.markdown, result.method, result.block_metas, settings
     )
@@ -217,7 +219,7 @@ async def ingest_pdf(path: str) -> IngestResult:
     image_descriptions, image_warnings = await describe_images(
         result.images,
         settings,
-        describe_one=get_pipeline().hooks.describe_one,
+        describe_one=pipeline.hooks.describe_one,
     )
     warnings.extend(image_warnings)
     embeddings = await _embed_chunks(chunk_results, image_descriptions)
@@ -232,6 +234,7 @@ async def ingest_pdf(path: str) -> IngestResult:
         embeddings,
         image_descriptions,
         settings,
+        pipeline=pipeline,
     )
     elapsed = time.monotonic() - start
     logger.info(
@@ -254,14 +257,14 @@ async def ingest_pdf(path: str) -> IngestResult:
     )
 
 
-async def reingest(document_id: str) -> IngestResult:
+async def reingest(document_id: str, *, pipeline: Pipeline) -> IngestResult:
     """Re-ingest by looking up source_path from DB and calling ingest_pdf."""
     doc_uuid = UUID(document_id)
     with StoreConnection.from_env() as conn:
         source_path = DocumentRepo(conn).get_source_path(doc_uuid)
     if source_path is None:
         raise KeyError(f"document {document_id} not found")
-    return await ingest_pdf(source_path)
+    return await ingest_pdf(source_path, pipeline=pipeline)
 
 
 __all__ = ["ingest_pdf", "reingest"]

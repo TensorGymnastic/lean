@@ -19,7 +19,13 @@ from lean.core.config.settings import (
     get_settings,
     set_active_yaml_path,
 )
-from lean.core.extraction.base import DomainHooks, Extractor, Pipeline, set_pipeline
+from lean.core.extraction.base import (
+    DomainHooks,
+    Extractor,
+    Pipeline,
+    get_pipeline,
+    set_pipeline,
+)
 from lean.core.transports.builder import TransportBuilder
 from lean.core.transports.registration import DomainRegistration
 
@@ -255,13 +261,6 @@ class _YamlDomain(DomainRegistration[CoreSettings]):
         from lean.core.adapters import register_cli_tools
 
         register_cli_tools(app, self._tools_module)
-
-
-def get_pipeline() -> Pipeline:
-    """Return the registered pipeline (re-export for clarity)."""
-    from lean.core.extraction.base import get_pipeline as _gp
-
-    return _gp()
 
 
 __all__ = ["build_from_yaml"]

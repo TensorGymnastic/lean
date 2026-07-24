@@ -14,6 +14,7 @@ import json
 import typer
 
 from lean.core.adapters import cli_command, mcp_tool, output, rest_route
+from lean.core.extraction.base import get_pipeline
 from lean.core.models import Chunk, IngestResult
 from lean.core.services.ingestion import ingest_pdf as _ingest_pdf
 from lean.core.services.ingestion import reingest as _reingest
@@ -24,7 +25,7 @@ from lean.core.tools.universal import *  # noqa: F403, F405
 @mcp_tool
 async def ingest_pdf(path: str) -> IngestResult:
     """Ingest a PDF into the corpus (uses marker → OCR → markitdown chain)."""
-    return await _ingest_pdf(path)
+    return await _ingest_pdf(path, pipeline=get_pipeline())
 
 
 @mcp_tool
@@ -60,7 +61,7 @@ async def search(
 @mcp_tool
 async def reingest(document_id: str) -> IngestResult:
     """Re-ingest a document with current settings."""
-    return await _reingest(document_id)
+    return await _reingest(document_id, pipeline=get_pipeline())
 
 
 @rest_route("GET", "/search")
@@ -102,14 +103,14 @@ async def ingest_rest(payload: dict[str, object]) -> dict[str, object]:
     path = str(payload.get("path", ""))
     if not path:
         raise HTTPException(status_code=400, detail="missing 'path' in payload")
-    result = await _ingest_pdf(path)
+    result = await _ingest_pdf(path, pipeline=get_pipeline())
     return result.model_dump(mode="json")
 
 
 @cli_command
 def ingest(path: str, json_output: bool = typer.Option(False, "--json")) -> None:
     """Ingest a PDF into the corpus."""
-    result = asyncio.run(_ingest_pdf(path))
+    result = asyncio.run(_ingest_pdf(path, pipeline=get_pipeline()))
     output(result, json_output)
 
 
@@ -152,7 +153,7 @@ def search_cli(
 @cli_command(name="reingest")
 def reingest_cli(doc_id: str, json_output: bool = typer.Option(False, "--json")) -> None:
     """Re-ingest a document (re-extract with current settings)."""
-    result = asyncio.run(_reingest(doc_id))
+    result = asyncio.run(_reingest(doc_id, pipeline=get_pipeline()))
     output(result, json_output)
 
 
@@ -176,7 +177,7 @@ def reingest_all(
             continue
         typer.echo(f"START {doc.id}  ({doc.page_count or '?'} pages, was {doc.extraction_method})")
         try:
-            res = asyncio.run(_reingest(doc.id))
+            res = asyncio.run(_reingest(doc.id, pipeline=get_pipeline()))
             success += 1
             results.append(
                 {
