@@ -44,7 +44,7 @@ def _is_allowed(module_path: str) -> bool:
 def _import_object(dotted: str) -> Any:
     """Import a Python object by dotted path.
 
-    Example: ``lean.domains.pdf_lss.adapters.MarkerAdapter``.
+    Example: ``lean.core.extraction.MarkerExtractor``.
 
     The module path must start with one of ``ALLOWED_ADAPTER_PREFIXES``;
     otherwise a ``ValueError`` is raised. Import errors are also wrapped
@@ -82,12 +82,12 @@ def _merge_extractor_defaults(
     """
     out = dict(config)
     name = adapter.rsplit(".", 1)[-1]
-    if name in {"MarkerAdapter", "MarkerExtractor"}:
+    if name == "MarkerExtractor":
         if not out.get("remote_url"):
             out["remote_url"] = settings.marker_remote_url
         if "force_ocr" not in out:
             out["force_ocr"] = settings.marker_force_ocr
-    if name in {"UnlimitedOCRAdapter", "UnlimitedOCRExtractor"}:
+    if name == "UnlimitedOCRExtractor":
         if not out.get("base_url"):
             out["base_url"] = settings.ocr_base_url
         if not out.get("model"):

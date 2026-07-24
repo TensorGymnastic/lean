@@ -23,7 +23,7 @@ class ExtractorRef(BaseModel):
 
     adapter: str = Field(
         description=(
-            "Dotted path to an Extractor class (e.g. lean.domains.pdf_lss.adapters.MarkerAdapter)"
+            "Dotted path to an Extractor class (e.g. lean.core.extraction.MarkerExtractor)"
         )
     )
     config: dict[str, Any] = Field(

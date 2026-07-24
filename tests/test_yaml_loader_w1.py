@@ -96,7 +96,7 @@ def test_import_object_allows_lean_core() -> None:
 
 def test_import_object_allows_lean_domains() -> None:
     """A legitimate lean.domains path must still resolve."""
-    obj = _import_object("lean.domains.pdf_lss.adapters.MarkitdownAdapter")
+    obj = _import_object("lean.domains.pdf_lss.metadata.extract")
     assert obj is not None
 
 

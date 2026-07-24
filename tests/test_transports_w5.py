@@ -220,7 +220,7 @@ def test_build_from_yaml_happy_path(tmp_path: Path) -> None:
     cfg.write_text(
         "domain: {name: smoke, version: 0.1.0}\n"
         "extractors:\n"
-        "  - adapter: lean.domains.pdf_lss.adapters.MarkitdownAdapter\n"
+        "  - adapter: lean.core.extraction.MarkitdownExtractor\n"
         "    config: {}\n"
         "tools: {module: lean.domains.pdf_lss.tools}\n"
     )
@@ -256,7 +256,7 @@ def test_yaml_loader_top_level_unknown_keys_become_settings(tmp_path: Path) -> N
     cfg.write_text(
         "domain: {name: x, version: 0.1.0}\n"
         "extractors:\n"
-        "  - adapter: lean.domains.pdf_lss.adapters.MarkitdownAdapter\n"
+        "  - adapter: lean.core.extraction.MarkitdownExtractor\n"
         "    config: {}\n"
         "tools: {module: lean.domains.pdf_lss.tools}\n"
         "foo:\n"
@@ -312,7 +312,7 @@ def test_build_from_yaml_uses_init_not_new(tmp_path: Path) -> None:
     cfg.write_text(
         "domain: {name: x, version: 0.1.0}\n"
         "extractors:\n"
-        "  - adapter: lean.domains.pdf_lss.adapters.MarkitdownAdapter\n"
+        "  - adapter: lean.core.extraction.MarkitdownExtractor\n"
         "    config: {}\n"
         "tools: {module: lean.domains.pdf_lss.tools}\n"
     )

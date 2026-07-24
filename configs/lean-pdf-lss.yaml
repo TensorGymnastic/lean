@@ -47,12 +47,12 @@ settings:
     max_tokens: 8192
 
 extractors:
-  - adapter: lean.domains.pdf_lss.adapters.MarkerAdapter
+  - adapter: lean.core.extraction.MarkerExtractor
     config: {}
-  - adapter: lean.domains.pdf_lss.adapters.UnlimitedOCRAdapter
+  - adapter: lean.core.extraction.UnlimitedOCRExtractor
     config:
       hf_token: ""
-  - adapter: lean.domains.pdf_lss.adapters.MarkitdownAdapter
+  - adapter: lean.core.extraction.MarkitdownExtractor
     config: {}
 
 vlm:
