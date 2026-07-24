@@ -99,6 +99,7 @@ class _SearchPatcher:
         self.mock_embedder = MagicMock()
         self.mock_embedder.embed_query.return_value = [0.1] * 1024
         self.mock_conn = MagicMock()
+        self.mock_conn.__enter__.return_value = self.mock_conn
         self.mock_analytics = MagicMock()
         self.mock_vector_search = MagicMock(return_value=self.vector_hits)
         self.mock_bm25_search = MagicMock(return_value=self.bm25_hits)
@@ -263,7 +264,7 @@ class TestSearchConnectionLifecycle:
         with _SearchPatcher(settings, vector_hits=[_make_hit(1, 0.9)]) as p:
             _search_orig("query")
 
-        p.mock_conn.close.assert_called_once()
+        p.mock_conn.__exit__.assert_called_once()
 
     def test_connection_closed_on_exception(self, valid_env):
         """Connection is closed even when an error occurs mid-search."""
@@ -276,7 +277,7 @@ class TestSearchConnectionLifecycle:
             with pytest.raises(RuntimeError, match="embed failed"):
                 _search_orig("query")
 
-        p.mock_conn.close.assert_called_once()
+        p.mock_conn.__exit__.assert_called_once()
 
 
 class TestSearchTopK:

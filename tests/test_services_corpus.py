@@ -37,6 +37,7 @@ def test_list_documents(monkeypatch_env):
     mock_repo = MagicMock()
     mock_repo.list_documents.return_value = fake_docs
     mock_conn = MagicMock()
+    mock_conn.__enter__.return_value = mock_conn
     with (
         patch("lean.core.services.corpus.DocumentRepo", return_value=mock_repo),
         patch("lean.core.services.corpus.StoreConnection") as mock_store,
@@ -45,7 +46,7 @@ def test_list_documents(monkeypatch_env):
         result = list_documents()
     assert len(result) == 1
     assert result[0].title == "Book A"
-    mock_conn.close.assert_called_once()
+    mock_conn.__exit__.assert_called_once()
 
 
 def test_get_chunk_found(monkeypatch_env):
@@ -63,6 +64,7 @@ def test_get_chunk_found(monkeypatch_env):
     mock_repo = MagicMock()
     mock_repo.get_chunk.return_value = fake_chunk
     mock_conn = MagicMock()
+    mock_conn.__enter__.return_value = mock_conn
     with (
         patch("lean.core.services.corpus.ChunkRepo", return_value=mock_repo),
         patch("lean.core.services.corpus.StoreConnection") as mock_store,
@@ -79,6 +81,7 @@ def test_get_chunk_not_found(monkeypatch_env):
     mock_repo = MagicMock()
     mock_repo.get_chunk.return_value = None
     mock_conn = MagicMock()
+    mock_conn.__enter__.return_value = mock_conn
     with (
         patch("lean.core.services.corpus.ChunkRepo", return_value=mock_repo),
         patch("lean.core.services.corpus.StoreConnection") as mock_store,
@@ -106,6 +109,7 @@ def test_get_document_markdown(monkeypatch_env):
     mock_repo = MagicMock()
     mock_repo.get_chunks_by_document.return_value = fake_chunks
     mock_conn = MagicMock()
+    mock_conn.__enter__.return_value = mock_conn
     with (
         patch("lean.core.services.corpus.ChunkRepo", return_value=mock_repo),
         patch("lean.core.services.corpus.StoreConnection") as mock_store,
@@ -122,6 +126,7 @@ def test_get_document_markdown_empty_raises(monkeypatch_env):
     mock_repo = MagicMock()
     mock_repo.get_chunks_by_document.return_value = []
     mock_conn = MagicMock()
+    mock_conn.__enter__.return_value = mock_conn
     with (
         patch("lean.core.services.corpus.ChunkRepo", return_value=mock_repo),
         patch("lean.core.services.corpus.StoreConnection") as mock_store,
@@ -136,6 +141,7 @@ def test_delete_document(monkeypatch_env):
 
     mock_repo = MagicMock()
     mock_conn = MagicMock()
+    mock_conn.__enter__.return_value = mock_conn
     with (
         patch("lean.core.services.corpus.DocumentRepo", return_value=mock_repo),
         patch("lean.core.services.corpus.StoreConnection") as mock_store,

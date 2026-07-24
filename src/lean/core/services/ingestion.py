@@ -159,8 +159,7 @@ async def _persist_ingest(
     image_descriptions: list[tuple[str, dict[str, object], str]],
     settings: CoreSettings,
 ) -> tuple[UUID, int]:
-    conn = StoreConnection.from_env()
-    try:
+    with StoreConnection.from_env() as conn:
         documents = DocumentRepo(conn)
         chunks_repo = ChunkRepo(conn)
         doc_id = documents.upsert_document(
@@ -193,8 +192,6 @@ async def _persist_ingest(
             raise
         conn.conn.commit()
         return doc_id, len(chunk_rows)
-    finally:
-        conn.close()
 
 
 async def ingest_pdf(path: str) -> IngestResult:
@@ -262,11 +259,8 @@ async def ingest_pdf(path: str) -> IngestResult:
 async def reingest(document_id: str) -> IngestResult:
     """Re-ingest by looking up source_path from DB and calling ingest_pdf."""
     doc_uuid = UUID(document_id)
-    conn = StoreConnection.from_env()
-    try:
+    with StoreConnection.from_env() as conn:
         source_path = DocumentRepo(conn).get_source_path(doc_uuid)
-    finally:
-        conn.close()
     if source_path is None:
         raise KeyError(f"document {document_id} not found")
     return await ingest_pdf(source_path)

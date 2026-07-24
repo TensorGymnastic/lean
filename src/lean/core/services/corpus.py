@@ -19,11 +19,8 @@ from lean.core.store.documents import DocumentRepo
 
 def list_documents() -> list[DocumentSummary]:
     """List all documents in the corpus, newest first."""
-    conn = StoreConnection.from_env()
-    try:
+    with StoreConnection.from_env() as conn:
         return DocumentRepo(conn).list_documents()
-    finally:
-        conn.close()
 
 
 def delete_document(document_id: str) -> dict[str, str]:
@@ -33,11 +30,8 @@ def delete_document(document_id: str) -> dict[str, str]:
     if the document id is not a valid UUID.
     """
     doc_uuid = UUID(document_id)
-    conn = StoreConnection.from_env()
-    try:
+    with StoreConnection.from_env() as conn:
         DocumentRepo(conn).delete_document(doc_uuid)
-    finally:
-        conn.close()
     return {"deleted": document_id}
 
 
@@ -48,34 +42,24 @@ def corpus_stats() -> CorpusStats:
     so the response is self-describing without an embedding round-trip.
     """
     settings = get_settings()
-    conn = StoreConnection.from_env()
-    try:
-        stats = AnalyticsRepo(conn).corpus_stats(
+    with StoreConnection.from_env() as conn:
+        return AnalyticsRepo(conn).corpus_stats(
             embedding_dim=settings.embedding_dim,
             embedding_model=settings.embedding_model,
         )
-    finally:
-        conn.close()
-    return stats
 
 
 def get_chunk(chunk_id: str) -> Chunk | None:
     """Fetch a single chunk by its UUID. Returns ``None`` if not found."""
-    conn = StoreConnection.from_env()
-    try:
+    with StoreConnection.from_env() as conn:
         return ChunkRepo(conn).get_chunk(UUID(chunk_id))
-    finally:
-        conn.close()
 
 
 def list_chunks_by_document(document_id: str) -> list[Chunk]:
     """List chunks for a document, ordered by chunk_index. No embeddings."""
     doc_uuid = UUID(document_id)
-    conn = StoreConnection.from_env()
-    try:
+    with StoreConnection.from_env() as conn:
         return ChunkRepo(conn).get_chunks_by_document(doc_uuid)
-    finally:
-        conn.close()
 
 
 def get_document_markdown(document_id: str) -> str:
@@ -84,11 +68,8 @@ def get_document_markdown(document_id: str) -> str:
     Raises ``KeyError`` if the document id does not exist.
     """
     doc_uuid = UUID(document_id)
-    conn = StoreConnection.from_env()
-    try:
+    with StoreConnection.from_env() as conn:
         chunks = ChunkRepo(conn).get_chunks_by_document(doc_uuid)
-    finally:
-        conn.close()
     if not chunks:
         raise KeyError(f"document {document_id} not found or has no chunks")
     return "\n\n".join(c.content for c in chunks)

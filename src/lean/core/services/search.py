@@ -328,8 +328,7 @@ def search(
         settings=settings,
     )
 
-    conn = StoreConnection.from_env()
-    try:
+    with StoreConnection.from_env() as conn:
         start = time.monotonic()
         hits = _execute_search(
             query=query,
@@ -364,8 +363,6 @@ def search(
                 n_queries=len(queries),
             ),
         )
-    finally:
-        conn.close()
 
     logger.info(
         "search q=%r k=%d hits=%d latency=%dms hybrid=%s reranked=%s queries=%d",

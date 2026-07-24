@@ -122,6 +122,7 @@ def test_ingest_pipeline_success(monkeypatch_settings, fake_pdf):
     mock_embedder.embed_documents.return_value = [[0.1] * 1024]
 
     mock_conn = MagicMock()
+    mock_conn.__enter__.return_value = mock_conn
     mock_doc_repo = MagicMock()
     mock_doc_repo.upsert_document.return_value = __import__("uuid").uuid4()
     mock_chunk_repo = MagicMock()
@@ -162,7 +163,7 @@ def test_ingest_pipeline_success(monkeypatch_settings, fake_pdf):
     mock_embedder.embed_documents.assert_called_once()
     mock_doc_repo.upsert_document.assert_called_once()
     mock_chunk_repo.replace_chunks.assert_called_once()
-    mock_conn.close.assert_called_once()
+    mock_conn.__exit__.assert_called_once()
 
     call_kwargs = mock_doc_repo.upsert_document.call_args.kwargs
     assert call_kwargs["metadata"]["keywords"] == []
@@ -199,6 +200,7 @@ def test_ingest_vlm_enrichment_creates_image_chunks(monkeypatch_settings, fake_p
     mock_embedder.embed_documents.return_value = [[0.1] * 1024, [0.2] * 1024]
 
     mock_conn = MagicMock()
+    mock_conn.__enter__.return_value = mock_conn
     mock_doc_repo = MagicMock()
     mock_doc_repo.upsert_document.return_value = __import__("uuid").uuid4()
     mock_chunk_repo = MagicMock()
@@ -356,6 +358,7 @@ def test_persist_rolls_back_when_replace_chunks_fails(monkeypatch_settings, fake
         pass
 
     mock_conn = MagicMock()
+    mock_conn.__enter__.return_value = mock_conn
     mock_doc_repo = MagicMock()
     mock_doc_repo.upsert_document.return_value = __import__("uuid").uuid4()
     mock_chunk_repo = MagicMock()
@@ -386,7 +389,7 @@ def test_persist_rolls_back_when_replace_chunks_fails(monkeypatch_settings, fake
             )
 
     mock_conn.conn.rollback.assert_called_once()
-    mock_conn.close.assert_called_once()
+    mock_conn.__exit__.assert_called_once()
 
 
 def test_persist_rolls_back_on_chunk_replace_failure_via_ingest(monkeypatch_settings, fake_pdf):
@@ -414,6 +417,7 @@ def test_persist_rolls_back_on_chunk_replace_failure_via_ingest(monkeypatch_sett
     mock_embedder.embed_documents.return_value = [[0.1] * 1024]
 
     mock_conn = MagicMock()
+    mock_conn.__enter__.return_value = mock_conn
     mock_doc_repo = MagicMock()
     mock_doc_repo.upsert_document.return_value = __import__("uuid").uuid4()
     mock_chunk_repo = MagicMock()
