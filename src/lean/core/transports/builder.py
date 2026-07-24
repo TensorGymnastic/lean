@@ -15,7 +15,6 @@ from __future__ import annotations
 from typing import Any
 
 from lean.core.config.settings import CoreSettings
-from lean.core.extraction.base import set_pipeline
 from lean.core.transports.registration import DomainRegistration
 
 
@@ -24,7 +23,7 @@ class TransportBuilder:
 
     On construction:
     - Builds the domain's ``Settings`` (subclassed from ``CoreSettings``).
-    - Builds the domain's ``Pipeline`` and installs it as the singleton.
+    - Builds the domain's ``Pipeline`` via ``domain.build_pipeline()``.
     - Builds the MCP app, the FastAPI app, and the Typer CLI app,
       with the domain's tools/routes/commands registered.
 
@@ -36,7 +35,6 @@ class TransportBuilder:
         self._domain = domain
         self._settings: CoreSettings = domain.build_settings()
         self._pipeline = domain.build_pipeline(self._settings)
-        set_pipeline(self._pipeline)
 
         self._services = self._build_services()
 

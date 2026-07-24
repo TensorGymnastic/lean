@@ -15,6 +15,7 @@ architectural decision — for *existing* behavior, document it in
 | [0004](0004-vlm-single-enabled-flag.md) | Accepted | `vlm.enabled` lives only at top-level YAML — single source of truth |
 | [0005](0005-dedup-by-sha256.md) | Accepted | Document dedup is by `source_sha256`, not by path |
 | [0006](0006-composition-injection.md) | Accepted | Domain behavior threaded via `DomainHooks` dataclass, replacing module-global mutation |
+| [0007](0007-eliminate-pipeline-singleton.md) | Accepted | Pipeline passed as explicit parameter to service functions |
 
 Pending / not-yet-decided:
 
