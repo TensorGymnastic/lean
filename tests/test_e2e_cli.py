@@ -49,6 +49,9 @@ def _lean_env() -> dict[str, str]:
     env = os.environ.copy()
     env.setdefault("HF_TOKEN", "test-token")
     env.setdefault("LEAN_MCP_API_KEY", "x" * 32)
+    env.setdefault("LEAN_CONFIG", "configs/lean-pdf-lss.yaml")
+    env.setdefault("MCP_HTTP_PORT", "8767")
+    env.setdefault("API_PORT", "8766")
     env["SUPABASE_DB_URL"] = os.environ["SUPABASE_DB_URL"]
     env["PYTHONPATH"] = str(Path(__file__).parent.parent / "src")
     return env

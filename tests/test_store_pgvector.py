@@ -303,7 +303,6 @@ def test_chunk_type_filter_at_db_level(conn) -> None:
             content="VLM-described chart",
             embedding=[0.5] * 1024,
             chunk_type="image",
-            image_hash="a" * 64,
         ),
     ]
     ChunkRepo(conn).replace_chunks(doc_id, chunks)
@@ -443,7 +442,6 @@ def test_find_duplicate_image_hashes_returns_real_duplicates(conn) -> None:
             content="desc a",
             embedding=[0.0] * 1024,
             chunk_type="image",
-            image_hash=dup_hash,
         ),
         ChunkRow(
             document_id=doc_id,
@@ -456,7 +454,6 @@ def test_find_duplicate_image_hashes_returns_real_duplicates(conn) -> None:
             content="same image reused elsewhere",
             embedding=[0.0] * 1024,
             chunk_type="image",
-            image_hash=dup_hash,
         ),
         ChunkRow(
             document_id=doc_id,
@@ -469,10 +466,21 @@ def test_find_duplicate_image_hashes_returns_real_duplicates(conn) -> None:
             content="unique image",
             embedding=[0.0] * 1024,
             chunk_type="image",
-            image_hash="unique123",
         ),
     ]
     ChunkRepo(conn).replace_chunks(doc_id, chunks)
+
+    with conn.conn.cursor() as cur:
+        cur.execute(
+            "UPDATE public.chunks SET image_hash = %s"
+            " WHERE document_id = %s AND chunk_index IN (0, 1)",
+            (dup_hash, doc_id),
+        )
+        cur.execute(
+            "UPDATE public.chunks SET image_hash = %s WHERE document_id = %s AND chunk_index = 2",
+            ("unique123", doc_id),
+        )
+    conn.conn.commit()
 
     dupes = ChunkRepo(conn).find_duplicate_image_hashes()
     dups_dict = dict(dupes)
