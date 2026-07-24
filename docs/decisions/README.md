@@ -14,6 +14,7 @@ architectural decision — for *existing* behavior, document it in
 | [0003](0003-minimax-api-key-alias.md) | Accepted | `Settings.llm_api_key` reads `MINIMAX_API_KEY` via validation_alias |
 | [0004](0004-vlm-single-enabled-flag.md) | Accepted | `vlm.enabled` lives only at top-level YAML — single source of truth |
 | [0005](0005-dedup-by-sha256.md) | Accepted | Document dedup is by `source_sha256`, not by path |
+| [0006](0006-composition-injection.md) | Accepted | Domain behavior threaded via `DomainHooks` dataclass, replacing module-global mutation |
 
 Pending / not-yet-decided:
 
