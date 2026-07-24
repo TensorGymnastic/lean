@@ -29,7 +29,6 @@ settings:
       enabled: false
   storage:
     corpus_root: "data"
-    max_pdf_mb: 50
   transport:
     mcp_http_port: 8767
     api_port: 8768
