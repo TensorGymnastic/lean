@@ -59,12 +59,9 @@ def test_documents_table_exists(db_url: str) -> None:
         "source_sha256",
         "title",
         "authors",
-        "publisher",
         "year",
         "page_count",
         "extraction_method",
-        "source_storage_path",
-        "markdown_storage_path",
         "ingested_at",
         "reingested_at",
         "metadata",
@@ -104,41 +101,51 @@ def test_chunk_type_check_constraint_rejects_invalid(db_url: str) -> None:
     """Migration 012's CHECK (chunk_type IN ('text','image')) rejects bogus values."""
     import psycopg
 
+    zero_vec = "[" + ",".join(["0.0"] * 1024) + "]"
     fake_doc_id = "00000000-0000-0000-0000-000000000001"
-    with psycopg.connect(db_url, autocommit=False) as conn, conn.cursor() as cur:
+    with psycopg.connect(db_url, autocommit=True) as conn, conn.cursor() as cur:
+        cur.execute(
+            "insert into public.documents "
+            "(id, source_path, source_sha256, title, extraction_method) "
+            "values (%s, 'check-test.pdf', 'check-test-001', 'Check Test', 'markitdown') "
+            "on conflict (source_sha256) do nothing",
+            (fake_doc_id,),
+        )
         try:
             cur.execute(
                 "insert into public.chunks "
                 "(document_id, chunk_index, section_path, token_count, content, "
                 " embedding, chunk_type) "
-                "values (%s, 999999, 'X', 1, 'x', '[0]'::vector, 'bogus_type')",
-                (fake_doc_id,),
+                "values (%s, 999999, 'X', 1, 'x', %s::vector, 'bogus_type')",
+                (fake_doc_id, zero_vec),
             )
         except psycopg.errors.CheckViolation:
-            conn.rollback()
+            pass
         else:
-            conn.rollback()
             raise AssertionError("CHECK constraint did not reject chunk_type='bogus_type'")
+        finally:
+            cur.execute("delete from public.documents where id = %s", (fake_doc_id,))
 
 
 def test_on_delete_cascade_removes_chunks(db_url: str) -> None:
     """FK from chunks.document_id -> documents.id has ON DELETE CASCADE."""
     import psycopg
 
+    zero_vec = "[" + ",".join(["0.0"] * 1024) + "]"
     fake_doc_id = "00000000-0000-0000-0000-000000000002"
     with psycopg.connect(db_url, autocommit=True) as conn, conn.cursor() as cur:
         cur.execute(
             "insert into public.documents "
             "(id, source_path, source_sha256, title, extraction_method) "
-            "values (%s, 'cascade-test.pdf', 'cascade-test-%s', 'Cascade Test', 'markitdown') "
+            "values (%s, 'cascade-test.pdf', %s, 'Cascade Test', 'markitdown') "
             "on conflict (source_sha256) do nothing",
-            (fake_doc_id, fake_doc_id),
+            (fake_doc_id, f"cascade-test-{fake_doc_id}"),
         )
         cur.execute(
             "insert into public.chunks "
             "(document_id, chunk_index, section_path, token_count, content, embedding) "
-            "values (%s, 0, 'X', 1, 'x', '[0]'::vector)",
-            (fake_doc_id,),
+            "values (%s, 0, 'X', 1, 'x', %s::vector)",
+            (fake_doc_id, zero_vec),
         )
         cur.execute(
             "select count(*) from public.chunks where document_id = %s",

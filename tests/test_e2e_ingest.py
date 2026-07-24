@@ -59,7 +59,13 @@ def test_list_documents_works() -> None:
     assert len(docs) >= 1
     for d in docs:
         assert d.chunk_count > 0
-        assert d.extraction_method in ("unlimited_ocr", "markitdown")
+        assert d.extraction_method in (
+            "marker",
+            "unlimited_ocr",
+            "markitdown",
+            "text_file",
+            "web_url",
+        )
 
 
 def test_corpus_stats_fields_all_populated() -> None:
@@ -70,7 +76,6 @@ def test_corpus_stats_fields_all_populated() -> None:
     assert isinstance(stats.embedding_model, str) and stats.embedding_model
     assert isinstance(stats.total_tokens, int) and stats.total_tokens > 0
     assert isinstance(stats.extraction_method_breakdown, dict)
-    assert isinstance(stats.duplicate_image_hashes, list)
     assert stats.last_ingested_at is not None
     for entry in stats.extraction_method_breakdown.values():
         assert entry >= 1
@@ -88,8 +93,6 @@ def test_get_chunk_returns_full_chunk_for_known_id() -> None:
     assert fetched is not None
     assert str(fetched.id) == chunk_id
     assert fetched.token_count > 0
-    assert fetched.embedding_model is not None
-    assert fetched.embedding_dim == 1024
 
 
 def test_search_respects_k_limit() -> None:

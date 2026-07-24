@@ -157,6 +157,7 @@ def test_minimax_contextual_adds_context() -> None:
 # ── Ollama LFM2.5-8B Tests ─────────────────────────────────────
 
 
+@ollama_skip
 def test_ollama_lfm_generate_returns_text() -> None:
     """Ollama LFM2.5-8B generate() returns a non-empty string."""
     try:
@@ -172,6 +173,7 @@ def test_ollama_lfm_generate_returns_text() -> None:
         raise
 
 
+@ollama_skip
 def test_ollama_lfm_hyde_returns_passage() -> None:
     """HyDE via Ollama generates a passage about the query topic."""
     from lean.core.retrieval.query_transform import hyde_transform
@@ -189,6 +191,7 @@ def test_ollama_lfm_hyde_returns_passage() -> None:
         raise
 
 
+@ollama_skip
 def test_ollama_lfm_multi_query_returns_variants() -> None:
     """Multi-query via Ollama generates paraphrased queries."""
     from lean.core.retrieval.query_transform import multi_query_transform
@@ -206,6 +209,7 @@ def test_ollama_lfm_multi_query_returns_variants() -> None:
         raise
 
 
+@ollama_skip
 def test_ollama_lfm_contextual_adds_context() -> None:
     """Contextual retrieval via Ollama adds context to chunks."""
     from lean.core.extraction.contextual import add_context_to_chunks
