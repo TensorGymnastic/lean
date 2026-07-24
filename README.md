@@ -3,7 +3,9 @@
 A dockerized MCP server driven by YAML domain manifests. Built-in domains
 ship out of the box: PDF (marker-pdf + OCR + markitdown + optional VLM),
 markdown/source-file corpus, and URL corpus. Adding a fourth domain = drop
-a YAML in `configs/` + a `tools.py` in `src/lean/domains/`.
+a YAML in `configs/` + a `tools.py` in `src/lean/domains/`. PDF-like
+domains also need `adapters.py`, `metadata.py`, and optionally `parser.py`
++ a prompt file — see "Adding a new domain" below.
 
 Uses marker-pdf for high-quality PDF extraction (with optional remote GPU
 acceleration), Vision-Language Model enrichment for charts and figures,
@@ -19,15 +21,17 @@ storage, and hybrid BM25 + vector search via pgvector.
   `@rest_route` / `@cli_command` decorators in `lean.core.adapters`.
 - **Marker-pdf extraction (primary)** — `datalab-to/marker` (surya OCR +
   texify) with proper table/equation/heading formatting and figure
-  extraction. Runs locally on CPU or on a remote GPU server via HTTP (44×
-  faster — 14s vs 626s for a 29-page PDF). Falls back to Unlimited-OCR
+  extraction. Runs locally on CPU or on a remote GPU server via HTTP
+  (up to 44× faster on a 29-page PDF; single-machine benchmark — see
+  `docs/marker-server-deployment.md` for the rig). Falls back to Unlimited-OCR
   (remote transformers) then markitdown (pure Python) when unavailable.
 - **VLM chart/image enrichment** — Vision-Language Model (MiniMax M3
   default, Ollama Qwen3.5 fallback) describes every chart, diagram, and
   figure at ingest time. Descriptions are structured
   (`title`, `chart_type`, `axis_labels`, `key_data_points`, `description`)
   and embedded alongside text, making visual content searchable.
-  **~3.5s/image, ~$0.004/image via MiniMax M3 API.**
+  **~3.5s/image, ~$0.004/image via MiniMax M3 API.** Ships
+  disabled-by-default (`vlm.enabled: false`) in all 3 example configs.
 - **Provenance metadata** — every chunk tracks `embedding_model`,
   `embedding_dim`; every image chunk tracks `image_hash`,
   `provenance_model` (which VLM described it). Enables model-version
@@ -48,8 +52,10 @@ storage, and hybrid BM25 + vector search via pgvector.
   manifest. Built-in domains ship tools + matching REST routes via shared
   decorators.
 - **Retrieval evaluation** — `lean eval` command computing hit_rate@k,
-  MRR@k, NDCG@k, Recall@k (see [`docs/evaluation.md`](docs/evaluation.md)
-  for caveats)
+  MRR@k, NDCG@k, Recall@k. Default mode measures self-similarity, not
+  real-world retrieval — see [`docs/evaluation.md`](docs/evaluation.md).
+  Use `--dataset` for curated mode or `--mode full` for the full search
+  pipeline.
 - **Optional LLM sidecar** — Contextual Retrieval, HyDE, multi-query
   generation — all opt-in, pipeline works without LLM
 - **Security hardening** — corpus-root path confinement, API key
@@ -217,8 +223,11 @@ universal error-handling contract.
 
 ## Adding a new domain
 
-1. Create `src/lean/domains/<my_domain>/` with `adapters.py`, `tools.py`,
-   optionally `metadata.py`.
+1. Create `src/lean/domains/<my_domain>/` with at minimum `tools.py`
+   (MCP/REST/CLI tool declarations). PDF-like domains also need
+   `adapters.py` (extraction pipeline wiring), `metadata.py` (custom
+   metadata extraction), and optionally `parser.py` + a prompt file
+   (e.g. VLM chart-extraction prompts).
 2. Drop a YAML manifest in `configs/<my-domain>.yaml`.
 3. Run `uv run lean --config configs/<my-domain>.yaml --help` to verify
    the surface.
