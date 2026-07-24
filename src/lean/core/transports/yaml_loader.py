@@ -20,6 +20,7 @@ from lean.core.config.settings import (
 )
 from lean.core.extraction.base import Extractor, Pipeline, set_pipeline
 from lean.core.transports.builder import TransportBuilder
+from lean.core.transports.registration import DomainRegistration
 
 logger = logging.getLogger(__name__)
 
@@ -267,21 +268,10 @@ class _DomainBuilder:
         self._tools_module = tools_module
 
     def build(self) -> TransportBuilder:
-        from lean.core.transports.builder import TransportBuilder as _TB
-
-        builder = _TB.__new__(_TB)
-        builder._domain = _YamlDomain(self._config, self._tools_module)  # type: ignore[assignment]
-        builder._settings = self._settings
-        builder._pipeline = self._pipeline
-        set_pipeline(self._pipeline)
-        builder._services = builder._build_services()
-        builder._mcp = builder._build_mcp()
-        builder._api = builder._build_api()
-        builder._cli = builder._build_cli()
-        return builder
+        return TransportBuilder(_YamlDomain(self._config, self._tools_module))
 
 
-class _YamlDomain:
+class _YamlDomain(DomainRegistration[CoreSettings]):
     """DomainRegistration-shaped adapter that delegates to the tools module."""
 
     def __init__(self, config: DomainConfig, tools_module: Any | None) -> None:

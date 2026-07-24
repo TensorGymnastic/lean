@@ -301,3 +301,33 @@ def test_yaml_domain_registers_mcp_without_module_shim() -> None:
     mcp.tool.assert_called_once()
 
     del sys.modules["fake_tools"]
+
+
+def test_build_from_yaml_uses_init_not_new(tmp_path: Path) -> None:
+    """build_from_yaml must use TransportBuilder(__init__), not __new__ bypass."""
+    from lean.core.transports import builder as builder_mod
+    from lean.core.transports.yaml_loader import _YamlDomain, build_from_yaml
+
+    cfg = tmp_path / "cfg.yaml"
+    cfg.write_text(
+        "domain: {name: x, version: 0.1.0}\n"
+        "extractors:\n"
+        "  - adapter: lean.domains.pdf_lss.adapters.MarkitdownAdapter\n"
+        "    config: {}\n"
+        "tools: {module: lean.domains.pdf_lss.tools}\n"
+    )
+
+    init_calls: list[object] = []
+
+    def recording_init(self: object, domain: object) -> None:
+        init_calls.append(domain)
+
+    with (
+        patch.object(builder_mod.TransportBuilder, "__init__", recording_init),
+        patch("lean.core.transports.yaml_loader.set_pipeline"),
+        patch("lean.core.transports.yaml_loader.get_settings"),
+    ):
+        build_from_yaml(cfg)
+
+    assert len(init_calls) == 1
+    assert isinstance(init_calls[0], _YamlDomain)
