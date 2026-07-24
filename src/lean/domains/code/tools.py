@@ -1,16 +1,8 @@
 """Code domain — tool surface.
 
-Auto-discoverable MCP tools, REST routes, and CLI commands for the
-code/markdown-file corpus. Reuses the universal services from
-lean (corpus_stats, list_documents, get_chunk, etc.) and adds
-domain-specific entry points (ingest_directory).
-
-For git-repository ingestion, clone the repo locally and pass the
-checkout directory to ``lean --config configs/lean-code.yaml
-ingest-directory --dir <checkout> --pattern "*"``. A dedicated
-``ingest_git_repo`` command is intentionally not provided: it would
-either reimplement ``ingest_directory`` or duplicate git's checkout
-machinery; see ADR-0001's extension pattern for adding one.
+Universal tools are imported from ``lean.core.tools.universal``. This
+module keeps only code-specific entry points: ingest_file,
+ingest_directory, and search with section/author filters.
 """
 
 from __future__ import annotations
@@ -22,24 +14,10 @@ from pathlib import Path
 import typer
 
 from lean.core.adapters import cli_command, mcp_tool, output, rest_route
-from lean.core.models import Chunk, CorpusStats, DocumentSummary, IngestResult
-from lean.core.services.corpus import (
-    corpus_stats as _corpus_stats,
-)
-from lean.core.services.corpus import (
-    delete_document as _delete_document,
-)
-from lean.core.services.corpus import (
-    get_chunk as _get_chunk,
-)
-from lean.core.services.corpus import (
-    get_document_markdown as _get_markdown,
-)
-from lean.core.services.corpus import (
-    list_documents as _list_documents,
-)
+from lean.core.models import Chunk, IngestResult
 from lean.core.services.ingestion import ingest_pdf as _ingest_pdf
 from lean.core.services.search import search as _search
+from lean.core.tools.universal import *  # noqa: F403, F405
 
 
 @mcp_tool
@@ -72,46 +50,6 @@ async def search(
             chunk_type=chunk_type,
         )
     )
-
-
-@mcp_tool
-async def get_chunk(chunk_id: str) -> Chunk | None:
-    """Retrieve a single chunk by ID."""
-    import anyio
-
-    return await anyio.to_thread.run_sync(lambda: _get_chunk(chunk_id))
-
-
-@mcp_tool
-async def list_documents() -> list[DocumentSummary]:
-    """List all documents in the corpus."""
-    import anyio
-
-    return await anyio.to_thread.run_sync(_list_documents)
-
-
-@mcp_tool
-async def corpus_stats() -> CorpusStats:
-    """Show corpus statistics."""
-    import anyio
-
-    return await anyio.to_thread.run_sync(_corpus_stats)
-
-
-@mcp_tool
-async def get_document_markdown(document_id: str) -> str:
-    """Get the full markdown for a document."""
-    import anyio
-
-    return await anyio.to_thread.run_sync(lambda: _get_markdown(document_id))
-
-
-@mcp_tool
-async def delete_document(document_id: str) -> dict[str, str]:
-    """Delete a document and all its chunks."""
-    import anyio
-
-    return await anyio.to_thread.run_sync(lambda: _delete_document(document_id))
 
 
 @rest_route("GET", "/search")
@@ -151,33 +89,6 @@ async def ingest_rest(payload: dict[str, object]) -> dict[str, object]:
         raise HTTPException(status_code=400, detail="missing 'path' in payload")
     result = await _ingest_pdf(path)
     return result.model_dump(mode="json")
-
-
-@rest_route("GET", "/documents")
-async def list_documents_rest() -> list[dict[str, object]]:
-    docs = _list_documents()
-    return [d.model_dump(mode="json") for d in docs]
-
-
-@rest_route("GET", "/chunks/{chunk_id}")
-async def get_chunk_rest(chunk_id: str) -> dict[str, object]:
-    chunk = _get_chunk(chunk_id)
-    if chunk is None:
-        from fastapi import HTTPException
-
-        raise HTTPException(status_code=404, detail="chunk not found")
-    return chunk.model_dump(mode="json")
-
-
-@rest_route("GET", "/stats")
-async def corpus_stats_rest() -> dict[str, object]:
-    stats = _corpus_stats()
-    return stats.model_dump(mode="json")
-
-
-@rest_route("DELETE", "/documents/{document_id}")
-async def delete_document_rest(document_id: str) -> dict[str, str]:
-    return _delete_document(document_id)
 
 
 @cli_command(name="ingest")
@@ -249,50 +160,3 @@ def search_cli(
     for c in chunks:
         score_str = f"[{c.score:.4f}] " if c.score else ""
         typer.echo(f"{score_str}{c.section_path} (chunk {c.chunk_index})\n  {c.content[:200]}...\n")
-
-
-@cli_command(name="list-documents")
-def list_documents_cli(json_output: bool = typer.Option(False, "--json")) -> None:
-    """List all documents in the corpus."""
-    docs = _list_documents()
-    output(docs, json_output)
-
-
-@cli_command(name="corpus-stats")
-def corpus_stats_cli(json_output: bool = typer.Option(False, "--json")) -> None:
-    """Show corpus statistics."""
-    stats = _corpus_stats()
-    output(stats, json_output)
-
-
-@cli_command(name="get-chunk")
-def get_chunk_cli(
-    chunk_id: str,
-    json_output: bool = typer.Option(False, "--json"),
-) -> None:
-    """Retrieve a single chunk by ID."""
-    chunk = _get_chunk(chunk_id)
-    if chunk is None:
-        typer.echo("Chunk not found.", err=True)
-        raise typer.Exit(1)
-    output(chunk, json_output)
-
-
-@cli_command(name="get-markdown")
-def get_markdown_cli(
-    doc_id: str,
-    json_output: bool = typer.Option(False, "--json"),
-) -> None:
-    """Get the full markdown for a document."""
-    md = _get_markdown(doc_id)
-    if json_output:
-        typer.echo(json.dumps({"doc_id": doc_id, "markdown": md}, indent=2))
-    else:
-        typer.echo(md)
-
-
-@cli_command
-def delete(doc_id: str, json_output: bool = typer.Option(False, "--json")) -> None:
-    """Delete a document and all its chunks."""
-    result = _delete_document(doc_id)
-    output(result, json_output)

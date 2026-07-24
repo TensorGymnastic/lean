@@ -1,7 +1,9 @@
 """PDF LSS domain — tool surface.
 
-Auto-discovered by the YAML loader: every public decorated callable is
-registered as either an MCP tool, REST route, or CLI command.
+Universal tools (get_chunk, list_documents, corpus_stats, etc.) are
+imported from ``lean.core.tools.universal``. This module keeps only
+PDF-specific entry points: ingest_pdf, reingest, reingest-all, and
+the full search with year/author/section filters.
 """
 
 from __future__ import annotations
@@ -11,31 +13,12 @@ import json
 
 import typer
 
-from lean.core.adapters import (
-    cli_command,
-    mcp_tool,
-    output,
-    rest_route,
-)
-from lean.core.models import Chunk, CorpusStats, DocumentSummary, IngestResult
-from lean.core.services.corpus import (
-    corpus_stats as _corpus_stats,
-)
-from lean.core.services.corpus import (
-    delete_document as _delete_document,
-)
-from lean.core.services.corpus import (
-    get_chunk as _get_chunk,
-)
-from lean.core.services.corpus import (
-    get_document_markdown as _get_markdown,
-)
-from lean.core.services.corpus import (
-    list_documents as _list_documents,
-)
+from lean.core.adapters import cli_command, mcp_tool, output, rest_route
+from lean.core.models import Chunk, IngestResult
 from lean.core.services.ingestion import ingest_pdf as _ingest_pdf
 from lean.core.services.ingestion import reingest as _reingest
 from lean.core.services.search import search as _search
+from lean.core.tools.universal import *  # noqa: F403, F405
 
 
 @mcp_tool
@@ -75,49 +58,9 @@ async def search(
 
 
 @mcp_tool
-async def get_chunk(chunk_id: str) -> Chunk | None:
-    """Retrieve a single chunk by ID."""
-    import anyio
-
-    return await anyio.to_thread.run_sync(lambda: _get_chunk(chunk_id))
-
-
-@mcp_tool
-async def list_documents() -> list[DocumentSummary]:
-    """List all documents in the corpus, newest first."""
-    import anyio
-
-    return await anyio.to_thread.run_sync(_list_documents)
-
-
-@mcp_tool
-async def get_document_markdown(document_id: str) -> str:
-    """Get the extracted markdown for a document."""
-    import anyio
-
-    return await anyio.to_thread.run_sync(lambda: _get_markdown(document_id))
-
-
-@mcp_tool
-async def delete_document(document_id: str) -> dict[str, str]:
-    """Delete a document and all its chunks."""
-    import anyio
-
-    return await anyio.to_thread.run_sync(lambda: _delete_document(document_id))
-
-
-@mcp_tool
 async def reingest(document_id: str) -> IngestResult:
     """Re-ingest a document with current settings."""
     return await _reingest(document_id)
-
-
-@mcp_tool
-async def corpus_stats() -> CorpusStats:
-    """Show corpus statistics."""
-    import anyio
-
-    return await anyio.to_thread.run_sync(_corpus_stats)
 
 
 @rest_route("GET", "/search")
@@ -163,49 +106,6 @@ async def ingest_rest(payload: dict[str, object]) -> dict[str, object]:
     return result.model_dump(mode="json")
 
 
-@rest_route("GET", "/documents")
-async def list_documents_rest() -> list[dict[str, object]]:
-    """List all documents in the corpus, newest first."""
-    docs = _list_documents()
-    return [d.model_dump(mode="json") for d in docs]
-
-
-@rest_route("GET", "/chunks/{chunk_id}")
-async def get_chunk_rest(chunk_id: str) -> dict[str, object]:
-    """Retrieve a single chunk by ID."""
-    from fastapi import HTTPException
-
-    chunk = _get_chunk(chunk_id)
-    if chunk is None:
-        raise HTTPException(status_code=404, detail="chunk not found")
-    return chunk.model_dump(mode="json")
-
-
-@rest_route("GET", "/documents/{document_id}/markdown")
-async def get_document_markdown_rest(document_id: str) -> dict[str, str]:
-    """Get the extracted markdown for a document."""
-    from fastapi import HTTPException
-
-    try:
-        markdown = _get_markdown(document_id)
-    except KeyError:
-        raise HTTPException(status_code=404, detail="document not found") from None
-    return {"document_id": document_id, "markdown": markdown}
-
-
-@rest_route("DELETE", "/documents/{document_id}")
-async def delete_document_rest(document_id: str) -> dict[str, str]:
-    """Delete a document and all its chunks."""
-    return _delete_document(document_id)
-
-
-@rest_route("GET", "/stats")
-async def corpus_stats_rest() -> dict[str, object]:
-    """Show corpus statistics."""
-    stats = _corpus_stats()
-    return stats.model_dump(mode="json")
-
-
 @cli_command
 def ingest(path: str, json_output: bool = typer.Option(False, "--json")) -> None:
     """Ingest a PDF into the corpus."""
@@ -249,53 +149,6 @@ def search_cli(
         typer.echo(f"{score_str}{c.section_path} (chunk {c.chunk_index})\n  {c.content[:200]}...\n")
 
 
-@cli_command(name="list-documents")
-def list_documents_cli(json_output: bool = typer.Option(False, "--json")) -> None:
-    """List all documents in the corpus."""
-    docs = _list_documents()
-    output(docs, json_output)
-
-
-@cli_command(name="corpus-stats")
-def corpus_stats_cli(json_output: bool = typer.Option(False, "--json")) -> None:
-    """Show corpus statistics."""
-    stats = _corpus_stats()
-    output(stats, json_output)
-
-
-@cli_command(name="get-chunk")
-def get_chunk_cli(
-    chunk_id: str,
-    json_output: bool = typer.Option(False, "--json"),
-) -> None:
-    """Retrieve a single chunk by ID."""
-    chunk = _get_chunk(chunk_id)
-    if chunk is None:
-        typer.echo("Chunk not found.", err=True)
-        raise typer.Exit(1)
-    output(chunk, json_output)
-
-
-@cli_command(name="get-markdown")
-def get_markdown_cli(
-    doc_id: str,
-    json_output: bool = typer.Option(False, "--json"),
-) -> None:
-    """Get the extracted markdown for a document."""
-    md = _get_markdown(doc_id)
-    if json_output:
-        typer.echo(json.dumps({"doc_id": doc_id, "markdown": md}, indent=2))
-    else:
-        typer.echo(md)
-
-
-@cli_command
-def delete(doc_id: str, json_output: bool = typer.Option(False, "--json")) -> None:
-    """Delete a document and all its chunks."""
-    result = _delete_document(doc_id)
-    output(result, json_output)
-
-
 @cli_command(name="reingest")
 def reingest_cli(doc_id: str, json_output: bool = typer.Option(False, "--json")) -> None:
     """Re-ingest a document (re-extract with current settings)."""
@@ -310,6 +163,7 @@ def reingest_all(
 ) -> None:
     """Reingest all documents (smallest first, skips OCR'd unless --force)."""
     from lean.core.models.schemas import ExtractionMethod
+    from lean.core.services.corpus import list_documents as _list_documents
 
     docs = sorted(_list_documents(), key=lambda d: d.chunk_count)
     results: list[dict[str, object]] = []
