@@ -12,6 +12,7 @@ from __future__ import annotations
 import base64
 import logging
 from pathlib import Path
+from typing import Any
 
 import fitz  # PyMuPDF
 import httpx
@@ -52,6 +53,23 @@ class UnlimitedOCRExtractor:
         self._timeout = timeout
         self._max_tokens = max_tokens
         self._batch_size = batch_size
+
+    @classmethod
+    def apply_settings_defaults(cls, config: dict[str, Any], settings: Any) -> dict[str, Any]:
+        out = dict(config)
+        if not out.get("base_url"):
+            out["base_url"] = settings.ocr_base_url
+        if not out.get("model"):
+            out["model"] = settings.ocr_model
+        if not out.get("dpi"):
+            out["dpi"] = settings.ocr_dpi
+        if not out.get("timeout"):
+            out["timeout"] = settings.ocr_timeout_s
+        if not out.get("max_tokens"):
+            out["max_tokens"] = settings.ocr_max_tokens
+        if not out.get("batch_size"):
+            out["batch_size"] = settings.ocr_batch_size
+        return out
 
     def is_configured(self) -> bool:
         return bool(self._base_url)

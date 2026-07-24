@@ -197,6 +197,15 @@ class MarkerExtractor:
         self._force_ocr = force_ocr
         self._remote_url = remote_url
 
+    @classmethod
+    def apply_settings_defaults(cls, config: dict[str, Any], settings: Any) -> dict[str, Any]:
+        out = dict(config)
+        if not out.get("remote_url"):
+            out["remote_url"] = settings.marker_remote_url
+        if "force_ocr" not in out:
+            out["force_ocr"] = settings.marker_force_ocr
+        return out
+
     def is_configured(self) -> bool:
         if self._remote_url:
             return True

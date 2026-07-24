@@ -68,45 +68,24 @@ def _import_object(dotted: str) -> Any:
 
 
 def _merge_extractor_defaults(
-    adapter: str, config: dict[str, Any], settings: CoreSettings
+    cls: Any, config: dict[str, Any], settings: CoreSettings
 ) -> dict[str, Any]:
-    """Overlay ``settings`` defaults onto ``config`` for known backends.
+    """Overlay ``settings`` defaults onto ``config`` via polymorphic dispatch.
 
-    Settings is the single source of truth for marker/ocr tunables. If
-    the extractor config block has an empty string (or the field is
-    missing), the value from ``settings`` wins — so a YAML author can
-    declare ``settings.marker.remote_url`` once and have it apply to
-    every marker extractor in the chain.
-
-    Returns a new dict — does not mutate ``config``.
+    If the extractor class defines ``apply_settings_defaults``, it owns
+    the overlay logic. Otherwise, return config unchanged.
     """
-    out = dict(config)
-    name = adapter.rsplit(".", 1)[-1]
-    if name == "MarkerExtractor":
-        if not out.get("remote_url"):
-            out["remote_url"] = settings.marker_remote_url
-        if "force_ocr" not in out:
-            out["force_ocr"] = settings.marker_force_ocr
-    if name == "UnlimitedOCRExtractor":
-        if not out.get("base_url"):
-            out["base_url"] = settings.ocr_base_url
-        if not out.get("model"):
-            out["model"] = settings.ocr_model
-        if not out.get("dpi"):
-            out["dpi"] = settings.ocr_dpi
-        if not out.get("timeout"):
-            out["timeout"] = settings.ocr_timeout_s
-        if not out.get("max_tokens"):
-            out["max_tokens"] = settings.ocr_max_tokens
-        if not out.get("batch_size"):
-            out["batch_size"] = settings.ocr_batch_size
-    return out
+    apply = getattr(cls, "apply_settings_defaults", None)
+    if apply is not None:
+        result: dict[str, Any] = apply(config, settings)
+        return result
+    return dict(config)
 
 
 def _load_extractor(ref: ExtractorRef, settings: CoreSettings) -> Extractor:
     """Load an extractor adapter and instantiate it with its config."""
     obj_or_cls = _import_object(ref.adapter)
-    config = _merge_extractor_defaults(ref.adapter, ref.config, settings)
+    config = _merge_extractor_defaults(obj_or_cls, ref.config, settings)
     if isinstance(obj_or_cls, type):
         return obj_or_cls(**config)  # type: ignore[no-any-return]
     return obj_or_cls(config)  # type: ignore[no-any-return]

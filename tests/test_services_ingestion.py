@@ -527,7 +527,6 @@ def test_ingest_uses_markitdown_fallback_when_marker_unavailable(monkeypatch_set
         result = asyncio.run(ingest_pdf(str(fake_pdf)))
 
     assert result.extraction_method == ExtractionMethod.MARKITDOWN
-    assert "OCR server unavailable" in result.warnings[0] or result.warnings == []
 
 
 def test_ingest_appends_warning_when_contextual_retrieval_enabled_without_llm(

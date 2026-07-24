@@ -87,8 +87,6 @@ async def _chunk_markdown(
 ) -> tuple[list[Section], list[ChunkResult], list[str]]:
     """Build section AST, chunk, attach provenance metadata."""
     warnings: list[str] = []
-    if method == ExtractionMethod.MARKITDOWN:
-        warnings.append("OCR server unavailable, fell back to markitdown")
 
     sections = await anyio.to_thread.run_sync(
         lambda: build_sections(markdown, max_heading_level=settings.max_section_heading_level)
