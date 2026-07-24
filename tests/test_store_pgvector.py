@@ -28,7 +28,6 @@ def conn(db_url: str):
 
 
 def _make_doc(conn, sha: str = "test-sha-256") -> uuid.UUID:
-    """Insert a test document and return its UUID. Cleans up via test isolation."""
     from lean.core.store.documents import DocumentRepo
 
     return DocumentRepo(conn).upsert_document(
@@ -36,8 +35,6 @@ def _make_doc(conn, sha: str = "test-sha-256") -> uuid.UUID:
         source_sha256=sha,
         title="Test Doc",
         extraction_method="markitdown",
-        source_storage_path=f"sources/{sha}.pdf",
-        markdown_storage_path=f"markdown/{sha}.md",
         page_count=10,
     )
 
@@ -185,8 +182,6 @@ def test_upsert_document_dedup(conn) -> None:
         source_sha256="dedup-test",
         title="Updated Title",
         extraction_method="unlimited_ocr",
-        source_storage_path="sources/dedup-test.pdf",
-        markdown_storage_path="markdown/dedup-test.md",
     )
     assert doc_id_1 == doc_id_2  # same UUID
     assert AnalyticsRepo(conn).count_documents() >= 0  # no duplicate created
@@ -308,7 +303,6 @@ def test_chunk_type_filter_at_db_level(conn) -> None:
             content="VLM-described chart",
             embedding=[0.5] * 1024,
             chunk_type="image",
-            image_meta={"chart_type": "bar"},
             image_hash="a" * 64,
         ),
     ]
@@ -449,7 +443,6 @@ def test_find_duplicate_image_hashes_returns_real_duplicates(conn) -> None:
             content="desc a",
             embedding=[0.0] * 1024,
             chunk_type="image",
-            image_meta={"chart_type": "bar"},
             image_hash=dup_hash,
         ),
         ChunkRow(
@@ -463,7 +456,6 @@ def test_find_duplicate_image_hashes_returns_real_duplicates(conn) -> None:
             content="same image reused elsewhere",
             embedding=[0.0] * 1024,
             chunk_type="image",
-            image_meta={"chart_type": "bar"},
             image_hash=dup_hash,
         ),
         ChunkRow(
@@ -477,7 +469,6 @@ def test_find_duplicate_image_hashes_returns_real_duplicates(conn) -> None:
             content="unique image",
             embedding=[0.0] * 1024,
             chunk_type="image",
-            image_meta={"chart_type": "pie"},
             image_hash="unique123",
         ),
     ]
@@ -550,8 +541,6 @@ def test_reingested_at_updates_on_upsert(conn) -> None:
         source_sha256=sha,
         title="Updated",
         extraction_method="marker",
-        source_storage_path="sources/r.pdf",
-        markdown_storage_path="markdown/r.md",
     )
 
     with conn.conn.cursor(row_factory=dict_row) as cur:
