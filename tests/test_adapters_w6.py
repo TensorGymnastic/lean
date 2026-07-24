@@ -150,6 +150,48 @@ def test_discover_tools_returns_only_marked_callables() -> None:
     assert "not_decorated" not in tools
 
 
+def test_discover_tools_filters_unmarked_callables_without_skip_set() -> None:
+    """Characterization test: __lean_tool_kind__ alone filters non-tool names."""
+    from lean.core.adapters import discover_tools
+
+    class _FakeModule:
+        Chunk = type("Chunk", (), {})
+        CorpusStats = type("CorpusStats", (), {})
+        asyncio = type("asyncio", (), {})
+        json = type("json", (), {})
+
+        def _private_helper(self) -> None:
+            pass
+
+        def not_a_tool(self) -> int:
+            return 1
+
+        @staticmethod
+        @mcp_tool
+        def real_tool() -> int:
+            return 42
+
+    tools = discover_tools(_FakeModule)
+    assert "real_tool" in tools
+    assert "Chunk" not in tools
+    assert "CorpusStats" not in tools
+    assert "asyncio" not in tools
+    assert "json" not in tools
+    assert "_private_helper" not in tools
+    assert "not_a_tool" not in tools
+
+
+def test_discover_tools_on_real_domain_does_not_raise() -> None:
+    """discover_tools on the real pdf_lss tools module must not raise."""
+    import importlib
+
+    from lean.core.adapters import discover_tools
+
+    mod = importlib.import_module("lean.domains.pdf_lss.tools")
+    tools = discover_tools(mod)
+    assert len(tools) > 0
+
+
 def test_output_pydantic_model_human_mode() -> None:
     """``output(model, json_mode=False)`` calls ``model.model_dump_json``."""
     from pydantic import BaseModel

@@ -81,51 +81,11 @@ def cli_command[F: Callable[..., Any]](
 
 def discover_tools(module: object) -> dict[str, Callable[..., Any]]:
     """Return all decorated tool functions on ``module``, keyed by name."""
-    import sys
-
-    if hasattr(module, "__dict__"):
-        mod = module
-    else:
-        mod = sys.modules[getattr(module, "__name__", module.__class__.__name__)]
-    skip: set[str] = set()
-    skip.update(
-        {
-            "asyncio",
-            "fnmatch",
-            "json",
-            "Path",
-            "Any",
-            "typer",
-            "discover_tools",
-            "register_mcp",
-            "register_api",
-            "register_cli",
-            "tools",
-            "sys",
-            "mod",
-        }
-    )
-    skip.update(
-        {
-            "Chunk",
-            "CorpusStats",
-            "DocumentSummary",
-            "IngestResult",
-            "_ingest_pdf",
-            "_search",
-            "_get_chunk",
-            "_list_documents",
-            "_corpus_stats",
-            "_delete_document",
-            "_get_markdown",
-            "_output",
-        }
-    )
     tools: dict[str, Callable[..., Any]] = {}
-    for name in dir(mod):
-        if name.startswith("_") or name in skip:
+    for name in dir(module):
+        if name.startswith("_"):
             continue
-        attr = getattr(mod, name, None)
+        attr = getattr(module, name, None)
         if attr is None:
             continue
         if callable(attr) and hasattr(attr, "__lean_tool_kind__"):
