@@ -227,8 +227,6 @@ class CoreSettings(BaseSettings):
     log_level: str = "INFO"
 
     # --- Eval ---
-    eval_sample_size: int = 50
-    eval_k: int = 5
     eval_seed: int = 42
 
     # --- LLM sidecar (universal; optional) ---
@@ -295,8 +293,6 @@ class CoreSettings(BaseSettings):
             raise ValueError(f"rrf_k must be > 0, got {self.rrf_k}")
         if self.fetch_multiplier < 1:
             raise ValueError(f"fetch_multiplier must be >= 1, got {self.fetch_multiplier}")
-        if self.eval_k <= 0:
-            raise ValueError(f"eval_k must be > 0, got {self.eval_k}")
         if self.search_max_k < 1:
             raise ValueError(f"search_max_k must be >= 1, got {self.search_max_k}")
         if self.search_max_query_len < 1:
@@ -368,11 +364,6 @@ class CoreSettings(BaseSettings):
         return cls(**aliased)
 
 
-# Backward-compat alias — code paths that imported ``Settings`` before
-# the lean split. Domains should subclass ``CoreSettings``.
-Settings = CoreSettings
-
-
 # Singleton — per-subclass so subclasses don't share a cached instance.
 _settings_cache: dict[type, Any] = {}
 _active_yaml_path: Path | None = None
@@ -411,7 +402,6 @@ def clear_settings_cache() -> None:
 
 __all__ = [
     "CoreSettings",
-    "Settings",
     "get_settings",
     "clear_settings_cache",
 ]

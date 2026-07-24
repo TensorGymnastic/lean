@@ -52,23 +52,6 @@ class DomainRegistration[SettingsT: CoreSettings](ABC):
         """
         ...
 
-    def describe_one_image(
-        self,
-        name: str,
-        image: object,
-        settings: SettingsT,
-        prompt: str,
-    ) -> tuple[str, dict[str, object], str]:
-        """Describe one image via VLM. Default: raise NotImplementedError."""
-        raise NotImplementedError(
-            f"{type(self).__name__} does not support image description; "
-            "override describe_one_image() or set vlm_enabled=False."
-        )
-
-    def image_chunk_heading(self, image_meta: dict[str, object], idx: int) -> str:
-        """Build a heading for an image chunk. Default: ``Image {n}``."""
-        return f"Image {idx + 1}"
-
     def register_mcp(self, mcp: FastMCP, services: dict[str, object], settings: SettingsT) -> None:
         """Register MCP tools/resources/prompts on the supplied ``FastMCP`` instance.
 

@@ -23,8 +23,6 @@ def _settings() -> MagicMock:
     s.health_http_timeout = 5.0
     s.log_level = "INFO"
     s.eval_seed = 42
-    s.eval_sample_size = 50
-    s.eval_k = 5
     s.db_url = "postgresql://localhost/postgres"
     return s
 

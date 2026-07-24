@@ -44,15 +44,11 @@ class OpenAICompatibleLLM:
         self,
         prompt: str,
         *,
-        system: str | None = None,
         max_tokens: int = 500,
         temperature: float = 0.0,
     ) -> str:
         """Generate text via chat completions endpoint."""
-        messages: list[dict[str, str]] = []
-        if system:
-            messages.append({"role": "system", "content": system})
-        messages.append({"role": "user", "content": prompt})
+        messages: list[dict[str, str]] = [{"role": "user", "content": prompt}]
 
         resp = self._client.post(
             f"{self._base_url}/v1/chat/completions",

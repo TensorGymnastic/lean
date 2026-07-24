@@ -27,7 +27,6 @@ class LLMClient(Protocol):
         self,
         prompt: str,
         *,
-        system: str | None = None,
         max_tokens: int = 500,
         temperature: float = 0.0,
     ) -> str: ...

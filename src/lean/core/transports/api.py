@@ -6,27 +6,13 @@ Domains register their own routes via ``register_fn(app, services, settings)``.
 
 from __future__ import annotations
 
-import hmac
 from collections.abc import Callable
-from typing import Annotated, Any
+from typing import Any
 
-from fastapi import FastAPI, HTTPException, Request, Security, status
+from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from lean.core.config.settings import CoreSettings
-
-_security = HTTPBearer(auto_error=False)
-TokenCreds = Annotated[HTTPAuthorizationCredentials | None, Security(_security)]
-
-
-async def _verify_token(creds: TokenCreds, settings: CoreSettings) -> None:
-    expected = settings.api_key
-    if not creds or not hmac.compare_digest(creds.credentials, expected):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="invalid or missing bearer token",
-        )
 
 
 def build_api(
@@ -44,11 +30,6 @@ def build_api(
         version=version,
         description=description or f"{name} corpus API",
     )
-
-    async def _token_dep(creds: TokenCreds = Security(_security)) -> None:
-        await _verify_token(creds, settings)
-
-    _ = _token_dep  # noqa: F841 — wired into register_fn below
 
     @app.exception_handler(ValueError)
     async def _value_error_handler(_request: Request, exc: ValueError) -> JSONResponse:

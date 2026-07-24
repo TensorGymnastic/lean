@@ -129,8 +129,6 @@ success**. Watch `IngestResult.warnings` or `extraction_method` to detect this.
 
 | Field | Default | Notes |
 |---|---|---|
-| `eval_sample_size` | `50` | Chunks to sample. Validated `> 0`. |
-| `eval_k` | `5` | Top-k for hit_rate / MRR / NDCG / Recall |
 | `eval_seed` | `42` | Seeds the Python `random.Random(seed).sample(rows, n)` call that selects chunks — stable across Postgres versions and platforms. |
 
 ### `transport`
@@ -235,7 +233,6 @@ All constraints below are enforced at startup via pydantic
 | `chunk_hard_cap` | `> chunk_target_max` |
 | `rrf_k` | `> 0` |
 | `fetch_multiplier` | `>= 1` |
-| `eval_k` | `> 0` |
 | `search_max_k`, `search_max_query_len`, `search_fetch_k_cap`, `max_pdf_mb` | `>= 1` |
 | `vlm.enabled` | If true, `vlm.base_url` and `vlm.model` must be non-empty |
 | `vlm.detail` | One of `low`/`default`/`high` |

@@ -14,10 +14,9 @@ from __future__ import annotations
 
 import logging
 from functools import lru_cache
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-if TYPE_CHECKING:
-    from lean.core.store.search import SearchHit
+from lean.core.store.search import SearchHit
 
 logger = logging.getLogger(__name__)
 
@@ -52,12 +51,10 @@ def rerank(
 
     scored = sorted(zip(hits, scores, strict=True), key=lambda x: x[1], reverse=True)
 
-    from lean.core.store.search import SearchHit as SH
-
-    result: list[SH] = []
+    result: list[SearchHit] = []
     for hit, score in scored[:top_n]:
         result.append(
-            SH(
+            SearchHit(
                 chunk=hit.chunk.model_copy(update={"score": float(score)}),
                 score=float(score),
             )

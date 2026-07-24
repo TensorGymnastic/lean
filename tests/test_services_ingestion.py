@@ -471,7 +471,7 @@ def test_reingest_raises_keyerror_when_document_not_found(monkeypatch_settings):
 
 
 def test_ingest_uses_markitdown_fallback_when_marker_unavailable(monkeypatch_settings, fake_pdf):
-    """When marker raises MarkerNotInstalled, pipeline falls back to markitdown."""
+    """When marker raises BackendUnavailable, pipeline falls back to markitdown."""
 
     from lean.core.chunker.markdown_ast import Section
     from lean.core.chunker.recursive import ChunkResult

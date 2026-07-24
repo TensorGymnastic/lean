@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import importlib
 import logging
-from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -115,32 +114,11 @@ def _load_extractor(ref: ExtractorRef, settings: CoreSettings) -> Extractor:
 
 def _build_pipeline(domain_config: DomainConfig, settings: CoreSettings) -> Pipeline:
     extractors = [_load_extractor(ref, settings) for ref in domain_config.extractors]
-    hooks = _build_vlm_hooks(domain_config)
+    hooks = _build_vlm_hooks(domain_config, settings)
     return Pipeline(extractors, hooks=hooks)
 
 
-@lru_cache(maxsize=1)
-def _get_vlm_client(
-    base_url: str,
-    model: str,
-    api_key: str,
-    timeout: float,
-    detail: str,
-    disable_thinking: bool,
-) -> Any:
-    from lean.core.vlm import OpenAICompatibleVLM
-
-    return OpenAICompatibleVLM(
-        base_url=base_url,
-        model=model,
-        api_key=api_key,
-        timeout=timeout,
-        detail=detail,
-        disable_thinking=disable_thinking,
-    )
-
-
-def _build_vlm_hooks(domain_config: DomainConfig) -> DomainHooks:
+def _build_vlm_hooks(domain_config: DomainConfig, settings: CoreSettings) -> DomainHooks:
     """Build DomainHooks for VLM enrichment (empty hooks if VLM disabled)."""
     if not domain_config.vlm.enabled:
         return DomainHooks()
@@ -149,20 +127,24 @@ def _build_vlm_hooks(domain_config: DomainConfig) -> DomainHooks:
     prompt = _resolve_prompt(vlm, domain_config)
 
     from lean.core.extraction.pipeline_helpers import hash_image
+    from lean.core.vlm import OpenAICompatibleVLM
+
+    # Create the VLM client once at hook-build time — not per-image.
+    client = OpenAICompatibleVLM(
+        base_url=settings.vlm_base_url,
+        model=settings.vlm_model,
+        api_key=settings.vlm_api_key,
+        timeout=settings.vlm_timeout_s,
+        detail=settings.vlm_detail,
+        disable_thinking=settings.vlm_disable_thinking,
+    )
+    max_tokens = settings.vlm_max_tokens
 
     async def _describe_one(
         name: str, image: object, settings: CoreSettings, _: str
     ) -> tuple[str, dict[str, object], str]:
-        client = _get_vlm_client(
-            base_url=settings.vlm_base_url,
-            model=settings.vlm_model,
-            api_key=settings.vlm_api_key,
-            timeout=settings.vlm_timeout_s,
-            detail=settings.vlm_detail,
-            disable_thinking=settings.vlm_disable_thinking,
-        )
         raw = await anyio.to_thread.run_sync(
-            lambda: client.describe_image(image, prompt=prompt, max_tokens=settings.vlm_max_tokens)
+            lambda: client.describe_image(image, prompt=prompt, max_tokens=max_tokens)
         )
 
         parsed: dict[str, object]

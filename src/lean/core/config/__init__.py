@@ -7,9 +7,8 @@ The YAML overlay lives in
 
 from lean.core.config.settings import (
     CoreSettings,
-    Settings,
     clear_settings_cache,
     get_settings,
 )
 
-__all__ = ["CoreSettings", "Settings", "get_settings", "clear_settings_cache"]
+__all__ = ["CoreSettings", "get_settings", "clear_settings_cache"]

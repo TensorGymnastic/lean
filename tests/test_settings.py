@@ -23,9 +23,9 @@ def test_settings_from_env(monkeypatch) -> None:
     monkeypatch.setenv("MINIMAX_API_KEY", "sk-test-from-minimax-alias")
     monkeypatch.setenv("LEAN_MCP_API_KEY", _VALID_KEY)
 
-    from lean.core.config.settings import Settings
+    from lean.core.config.settings import CoreSettings
 
-    settings = Settings()
+    settings = CoreSettings()
 
     assert settings.db_url == "postgresql://postgres:postgres@localhost:54322/postgres"
     assert settings.hf_token == "test-hf-token"
@@ -52,9 +52,9 @@ def test_llm_api_key_alias_is_minimax(monkeypatch) -> None:
     monkeypatch.setenv("LEAN_MCP_API_KEY", _VALID_KEY)
     monkeypatch.setenv("MINIMAX_API_KEY", "sk-from-env-example")
 
-    from lean.core.config.settings import Settings
+    from lean.core.config.settings import CoreSettings
 
-    settings = Settings()
+    settings = CoreSettings()
     assert settings.llm_api_key == "sk-from-env-example"
 
 
@@ -64,9 +64,9 @@ def test_settings_defaults_for_optional_fields(monkeypatch) -> None:
     monkeypatch.setenv("HF_TOKEN", "token")
     monkeypatch.setenv("LEAN_MCP_API_KEY", _VALID_KEY)
 
-    from lean.core.config.settings import Settings
+    from lean.core.config.settings import CoreSettings
 
-    settings = Settings()
+    settings = CoreSettings()
     assert settings.ocr_base_url is not None
 
 
@@ -80,15 +80,15 @@ def test_transport_ports_require_env_or_yaml(monkeypatch) -> None:
     monkeypatch.setenv("HF_TOKEN", "token")
     monkeypatch.setenv("LEAN_MCP_API_KEY", _VALID_KEY)
 
-    from lean.core.config.settings import Settings
+    from lean.core.config.settings import CoreSettings
 
-    settings = Settings()
+    settings = CoreSettings()
     assert settings.mcp_http_port == 8765
     assert settings.api_port == 8766
 
     monkeypatch.setenv("MCP_HTTP_PORT", "9999")
     monkeypatch.setenv("API_PORT", "9998")
-    settings = Settings()
+    settings = CoreSettings()
     assert settings.mcp_http_port == 9999
     assert settings.api_port == 9998
 
@@ -107,11 +107,11 @@ def test_transport_ports_missing_without_env() -> None:
         }
     )
 
-    from lean.core.config.settings import Settings, clear_settings_cache
+    from lean.core.config.settings import CoreSettings, clear_settings_cache
 
     clear_settings_cache()
     with pytest.raises(ValidationError, match="MCP_HTTP_PORT"):
-        Settings()
+        CoreSettings()
 
 
 def test_get_settings_factory_caches_singleton(monkeypatch) -> None:
@@ -120,14 +120,14 @@ def test_get_settings_factory_caches_singleton(monkeypatch) -> None:
     monkeypatch.setenv("HF_TOKEN", "token")
     monkeypatch.setenv("LEAN_MCP_API_KEY", _VALID_KEY)
 
-    from lean.core.config.settings import Settings, clear_settings_cache, get_settings
+    from lean.core.config.settings import CoreSettings, clear_settings_cache, get_settings
 
     clear_settings_cache()
 
     s1 = get_settings()
     s2 = get_settings()
-    assert isinstance(s1, Settings)
-    assert isinstance(s2, Settings)
+    assert isinstance(s1, CoreSettings)
+    assert isinstance(s2, CoreSettings)
     assert s1 is s2
 
     clear_settings_cache()
@@ -160,10 +160,10 @@ def test_rejects_short_api_key(monkeypatch) -> None:
     monkeypatch.setenv("HF_TOKEN", "token")
     monkeypatch.setenv("LEAN_MCP_API_KEY", "short")
 
-    from lean.core.config.settings import Settings
+    from lean.core.config.settings import CoreSettings
 
     with pytest.raises(ValidationError, match="at least 16"):
-        Settings()
+        CoreSettings()
 
 
 def test_rejects_default_api_key(monkeypatch) -> None:
@@ -172,10 +172,10 @@ def test_rejects_default_api_key(monkeypatch) -> None:
     monkeypatch.setenv("HF_TOKEN", "token")
     monkeypatch.setenv("LEAN_MCP_API_KEY", "change-me")
 
-    from lean.core.config.settings import Settings
+    from lean.core.config.settings import CoreSettings
 
     with pytest.raises(ValidationError, match="change-me"):
-        Settings()
+        CoreSettings()
 
 
 @pytest.mark.parametrize(
@@ -193,10 +193,10 @@ def test_rejects_non_positive_resource_limits(monkeypatch, field, value) -> None
     monkeypatch.setenv("HF_TOKEN", "token")
     monkeypatch.setenv("LEAN_MCP_API_KEY", "x" * 32)
 
-    from lean.core.config.settings import Settings
+    from lean.core.config.settings import CoreSettings
 
     with pytest.raises(ValidationError, match=field):
-        Settings(**{field: value})
+        CoreSettings(**{field: value})
 
 
 def test_rejects_hard_cap_le_target_max(monkeypatch) -> None:
@@ -205,10 +205,10 @@ def test_rejects_hard_cap_le_target_max(monkeypatch) -> None:
     monkeypatch.setenv("HF_TOKEN", "token")
     monkeypatch.setenv("LEAN_MCP_API_KEY", "x" * 32)
 
-    from lean.core.config.settings import Settings
+    from lean.core.config.settings import CoreSettings
 
     with pytest.raises(ValidationError, match="chunk_hard_cap"):
-        Settings(chunk_target_max=500, chunk_hard_cap=500)
+        CoreSettings(chunk_target_max=500, chunk_hard_cap=500)
 
 
 def test_rejects_non_positive_rrf_k(monkeypatch) -> None:
@@ -217,10 +217,10 @@ def test_rejects_non_positive_rrf_k(monkeypatch) -> None:
     monkeypatch.setenv("HF_TOKEN", "token")
     monkeypatch.setenv("LEAN_MCP_API_KEY", "x" * 32)
 
-    from lean.core.config.settings import Settings
+    from lean.core.config.settings import CoreSettings
 
     with pytest.raises(ValidationError, match="rrf_k"):
-        Settings(rrf_k=0)
+        CoreSettings(rrf_k=0)
 
 
 def test_rejects_fetch_multiplier_below_one(monkeypatch) -> None:
@@ -229,22 +229,10 @@ def test_rejects_fetch_multiplier_below_one(monkeypatch) -> None:
     monkeypatch.setenv("HF_TOKEN", "token")
     monkeypatch.setenv("LEAN_MCP_API_KEY", "x" * 32)
 
-    from lean.core.config.settings import Settings
+    from lean.core.config.settings import CoreSettings
 
     with pytest.raises(ValidationError, match="fetch_multiplier"):
-        Settings(fetch_multiplier=0)
-
-
-def test_rejects_non_positive_eval_k(monkeypatch) -> None:
-    """eval_k must be > 0."""
-    monkeypatch.setenv("SUPABASE_DB_URL", "postgresql://localhost/postgres")
-    monkeypatch.setenv("HF_TOKEN", "token")
-    monkeypatch.setenv("LEAN_MCP_API_KEY", "x" * 32)
-
-    from lean.core.config.settings import Settings
-
-    with pytest.raises(ValidationError, match="eval_k"):
-        Settings(eval_k=0)
+        CoreSettings(fetch_multiplier=0)
 
 
 def test_vlm_enabled_requires_base_url_and_model(monkeypatch) -> None:
@@ -258,10 +246,10 @@ def test_vlm_enabled_requires_base_url_and_model(monkeypatch) -> None:
     monkeypatch.setenv("HF_TOKEN", "token")
     monkeypatch.setenv("LEAN_MCP_API_KEY", "x" * 32)
 
-    from lean.core.config.settings import Settings
+    from lean.core.config.settings import CoreSettings
 
     with pytest.raises(ValidationError, match="vlm.enabled"):
-        Settings(_env_file=None, domain_config={"vlm": {"enabled": True}})
+        CoreSettings(_env_file=None, domain_config={"vlm": {"enabled": True}})
 
 
 def test_rejects_invalid_vlm_detail(monkeypatch) -> None:
@@ -270,10 +258,10 @@ def test_rejects_invalid_vlm_detail(monkeypatch) -> None:
     monkeypatch.setenv("HF_TOKEN", "token")
     monkeypatch.setenv("LEAN_MCP_API_KEY", "x" * 32)
 
-    from lean.core.config.settings import Settings
+    from lean.core.config.settings import CoreSettings
 
     with pytest.raises(ValidationError, match="vlm_detail"):
-        Settings(vlm_detail="medium")
+        CoreSettings(vlm_detail="medium")
 
 
 def test_rejects_vlm_max_concurrency_below_one(monkeypatch) -> None:
@@ -282,10 +270,10 @@ def test_rejects_vlm_max_concurrency_below_one(monkeypatch) -> None:
     monkeypatch.setenv("HF_TOKEN", "token")
     monkeypatch.setenv("LEAN_MCP_API_KEY", "x" * 32)
 
-    from lean.core.config.settings import Settings
+    from lean.core.config.settings import CoreSettings
 
     with pytest.raises(ValidationError, match="vlm_max_concurrency"):
-        Settings(vlm_max_concurrency=0)
+        CoreSettings(vlm_max_concurrency=0)
 
 
 @pytest.mark.parametrize("port_field", ["mcp_http_port", "api_port"])
@@ -299,7 +287,7 @@ def test_rejects_port_out_of_range(monkeypatch, port_field, bad_port) -> None:
     monkeypatch.setenv("HF_TOKEN", "token")
     monkeypatch.setenv("LEAN_MCP_API_KEY", "x" * 32)
 
-    from lean.core.config.settings import Settings, clear_settings_cache
+    from lean.core.config.settings import CoreSettings, clear_settings_cache
 
     env_var_name = port_field.upper()
     if env_var_name not in ("MCP_HTTP_PORT", "API_PORT"):
@@ -309,4 +297,4 @@ def test_rejects_port_out_of_range(monkeypatch, port_field, bad_port) -> None:
     monkeypatch.setenv(env_var_name, str(bad_port))
     clear_settings_cache()
     with pytest.raises(ValidationError, match="port"):
-        Settings()
+        CoreSettings()

@@ -47,28 +47,8 @@ def test_ollama_generate_success() -> None:
         base_url="http://gpu-host:11434",
         model="qwen3.5:9b",
     )
-    result = llm.generate("Generate context", system="You are a helpful assistant.")
+    result = llm.generate("Generate context")
     assert "quality" in result
-
-
-@respx.mock
-def test_generate_with_system_prompt() -> None:
-    """System prompt is included in the request."""
-    route = respx.post("https://api.test.io/v1/chat/completions").mock(
-        return_value=httpx.Response(
-            200,
-            json={"choices": [{"message": {"content": "Response"}}]},
-        )
-    )
-
-    from lean.core.llm.openai_compatible import OpenAICompatibleLLM
-
-    llm = OpenAICompatibleLLM(base_url="https://api.test.io", model="test-model")
-    llm.generate("Hello", system="You are a robot")
-
-    request_body = route.calls[0].request.read().decode()
-    assert "system" in request_body
-    assert "robot" in request_body
 
 
 @respx.mock
