@@ -61,20 +61,12 @@ context: |
 # Per-artifact rules — keep proposals short and rigorous.
 rules:
   proposal:
-    - Include a "Why" section framed for a code reviewer, not a
-      stakeholder ("text X is duplicated across Y and Z" beats
-      "would be nice to consolidate").
-    - State the non-goals: what is explicitly OUT of scope for this
-      change, even if it sounds related.
+    - 'Include a "Why" section framed for a code reviewer, not a stakeholder ("text X is duplicated across Y and Z" beats "would be nice to consolidate").'
+    - "State the non-goals: what is explicitly OUT of scope for this change, even if it sounds related."
   design:
-    - Cite the file:line of every existing function being changed
-      or extended. Without an anchor, the next reader has to grep.
-    - When changing the public API of CoreSettings, note which
-      existing YAML manifests exercise the change.
+    - "Cite the file:line of every existing function being changed or extended. Without an anchor, the next reader has to grep."
+    - "When changing the public API of CoreSettings, note which existing YAML manifests exercise the change."
   tasks:
-    - Tasks should be independently shippable commits. Each task
-      ends with `make verify` GREEN before the next starts.
-    - For any behavior change, the task includes "write failing test
-      first" before "implement".
-    - For docs-only changes, the task references the doc-update rule
-      in AGENTS.md.
+    - "Tasks should be independently shippable commits. Each task ends with `make verify` GREEN before the next starts."
+    - "For any behavior change, the task includes write-failing-test-first before implement."
+    - "For docs-only changes, the task references the doc-update rule in AGENTS.md."
