@@ -63,7 +63,7 @@ def test_missing_extractor_module_raises_value_error(tmp_path: Path) -> None:
         "extractors:\n"
         "  - adapter: does.not.exist.MyExtractor\n"
         "    config: {}\n"
-        "tools: {module: x, enabled: [], disabled: []}\n"
+        "tools: {module: x}\n"
     )
     with pytest.raises(ValueError, match=r"(not in allowed prefixes|could not import adapter)"):
         build_from_yaml(cfg)

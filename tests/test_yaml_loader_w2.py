@@ -15,7 +15,6 @@ from lean.core.config.domain_config import (
     DomainMetadata,
     ExtractorRef,
     MetadataConfig,
-    ToolsConfig,
     VLMConfig,
 )
 from lean.core.config.settings import _apply_settings_overrides
@@ -47,13 +46,6 @@ def test_vlm_config_disabled_by_default() -> None:
     assert v.image_heading_format == "Image {n}"
 
 
-def test_tools_config_disabled_defaults_to_empty() -> None:
-    """ToolsConfig.disabled defaults to an empty list."""
-    t = ToolsConfig(module=None)
-    assert t.enabled == []
-    assert t.disabled == []
-
-
 def test_metadata_config_extractor_defaults_to_none() -> None:
     """MetadataConfig.extractor defaults to None (no custom PDF metadata extractor)."""
     m = MetadataConfig()
@@ -76,7 +68,7 @@ def test_domain_config_from_yaml_extras_go_to_settings(tmp_path: Path) -> None:
         "domain: {name: x, version: 0.1.0}\n"
         "extractors:\n"
         "  - adapter: lean.core.extraction.markitdown.MarkitdownExtractor\n"
-        "tools: {module: x, enabled: [], disabled: []}\n"
+        "tools: {module: x}\n"
         "embedding:\n"  # not a DomainConfig field
         "  model: my-model\n"
     )

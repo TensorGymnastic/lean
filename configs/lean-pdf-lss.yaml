@@ -67,5 +67,3 @@ metadata:
 
 tools:
   module: lean.domains.pdf_lss.tools
-  enabled: []
-  disabled: []

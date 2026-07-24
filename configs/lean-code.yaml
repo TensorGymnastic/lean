@@ -45,5 +45,3 @@ metadata:
 
 tools:
   module: lean.domains.code.tools
-  enabled: []
-  disabled: []

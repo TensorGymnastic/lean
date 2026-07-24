@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ExtractorRef(BaseModel):
@@ -60,11 +60,9 @@ class MetadataConfig(BaseModel):
 class ToolsConfig(BaseModel):
     """Where to find domain-specific tools (MCP tools, REST routes, CLI commands)."""
 
+    model_config = ConfigDict(extra="forbid")
+
     module: str | None = Field(default=None, description="Dotted path to a Python module to scan")
-    enabled: list[str] = Field(
-        default_factory=list, description="Names of tools to register from the module"
-    )
-    disabled: list[str] = Field(default_factory=list, description="Names of tools to exclude")
 
 
 class DomainMetadata(BaseModel):

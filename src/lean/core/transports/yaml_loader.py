@@ -211,26 +211,6 @@ def _load_tools_module(domain_config: DomainConfig) -> Any | None:
     return importlib.import_module(domain_config.tools.module)
 
 
-def _apply_tools_filter(module: Any, domain_config: DomainConfig) -> dict[str, Any]:
-    """Return a dict of filtered tool callables from the module."""
-    if module is None:
-        return {}
-    tools: dict[str, Any] = {}
-    for name in dir(module):
-        if name.startswith("_"):
-            continue
-        if domain_config.tools.enabled and name not in domain_config.tools.enabled:
-            continue
-        if name in domain_config.tools.disabled:
-            continue
-        attr = getattr(module, name, None)
-        if attr is None:
-            continue
-        if callable(attr) and hasattr(attr, "__lean_tool_kind__"):
-            tools[name] = attr
-    return tools
-
-
 def build_from_yaml(yaml_path: Path) -> TransportBuilder:
     """Read a domain YAML and return a fully-wired TransportBuilder."""
     domain_config = DomainConfig.from_yaml(yaml_path)

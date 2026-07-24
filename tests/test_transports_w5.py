@@ -222,7 +222,7 @@ def test_build_from_yaml_happy_path(tmp_path: Path) -> None:
         "extractors:\n"
         "  - adapter: lean.domains.pdf_lss.adapters.MarkitdownAdapter\n"
         "    config: {}\n"
-        "tools: {module: lean.domains.pdf_lss.tools, enabled: [], disabled: []}\n"
+        "tools: {module: lean.domains.pdf_lss.tools}\n"
     )
     with (
         patch("lean.core.transports.yaml_loader.set_pipeline"),
@@ -242,7 +242,7 @@ def test_yaml_loader_imports_no_such_module_raises_value_error(tmp_path: Path) -
         "extractors:\n"
         "  - adapter: this.module.does.not.exist.MyClass\n"
         "    config: {}\n"
-        "tools: {module: lean.domains.pdf_lss.tools, enabled: [], disabled: []}\n"
+        "tools: {module: lean.domains.pdf_lss.tools}\n"
     )
     with pytest.raises(ValueError):
         build_from_yaml(cfg)
@@ -258,7 +258,7 @@ def test_yaml_loader_top_level_unknown_keys_become_settings(tmp_path: Path) -> N
         "extractors:\n"
         "  - adapter: lean.domains.pdf_lss.adapters.MarkitdownAdapter\n"
         "    config: {}\n"
-        "tools: {module: lean.domains.pdf_lss.tools, enabled: [], disabled: []}\n"
+        "tools: {module: lean.domains.pdf_lss.tools}\n"
         "foo:\n"
         "  bar: baz\n"
     )
